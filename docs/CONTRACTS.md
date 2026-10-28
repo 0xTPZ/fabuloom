@@ -35,6 +35,14 @@ Dialogues are either `dialogue` with a `speaker_id` or `narration` with a `narra
 
 `TTSProvider` is a protocol. The `SimulatedTTSProvider` implements it without models, network access, files, or GPU. Its URI and word timings are explicitly marked `simulated`/`synthetic` and must not be treated as real acoustic measurements.
 
+`KokoroTTSProvider` is an optional real provider. It accepts `pt-BR` with
+voices `pf_dora`, `pm_alex`, and `pm_santa`, writes a measured WAV, and
+reports the actual duration from the file. Its current adapter supports only
+the contract's positive `speed` parameter. Pitch, volume, and arbitrary extras
+are rejected as unsupported. It returns empty word/phoneme/viseme timing
+arrays with `timing_source: "audio_duration_only"` when the provider has not
+supplied those timings.
+
 Synthesis speed and volume must be finite, non-boolean numbers greater than zero. Pitch must be a finite, non-boolean numeric offset; negative pitch is valid. `NaN`, positive/negative infinity, zero or negative speed/volume, and booleans are rejected with stable `TTSError` codes.
 
 ## Synchronization contract

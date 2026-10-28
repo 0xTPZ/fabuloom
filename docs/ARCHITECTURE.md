@@ -26,7 +26,7 @@ Project / Script
 
 The first implementation lives in `src/fabuloom_core` and is intentionally independent of all external engines. Domain models use stable IDs and `format_version: "0.1.0"`. JSON serialization is explicit and rejects unsupported minor versions.
 
-`TTSProvider` is a provider-neutral protocol. `SimulatedTTSProvider` is the only provider shipped in V0.1; it creates deterministic placeholder results and does not load a model or write audio.
+`TTSProvider` is a provider-neutral protocol. `SimulatedTTSProvider` remains the dependency-free provider for tests. The optional `KokoroTTSProvider` is lazy, loads one PT-BR pipeline on demand, reuses it, writes measured WAV output, and releases it through `close()`.
 
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
 
@@ -36,7 +36,7 @@ The editor will represent books, chapters, scenes, speakers, narration, directio
 
 ### TTS providers
 
-The provider contract should isolate text normalization, voice selection, synthesis, duration metadata, and errors. Kokoro is the first primary candidate; Piper is an offline fallback. Provider-specific models and environments must stay outside the public repository.
+The provider contract isolates text normalization, voice selection, synthesis, duration metadata, and errors. Kokoro is the first integrated provider and Piper remains an offline fallback candidate. The Kokoro adapter currently supports PT-BR voices `pf_dora`, `pm_alex`, and `pm_santa`, plus speed. It rejects unsupported pitch/volume/extras rather than silently ignoring them. Provider-specific models and environments stay outside the public repository.
 
 ### Character engine
 
@@ -56,4 +56,4 @@ SQLite is the planned local index for projects and metadata. Large media and mod
 
 ## License boundary
 
-Only original Fabuloom code is covered by the project MIT license. Every external integration needs a license/provenance record before distribution.
+Only original Fabuloom code is covered by the project MIT license. Kokoro model/package, runtime dependencies, voices, and generated media remain subject to their own licenses. Every external integration needs a license/provenance record before distribution; see `docs/KOKORO-INTEGRATION.md`.

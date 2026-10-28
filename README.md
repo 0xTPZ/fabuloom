@@ -20,14 +20,14 @@ Fabuloom should let a creator move from a written story to an editable scene tim
 
 ## Current status
 
-Fabuloom Core V0.1 now provides dependency-free, versioned Python contracts for projects, books, chapters, scenes, characters, narrators, dialogue, audio segments, animation events, timelines, and audio manifests. It also includes a provider-neutral TTS interface and a deterministic simulated provider for tests.
+Fabuloom Core V0.1 now provides dependency-free, versioned Python contracts for projects, books, chapters, scenes, characters, narrators, dialogue, audio segments, animation events, timelines, and audio manifests. It also includes a provider-neutral TTS interface and a deterministic simulated provider for tests. The V0.2 integration branch adds an optional, lazy Kokoro PT-BR provider; it does not add model weights to this repository.
 
-Real Kokoro, Piper, Animus, editor, animation, and video-compositor integrations are not implemented yet.
+Piper, Animus, editor, animation, and video-compositor integrations are not implemented yet.
 
 ## Technology direction
 
 - Python for audio generation and processing.
-- Kokoro for the first TTS integration.
+- Kokoro for the first optional TTS integration.
 - Piper for offline fallback.
 - TypeScript for the future interface.
 - FFmpeg for media export.
@@ -39,6 +39,6 @@ All dependencies and model licenses must be reviewed before integration. Large m
 
 Original Fabuloom Studio code is intended to use the MIT License. This choice applies only to original project material; third-party code, models, voices, and media remain subject to their own licenses.
 
-See the contribution, security, architecture, and getting-started documents for project boundaries.
+See `docs/KOKORO-INTEGRATION.md` for the optional provider, capability limits, offline demonstration, and third-party licensing notes. See the contribution, security, architecture, and getting-started documents for project boundaries.
 
 Core contract details and invariants are documented in `docs/CONTRACTS.md`. Test instructions are in `docs/TESTING.md`.

@@ -9,6 +9,21 @@ python -m unittest discover -s tests -v
 python .\examples\contract_demo.py
 ```
 
+The Kokoro unit tests use injected fakes and do not load a model. The real
+integration test is opt-in and requires an already available local model:
+
+```powershell
+$env:FABULOOM_RUN_KOKORO_REAL = "1"
+python -m unittest tests.integration.test_kokoro_real -v
+```
+
+The demonstration uses offline mode and writes only to
+`E:\Fabuloom\workspace\exports`:
+
+```powershell
+python .\examples\kokoro_demo.py --text "Uma história em português brasileiro." --voice pf_dora
+```
+
 The tests cover:
 
 - project validation;
@@ -24,5 +39,7 @@ The tests cover:
 - audio manifest round-trip;
 - simulated TTS determinism and error handling;
 - finite, non-boolean speed, volume, and pitch parameters.
+- Kokoro PT-BR voice selection, model reuse, output-path protection, WAV
+  validation, provider errors, and unavailable timing metadata.
 
 The simulated provider intentionally returns a placeholder URI and synthetic word timing. Passing these tests does not validate the quality or timing of a real TTS engine.
