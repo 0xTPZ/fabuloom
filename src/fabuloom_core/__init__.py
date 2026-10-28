@@ -23,6 +23,23 @@ from .models import (
 )
 from .serialization import deserialize_manifest, deserialize_project, serialize_manifest, serialize_project
 from .sync import AudioManifest, TimelineValidationError, validate_timeline
+from .kokoro import (
+    KOKORO_MODEL_ID,
+    KOKORO_MODEL_REVISION,
+    PT_BR_VOICES,
+    KokoroTTSProvider,
+    WavInfo,
+)
+from .narration import (
+    NarrationFailure,
+    NarrationProvider,
+    NarrationRun,
+    NarrationSynthesisError,
+    NarrationTextSegment,
+    compose_narration_manifest,
+    segment_text,
+    synthesize_narration,
+)
 from .tts import (
     SimulatedTTSProvider,
     SynthesisParameters,
@@ -40,10 +57,19 @@ __all__ = [
     "Book",
     "Chapter",
     "Character",
+    "KOKORO_MODEL_ID",
+    "KOKORO_MODEL_REVISION",
+    "KokoroTTSProvider",
+    "NarrationFailure",
+    "NarrationProvider",
+    "NarrationRun",
+    "NarrationSynthesisError",
+    "NarrationTextSegment",
     "Dialogue",
     "Narrator",
     "PhonemeTiming",
     "Project",
+    "PT_BR_VOICES",
     "Scene",
     "SimulatedTTSProvider",
     "SynthesisParameters",
@@ -55,10 +81,14 @@ __all__ = [
     "TimelineValidationError",
     "VisemeTiming",
     "WordTiming",
+    "WavInfo",
     "deserialize_manifest",
     "deserialize_project",
     "make_stable_id",
     "serialize_manifest",
     "serialize_project",
+    "segment_text",
+    "compose_narration_manifest",
+    "synthesize_narration",
     "validate_timeline",
 ]

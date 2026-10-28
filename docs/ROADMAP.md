@@ -17,9 +17,10 @@
 
 Deferred from V0.1: TypeScript shell and SQLite index.
 
-## Version 0.2 — next
+## Version 0.2 — in progress
 
-- Kokoro local provider.
+- Kokoro local provider — implemented in the Mission 005 integration branch;
+  pending review.
 - Piper offline provider.
 - Chapter/scene preparation.
 - WAV export and duration inspection.

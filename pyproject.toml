@@ -6,5 +6,12 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = []
 
+[project.optional-dependencies]
+kokoro = [
+    "kokoro==0.9.4",
+    "numpy",
+    "soundfile==0.14.0",
+]
+
 [tool.fabuloom]
 format-version = "0.1.0"
