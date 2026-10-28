@@ -1,0 +1,10 @@
+[project]
+name = "fabuloom-core"
+version = "0.1.0"
+description = "Versioned contracts and deterministic local core for Fabuloom Studio"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[tool.fabuloom]
+format-version = "0.1.0"

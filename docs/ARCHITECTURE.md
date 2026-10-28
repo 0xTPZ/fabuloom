@@ -22,6 +22,14 @@ Project / Script
   Export Adapters
 ```
 
+## V0.1 implementation
+
+The first implementation lives in `src/fabuloom_core` and is intentionally independent of all external engines. Domain models use stable IDs and `format_version: "0.1.0"`. JSON serialization is explicit and rejects unsupported minor versions.
+
+`TTSProvider` is a provider-neutral protocol. `SimulatedTTSProvider` is the only provider shipped in V0.1; it creates deterministic placeholder results and does not load a model or write audio.
+
+The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
+
 ### Script editor
 
 The editor will represent books, chapters, scenes, speakers, narration, direction notes, and reusable character references. The first data model should be serializable and versioned before a rich UI is built.

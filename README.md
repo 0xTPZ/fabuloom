@@ -20,7 +20,9 @@ Fabuloom should let a creator move from a written story to an editable scene tim
 
 ## Current status
 
-This repository contains the documentation and architectural foundation only. The editor, animation engine, TTS runtime, and compositor are not implemented in this mission.
+Fabuloom Core V0.1 now provides dependency-free, versioned Python contracts for projects, books, chapters, scenes, characters, narrators, dialogue, audio segments, animation events, timelines, and audio manifests. It also includes a provider-neutral TTS interface and a deterministic simulated provider for tests.
+
+Real Kokoro, Piper, Animus, editor, animation, and video-compositor integrations are not implemented yet.
 
 ## Technology direction
 
@@ -38,3 +40,5 @@ All dependencies and model licenses must be reviewed before integration. Large m
 Original Fabuloom Studio code is intended to use the MIT License. This choice applies only to original project material; third-party code, models, voices, and media remain subject to their own licenses.
 
 See the contribution, security, architecture, and getting-started documents for project boundaries.
+
+Core contract details and invariants are documented in `docs/CONTRACTS.md`. Test instructions are in `docs/TESTING.md`.

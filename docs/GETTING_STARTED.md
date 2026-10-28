@@ -1,6 +1,6 @@
 # Getting started
 
-This is the documentation-only foundation. There is no editor, TTS runtime, animation engine, or video compositor to run yet.
+The repository now contains the dependency-free Fabuloom Core V0.1 contracts. There is still no real TTS engine, editor, animation engine, or video compositor.
 
 ## Layout
 
@@ -15,6 +15,17 @@ This is the documentation-only foundation. There is no editor, TTS runtime, anim
 - Treat TopazioReader and Card Game Studio as read-only references.
 - Prefer interfaces and manifests before concrete integrations.
 - Record decisions and verification results as the project evolves.
+
+## Run the core checks
+
+From `E:\Fabuloom\studio`:
+
+```powershell
+python -m unittest discover -s tests -v
+python .\examples\contract_demo.py
+```
+
+No installation or network access is required for these checks.
 
 ## Future prerequisites
 
