@@ -49,7 +49,7 @@ let manifest = null;
 
 const characterMeta = {
   geometric: { name: "Lia", kind: "Rig geométrico · Canvas", motion: "Respiração sutil" },
-  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", motion: "Cabelo e respiração" },
+  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", motion: "Cabeça, braços, cabelo e respiração" },
 };
 
 for (const narration of NARRATIONS) {

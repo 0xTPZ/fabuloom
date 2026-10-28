@@ -28,6 +28,8 @@ function layerRotation(layer, pack, pose) {
   let rotation = 0;
   if (pack.bindings.head_rotation === layer.id) rotation += pose.head_rotation;
   if (pack.bindings.hair_sway === layer.id) rotation += pose.hair_sway;
+  if (pack.bindings.left_arm === layer.id) rotation += pose.left_arm;
+  if (pack.bindings.right_arm === layer.id) rotation += pose.right_arm;
   return rotation;
 }
 
@@ -60,7 +62,13 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
     if (pack.bindings.breathing === layer.id) {
       local = multiply(local, translate(0, (pose.breathing - 0.5) * frameHeight * 0.012));
     }
-    local = multiply(local, scale(drawWidth / intrinsic[0], (drawHeight / intrinsic[1]) * animatedY));
+    if (pack.bindings.brow_raise === layer.id) {
+      local = multiply(local, translate(0, -clamp(pose.brow_raise) * frameHeight * 0.018));
+    }
+    const breathingScale = pack.bindings.breathing === layer.id
+      ? 1 + (clamp(pose.breathing) - 0.5) * 0.018
+      : 1;
+    local = multiply(local, scale(drawWidth / intrinsic[0], (drawHeight / intrinsic[1]) * animatedY * breathingScale));
     local = multiply(local, translate(-anchor[0] * intrinsic[0], -anchor[1] * intrinsic[1]));
 
     const plan = {
@@ -69,7 +77,7 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
       drawWidth,
       drawHeight,
       intrinsic,
-      opacity: pack.bindings.breathing === layer.id ? 0.18 + clamp(pose.breathing) * 0.44 : 1,
+      opacity: layer.opacity === undefined ? 1 : clamp(layer.opacity),
     };
     plans.set(layer.id, plan);
     return plan;
@@ -82,7 +90,16 @@ export class LayeredCharacterRig {
   constructor() {
     this.speechAmplitude = 0;
     this.currentExpression = "neutral";
-    this.currentPose = { breathing: 0, head_rotation: 0, eye_open: 1, mouth_open: 0, hair_sway: 0 };
+    this.currentPose = {
+      breathing: 0,
+      head_rotation: 0,
+      eye_open: 1,
+      mouth_open: 0,
+      hair_sway: 0,
+      brow_raise: 0,
+      left_arm: 0,
+      right_arm: 0,
+    };
     this.nextBlinkAt = 4200;
     this.blinkStartedAt = -1;
   }
@@ -95,6 +112,9 @@ export class LayeredCharacterRig {
     const breathing = (Math.sin(seconds * Math.PI * 1.8) + 1) / 2;
     const headRotation = Math.sin(seconds * 0.48) * 0.024 + Math.sin(seconds * 0.21) * 0.012;
     const hairSway = Math.sin(seconds * 0.67) * 0.009;
+    const leftArm = Math.sin(seconds * 0.42 + 0.8) * 0.018;
+    const rightArm = Math.sin(seconds * 0.39 + 2.1) * 0.014;
+    const browRaise = isPlaying ? (Math.sin(seconds * 0.9) + 1) * 0.12 : 0;
     if (timeMs >= this.nextBlinkAt && this.blinkStartedAt < 0) {
       this.blinkStartedAt = timeMs;
       this.nextBlinkAt = timeMs + 3800 + ((Math.sin(seconds * 1.7) + 1) * 700);
@@ -106,7 +126,16 @@ export class LayeredCharacterRig {
       else if (elapsed <= 260) eyeOpen = (elapsed - 130) / 130;
       else this.blinkStartedAt = -1;
     }
-    this.currentPose = { breathing, head_rotation: headRotation, eye_open: eyeOpen, mouth_open: isPlaying ? this.speechAmplitude : 0, hair_sway: hairSway };
+    this.currentPose = {
+      breathing,
+      head_rotation: headRotation,
+      eye_open: eyeOpen,
+      mouth_open: isPlaying ? this.speechAmplitude : 0,
+      hair_sway: hairSway,
+      brow_raise: browRaise,
+      left_arm: leftArm,
+      right_arm: rightArm,
+    };
   }
 
   pose() { return { ...this.currentPose }; }

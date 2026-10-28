@@ -28,6 +28,9 @@ adds the responsive Studio UI foundation around that stage: a local-only shell,
 timeline, inspector, accessible transport controls, and original SVG branding.
 Mission 007A.1 adds an optional validated layered-character renderer and an
 original adult fantasy narrator pack while preserving the geometric rig.
+Mission 007A.2 refines Ari into a 16-node anatomical rig with independent
+head, face, hair, arms, hands and accessory transforms; the torso remains the
+breathing root and is not rotated by head motion.
 Piper, Animus, full editor, MP4 export, and cinematic animation are not
 implemented yet.
 

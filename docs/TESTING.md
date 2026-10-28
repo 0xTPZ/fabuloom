@@ -80,4 +80,6 @@ optional renderer with the dependency-free layered rig tests. Browser checks
 cover selection between the geometric and layered characters, expression
 switching, local PNG/SVG loading, Play/Pause/Stop while the layered character
 is active, desktop composition, mobile no-overflow, and empty console error /
-warning logs.
+warning logs. Mission 007A.2 additionally covers the 16-node Ari anatomical
+hierarchy, head-only rotation isolation, inherited facial transforms, arm /
+hair / brow bindings, and the refined original layer assets.
