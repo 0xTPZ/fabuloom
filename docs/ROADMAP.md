@@ -1,22 +1,23 @@
 # Roadmap
 
-## Foundation — current mission
+## Foundation — completed
 
 - Establish the isolated project layout.
 - Document the architecture and project boundaries.
 - Define public contribution and security rules.
 - Define private recovery and continuity records.
 
-## Version 0.1 — planned
+## Version 0.1 — completed in Mission 004
 
-- Versioned script and scene data model.
-- Minimal TypeScript shell.
-- Python audio service boundary.
-- Provider interface with mocked synthesis.
-- SQLite project index.
-- Basic segment manifest.
+- Versioned script and scene data model — complete.
+- Python provider-neutral TTS boundary — complete.
+- Deterministic simulated TTS provider — complete.
+- Audio segment and synchronization manifest — complete.
+- Automated offline tests and executable example — complete.
 
-## Version 0.2 — planned
+Deferred from V0.1: TypeScript shell and SQLite index.
+
+## Version 0.2 — next
 
 - Kokoro local provider.
 - Piper offline provider.
