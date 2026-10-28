@@ -31,6 +31,9 @@ const expressionSelect = document.querySelector("#expression-select");
 const characterName = document.querySelector("#character-name");
 const characterKind = document.querySelector("#character-kind");
 const characterMotion = document.querySelector("#character-motion");
+const presenceAvatar = document.querySelector("#presence-avatar");
+const presenceName = document.querySelector("#presence-name");
+const presenceKind = document.querySelector("#presence-kind");
 const sidebar = document.querySelector("#sidebar");
 const sidebarToggle = document.querySelector("#sidebar-toggle");
 const sidebarClose = document.querySelector("#sidebar-close");
@@ -48,8 +51,8 @@ let player = null;
 let manifest = null;
 
 const characterMeta = {
-  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", motion: "Respiração sutil" },
-  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", motion: "Cabeça, braços, cabelo e respiração" },
+  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", presence: "Personagem demonstrativo", motion: "Respiração sutil" },
+  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", presence: "Narrador ilustrado", motion: "Cabeça, braços, cabelo e respiração" },
 };
 
 for (const narration of NARRATIONS) {
@@ -64,6 +67,9 @@ function updateCharacterMeta() {
   characterName.textContent = meta.name;
   characterKind.textContent = meta.kind;
   characterMotion.textContent = meta.motion;
+  if (presenceAvatar) presenceAvatar.textContent = meta.name.slice(0, 1);
+  if (presenceName) presenceName.textContent = meta.name;
+  if (presenceKind) presenceKind.textContent = meta.presence;
 }
 
 function selectCharacter(characterId) {
