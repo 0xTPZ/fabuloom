@@ -35,7 +35,42 @@ and composes the existing `AudioManifest`; timeline durations come from the
 measured files, while word/phoneme/viseme timestamps remain empty when the
 provider does not supply them.
 
+### Character stage V0.3
+
+The local `frontend` stage separates `AudioTimelinePlayer`, `PlaybackClock`,
+RMS analysis, `CharacterRig`, Canvas rendering, manifest loading, and UI
+controls. The rig consumes a normalized speech amplitude signal and does not
+import Kokoro or Animus. Pauses produce zero speech amplitude while breathing,
+blinking, and subtle head motion continue. The amplitude path is explicitly a
+visual approximation, not phonetic alignment.
+
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
+
+### Studio UI foundation 006.1
+
+The frontend shell is organized into independent visual responsibilities:
+
+```text
+App shell
+  ├─ Sidebar / project context
+  ├─ Topbar / local status
+  └─ Studio workspace
+       ├─ Stage preview + transport
+       ├─ Timeline rows from the audio manifest
+       └─ Inspector (character, voice, diagnostics)
+```
+
+The UI reads the existing manifest and player contracts; it does not call
+Kokoro, Animus, or any private project directly. Design tokens live in
+`frontend/style.css`, and the shell uses CSS grid with responsive breakpoints
+for desktop, tablet, and narrow mobile screens. `frontend/assets/logo.svg` and
+`frontend/assets/favicon.svg` are original, lightweight vector assets.
+
+The sidebar collapses behind an accessible mobile menu below 920px. Transport
+buttons, the narration select, the seek slider, diagnostics disclosure, and
+navigation affordances retain labels and visible keyboard focus. The UI keeps
+the audio caveat explicit: RMS amplitude drives a visual mouth approximation;
+it is not word, phoneme, or viseme alignment.
 
 ### Script editor
 

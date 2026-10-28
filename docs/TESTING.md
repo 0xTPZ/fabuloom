@@ -47,3 +47,28 @@ The tests cover:
   and explicit overwrite control.
 
 The simulated provider intentionally returns a placeholder URI and synthetic word timing. Passing these tests does not validate the quality or timing of a real TTS engine.
+
+The V0.3 frontend tests are dependency-free Node tests using built-in
+TypeScript stripping:
+
+```powershell
+node --experimental-strip-types .\frontend\tests\test_timeline.mjs
+node --experimental-strip-types .\frontend\tests\test_audio.mjs
+python .\frontend\server.py
+```
+
+The last command serves the stage only on `127.0.0.1`. Browser validation
+covers manifest loading, real WAV playback, Play/Pause/Stop, seek, silence
+gaps, Canvas rendering, and the amplitude-driven mouth. The visual signal is
+not phonetic alignment.
+
+The UI foundation was also checked in a browser at these viewports:
+
+- 1920x1080 and 1366x768: two-column stage plus inspector;
+- 768x1024: single-column stage with a two-column inspector;
+- 390x844 and 360x800: single-column mobile layout, collapsed sidebar, and no
+  horizontal overflow.
+
+The browser check also confirmed keyboard-visible focus styles, the mobile
+sidebar open/close behavior, successful Play/Pause/Stop transitions, and no
+browser console errors or warnings during the local demo.

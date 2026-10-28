@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-labelledby="title desc">
+  <title id="title">Fabuloom Studio</title><desc id="desc">Identidade visual do Fabuloom Studio</desc>
+  <defs><linearGradient id="book" x1="8" x2="54" y1="7" y2="58" gradientUnits="userSpaceOnUse"><stop stop-color="#82b4ff"/><stop offset="1" stop-color="#715bc9"/></linearGradient></defs>
+  <g transform="translate(2 2)"><rect width="60" height="60" rx="15" fill="#0e1b2d" stroke="#263e60"/>
+    <path d="M12 16.5c8.1-.9 14.9 1.2 20 6.3v27c-5.1-5.1-11.9-7.2-20-6.3z" fill="url(#book)" stroke="#c3d8ff" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M52 16.5c-8.1-.9-14.9 1.2-20 6.3v27c5.1-5.1 11.9-7.2 20-6.3z" fill="#45598f" stroke="#c3d8ff" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M39.5 30.5c1.7-2 3.2-2 4.7 0s3 2 4.5 0M39.5 36c1.7-2 3.2-2 4.7 0s3 2 4.5 0" fill="none" stroke="#f0c675" stroke-linecap="round" stroke-width="2.5"/>
+  </g>
+  <text x="78" y="40" fill="#edf3ff" font-family="Inter,Segoe UI,sans-serif" font-size="24" font-weight="650" letter-spacing="-.7">Fabuloom <tspan fill="#81b1ff">Studio</tspan></text>
+</svg>

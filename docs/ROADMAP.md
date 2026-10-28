@@ -26,12 +26,12 @@ Deferred from V0.1: TypeScript shell and SQLite index.
 - WAV export and duration inspection.
 - Initial character identity model.
 
-## Version 0.3 — planned
+## Version 0.3 — in progress
 
-- Timeline editor.
-- Character animation adapter boundary.
-- Audio-to-animation synchronization.
-- Preview composition.
+- Timeline editor — deferred.
+- Character animation adapter boundary — demonstrator implemented in the local stage.
+- Audio-to-animation synchronization — amplitude-driven preview implemented; phonetic alignment deferred.
+- Preview composition — local Canvas stage implemented; export deferred.
 
 ## Later
 
