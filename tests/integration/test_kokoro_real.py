@@ -15,7 +15,7 @@ class RealKokoroIntegrationTests(unittest.TestCase):
     def test_pt_br_voice_produces_a_valid_wav(self) -> None:
         output_dir = Path(r"E:\Fabuloom\workspace\exports")
         output_path = output_dir / "kokoro-integration-test.wav"
-        provider = KokoroTTSProvider(output_dir=output_dir)
+        provider = KokoroTTSProvider(output_dir=output_dir, allow_overwrite=True)
         try:
             result = provider.synthesize(
                 SynthesisRequest(

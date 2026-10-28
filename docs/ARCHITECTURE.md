@@ -28,6 +28,13 @@ The first implementation lives in `src/fabuloom_core` and is intentionally indep
 
 `TTSProvider` is a provider-neutral protocol. `SimulatedTTSProvider` remains the dependency-free provider for tests. The optional `KokoroTTSProvider` is lazy, loads one PT-BR pipeline on demand, reuses it, writes measured WAV output, and releases it through `close()`.
 
+Narration preparation is separated from the provider. `segment_text` creates
+stable ordered source segments from paragraphs and sentence punctuation, with
+explicit pause policy. `synthesize_narration` turns each segment into a WAV
+and composes the existing `AudioManifest`; timeline durations come from the
+measured files, while word/phoneme/viseme timestamps remain empty when the
+provider does not supply them.
+
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
 
 ### Script editor

@@ -144,6 +144,29 @@ class KokoroProviderTests(unittest.TestCase):
                         provider.synthesize(make_request(), output_path)
                     self.assertEqual(context.exception.code, "INVALID_OUTPUT_PATH")
 
+    def test_existing_output_requires_explicit_overwrite_control(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "existing.wav"
+            path.write_bytes(b"existing")
+            provider = KokoroTTSProvider(
+                output_dir=directory,
+                pipeline_factory=lambda **_: FakePipeline(),
+                audio_writer=write_fake_wav,
+            )
+            with self.assertRaises(TTSError) as context:
+                provider.synthesize(make_request(), path)
+            self.assertEqual(context.exception.code, "OUTPUT_EXISTS")
+
+            overwrite_provider = KokoroTTSProvider(
+                output_dir=directory,
+                pipeline_factory=lambda **_: FakePipeline(),
+                audio_writer=write_fake_wav,
+                allow_overwrite=True,
+            )
+            overwrite_provider.synthesize(make_request(), path)
+            with wave.open(str(path), "rb") as output:
+                self.assertEqual(output.getnframes(), 2_400)
+
     def test_invalid_wav_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "invalid.wav"

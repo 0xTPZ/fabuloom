@@ -43,6 +43,14 @@ are rejected as unsupported. It returns empty word/phoneme/viseme timing
 arrays with `timing_source: "audio_duration_only"` when the provider has not
 supplied those timings.
 
+`NarrationTextSegment` preserves source order, paragraph/sentence indexes,
+source text, and an explicit punctuation/paragraph pause. `compose_narration_manifest`
+maps those segments to `AudioSegment` entries. Each entry stores the original
+text, provider, voice, audio URI, measured duration, `[start_ms, end_ms)`
+range, and `temporal_source: "measured_wav"`. The manifest may be partial only
+when the caller explicitly enables continue-on-error; failures are recorded by
+segment ID.
+
 Synthesis speed and volume must be finite, non-boolean numbers greater than zero. Pitch must be a finite, non-boolean numeric offset; negative pitch is valid. `NaN`, positive/negative infinity, zero or negative speed/volume, and booleans are rejected with stable `TTSError` codes.
 
 ## Synchronization contract

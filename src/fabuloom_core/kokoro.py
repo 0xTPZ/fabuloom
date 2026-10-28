@@ -7,8 +7,10 @@ its unit tests remain usable without models, GPU, or network access.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import threading
+import tempfile
 import time
 from typing import Any, Callable, Iterable
 import wave
@@ -66,6 +68,7 @@ class KokoroTTSProvider:
         *,
         pipeline_factory: PipelineFactory | None = None,
         audio_writer: AudioWriter | None = None,
+        allow_overwrite: bool = False,
     ) -> None:
         self.output_dir = (
             Path(output_dir)
@@ -74,6 +77,7 @@ class KokoroTTSProvider:
         )
         self._pipeline_factory = pipeline_factory
         self._audio_writer = audio_writer or _write_wav
+        self.allow_overwrite = allow_overwrite
         self._pipeline: Any | None = None
         self._lock = threading.RLock()
         self._model_load_count = 0
@@ -119,7 +123,13 @@ class KokoroTTSProvider:
                 factory = KPipeline
             started = time.perf_counter()
             try:
-                self._pipeline = factory(lang_code=KOKORO_LANGUAGE_CODE)
+                factory_kwargs = {"lang_code": KOKORO_LANGUAGE_CODE}
+                if self._pipeline_factory is None:
+                    # Kokoro 0.9.x accepts repo_id but not a revision argument.
+                    # The pinned revision is recorded from the validated local
+                    # model snapshot and surfaced in every synthesis result.
+                    factory_kwargs["repo_id"] = self.model_id
+                self._pipeline = factory(**factory_kwargs)
             except Exception as exc:
                 self._pipeline = None
                 raise TTSError("INITIALIZATION_FAILED", f"Kokoro pipeline could not initialize: {exc}") from exc
@@ -226,6 +236,11 @@ class KokoroTTSProvider:
         if candidate.suffix.lower() != ".wav":
             raise TTSError("INVALID_OUTPUT_PATH", "Kokoro output must use the .wav extension")
         candidate.parent.mkdir(parents=True, exist_ok=True)
+        if candidate.exists() and not self.allow_overwrite:
+            raise TTSError(
+                "OUTPUT_EXISTS",
+                "WAV output already exists; pass allow_overwrite=True to replace it explicitly",
+            )
         return candidate
 
 
@@ -262,11 +277,30 @@ def _write_wav(path: Path, chunks: Iterable[Any]) -> WavInfo:
     if not pieces:
         raise TTSError("EMPTY_AUDIO", "Kokoro returned only empty audio chunks")
     audio = np.concatenate(pieces)
+    temporary_path: Path | None = None
     try:
-        sf.write(str(path), audio, DEFAULT_SAMPLE_RATE, format="WAV", subtype="PCM_16")
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.stem}-",
+            suffix=".wav",
+            dir=path.parent,
+        )
+        os.close(descriptor)
+        temporary_path = Path(temporary_name)
+        sf.write(str(temporary_path), audio, DEFAULT_SAMPLE_RATE, format="WAV", subtype="PCM_16")
+        wav_info = _inspect_wav(temporary_path)
+        os.replace(temporary_path, path)
+        temporary_path = None
+        return wav_info
+    except TTSError:
+        raise
     except Exception as exc:
         raise TTSError("AUDIO_WRITE_FAILED", f"soundfile could not write WAV: {exc}") from exc
-    return _inspect_wav(path)
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def _inspect_wav(path: Path) -> WavInfo:

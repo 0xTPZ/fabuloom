@@ -18,6 +18,11 @@ def main() -> int:
     parser.add_argument("--text", default="Era uma vez uma história contada em voz alta.")
     parser.add_argument("--voice", default="pf_dora")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="explicitly allow replacing an existing WAV",
+    )
     args = parser.parse_args()
 
     # The demonstration is intentionally offline: an existing local cache is
@@ -26,7 +31,10 @@ def main() -> int:
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
 
-    provider = KokoroTTSProvider(output_dir=Path(r"E:\Fabuloom\workspace\exports"))
+    provider = KokoroTTSProvider(
+        output_dir=Path(r"E:\Fabuloom\workspace\exports"),
+        allow_overwrite=args.overwrite,
+    )
     try:
         result = provider.synthesize(
             SynthesisRequest(

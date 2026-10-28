@@ -30,6 +30,16 @@ from .kokoro import (
     KokoroTTSProvider,
     WavInfo,
 )
+from .narration import (
+    NarrationFailure,
+    NarrationProvider,
+    NarrationRun,
+    NarrationSynthesisError,
+    NarrationTextSegment,
+    compose_narration_manifest,
+    segment_text,
+    synthesize_narration,
+)
 from .tts import (
     SimulatedTTSProvider,
     SynthesisParameters,
@@ -50,6 +60,11 @@ __all__ = [
     "KOKORO_MODEL_ID",
     "KOKORO_MODEL_REVISION",
     "KokoroTTSProvider",
+    "NarrationFailure",
+    "NarrationProvider",
+    "NarrationRun",
+    "NarrationSynthesisError",
+    "NarrationTextSegment",
     "Dialogue",
     "Narrator",
     "PhonemeTiming",
@@ -72,5 +87,8 @@ __all__ = [
     "make_stable_id",
     "serialize_manifest",
     "serialize_project",
+    "segment_text",
+    "compose_narration_manifest",
+    "synthesize_narration",
     "validate_timeline",
 ]

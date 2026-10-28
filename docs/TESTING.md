@@ -22,6 +22,7 @@ The demonstration uses offline mode and writes only to
 
 ```powershell
 python .\examples\kokoro_demo.py --text "Uma história em português brasileiro." --voice pf_dora
+python .\examples\kokoro_story_demo.py --voice pf_dora
 ```
 
 The tests cover:
@@ -41,5 +42,8 @@ The tests cover:
 - finite, non-boolean speed, volume, and pitch parameters.
 - Kokoro PT-BR voice selection, model reuse, output-path protection, WAV
   validation, provider errors, and unavailable timing metadata.
+- sentence/paragraph segmentation, long-text limits, punctuation pauses,
+  ordered manifest composition, voice consistency, partial failure reporting,
+  and explicit overwrite control.
 
 The simulated provider intentionally returns a placeholder URI and synthetic word timing. Passing these tests does not validate the quality or timing of a real TTS engine.

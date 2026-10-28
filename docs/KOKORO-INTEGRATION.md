@@ -22,6 +22,14 @@ first synthesis request and reused until `close()` is called.
 The output path must be a `.wav` file inside
 `E:\Fabuloom\workspace\exports`. Model weights, caches, generated audio, and
 virtual environments are external to this repository and are not published.
+Existing output files are protected by default. Replacing one requires the
+explicit `allow_overwrite=True` provider option or the `--overwrite` demo flag.
+
+Kokoro 0.9.x accepts a model repository identifier but not a revision argument
+on `KPipeline`. The adapter therefore passes the pinned model ID and records
+the validated local snapshot revision `f3ff3571791e39611d31c381e3a41a3af07b4987`
+in result metadata. A future runtime that supports revision pinning should make
+that pin explicit at pipeline construction.
 
 ## Local demonstration
 
@@ -42,6 +50,18 @@ python E:\Fabuloom\studio\examples\kokoro_demo.py `
 The command prints the provider, voice, language, measured duration, WAV
 format, model-load time, synthesis time, output path, and the explicit
 unavailability of word/phoneme/viseme timing.
+
+For a multi-segment original short story, run:
+
+```powershell
+python E:\Fabuloom\studio\examples\kokoro_story_demo.py --voice pf_dora
+```
+
+This writes one WAV per ordered sentence/paragraph fragment and a JSON
+manifest in the same export directory. Segment start/end values use measured
+WAV durations; punctuation and paragraph gaps are explicit composition pauses,
+not invented speech timestamps. Re-running the same demo requires
+`--overwrite`.
 
 ## Dependencies and licensing
 
