@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fabuloom Character Stage</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">FABULOOM STUDIO · V0.3</p>
+          <h1>Character Stage</h1>
+          <p class="subtitle">Palco 2D local para narração, ritmo e personagem.</p>
+        </div>
+        <div class="badge"><span class="dot"></span> Local only</div>
+      </header>
+
+      <section class="stage-card" aria-label="Palco visual">
+        <canvas id="stage" width="960" height="540"></canvas>
+        <div class="stage-caption">
+          <span>Personagem demonstrativo · rig independente do provedor TTS</span>
+          <span id="state-label">stopped</span>
+        </div>
+      </section>
+
+      <section class="controls-card" aria-label="Controles de reprodução">
+        <label class="field-label" for="narration-select">Narração</label>
+        <select id="narration-select"></select>
+        <div class="transport">
+          <button id="play" class="primary">Play</button>
+          <button id="pause">Pause</button>
+          <button id="stop">Stop</button>
+          <span id="time-label" class="time">0:00 / 0:00</span>
+        </div>
+        <input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="Posição da narração" />
+        <p id="status-label" class="status">Inicializando palco local…</p>
+      </section>
+
+      <section class="diagnostics-card" aria-label="Diagnóstico">
+        <div>
+          <p class="eyebrow">DIAGNÓSTICO</p>
+          <h2>Sincronização de reprodução</h2>
+        </div>
+        <pre id="diagnostics">Carregando…</pre>
+      </section>
+
+      <footer>Amplitude RMS controla a abertura da boca; isso não é alinhamento fonético.</footer>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

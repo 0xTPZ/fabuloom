@@ -47,3 +47,17 @@ The tests cover:
   and explicit overwrite control.
 
 The simulated provider intentionally returns a placeholder URI and synthetic word timing. Passing these tests does not validate the quality or timing of a real TTS engine.
+
+The V0.3 frontend tests are dependency-free Node tests using built-in
+TypeScript stripping:
+
+```powershell
+node --experimental-strip-types .\frontend\tests\test_timeline.mjs
+node --experimental-strip-types .\frontend\tests\test_audio.mjs
+python .\frontend\server.py
+```
+
+The last command serves the stage only on `127.0.0.1`. Browser validation
+covers manifest loading, real WAV playback, Play/Pause/Stop, seek, silence
+gaps, Canvas rendering, and the amplitude-driven mouth. The visual signal is
+not phonetic alignment.

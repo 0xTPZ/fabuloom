@@ -35,6 +35,15 @@ and composes the existing `AudioManifest`; timeline durations come from the
 measured files, while word/phoneme/viseme timestamps remain empty when the
 provider does not supply them.
 
+### Character stage V0.3
+
+The local `frontend` stage separates `AudioTimelinePlayer`, `PlaybackClock`,
+RMS analysis, `CharacterRig`, Canvas rendering, manifest loading, and UI
+controls. The rig consumes a normalized speech amplitude signal and does not
+import Kokoro or Animus. Pauses produce zero speech amplitude while breathing,
+blinking, and subtle head motion continue. The amplitude path is explicitly a
+visual approximation, not phonetic alignment.
+
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
 
 ### Script editor

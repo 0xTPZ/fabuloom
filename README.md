@@ -22,7 +22,9 @@ Fabuloom should let a creator move from a written story to an editable scene tim
 
 Fabuloom Core V0.1 now provides dependency-free, versioned Python contracts for projects, books, chapters, scenes, characters, narrators, dialogue, audio segments, animation events, timelines, and audio manifests. It also includes a provider-neutral TTS interface and a deterministic simulated provider for tests. The V0.2 integration branch adds an optional, lazy Kokoro PT-BR provider; it does not add model weights to this repository.
 
-Piper, Animus, editor, animation, and video-compositor integrations are not implemented yet.
+The V0.3 branch adds a local Canvas character-stage demonstrator with real
+manifest-backed playback and amplitude-driven mouth motion. Piper, Animus,
+full editor, MP4 export, and cinematic animation are not implemented yet.
 
 ## Technology direction
 
