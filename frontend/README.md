@@ -14,6 +14,12 @@ The visual rig does not import Kokoro or Animus. Its mouth signal is amplitude
 based and intentionally not phonetic alignment. Blinking, breathing, and head
 motion continue during pauses and do not depend on audio amplitude.
 
+The Character Stage can switch between the original geometric rig and the
+optional layered pack for Ari, an adult fantasy narrator. The pack is validated
+before local PNG/SVG assets are loaded; layer transforms, pivots, draw order,
+expressions, blinking, head motion, mouth openness, breathing, and subtle hair
+sway are handled by `src/layered-character.ts`.
+
 ## Run locally
 
 From `E:\Fabuloom\studio`:

@@ -26,5 +26,9 @@ test("rejects traversal and remote assets", () => {
 test("rejects invalid numeric pivots", () => {
   for(const n of [NaN,Infinity,-0.1,1.1]) { const p=base(); p.layers[0].anchor[0]=n; assert.throws(()=>validateCharacterPack(p)); }
 });
+test("validates optional normalized layer size", () => {
+  const p=base(); p.layers[0].size=[0.8,0.9]; assert.equal(validateCharacterPack(p).layers[0].size[0],0.8);
+  p.layers[0].size=[1.1,0.9]; assert.throws(()=>validateCharacterPack(p),/layer size/);
+});
 test("rejects unsupported animation target", () => { const p=base(); p.bindings.mouth_open="absent"; assert.throws(()=>validateCharacterPack(p)); });
 test("rejects expression overriding absent layer", () => { const p=base(); p.expressions[0].overrides={nope:"assets/a.png"}; assert.throws(()=>validateCharacterPack(p)); });

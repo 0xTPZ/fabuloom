@@ -1,5 +1,8 @@
 import { AudioTimelinePlayer } from "./audio.ts";
 import { CanvasCharacterRenderer, CharacterRig } from "./character.ts";
+import { FANTASY_NARRATOR_PACK } from "./fantasy-narrator-pack.mjs";
+import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
+import { validateCharacterPack } from "./character-pack.mjs";
 import { validateManifest } from "./timeline.ts";
 
 const NARRATIONS = [
@@ -23,21 +26,72 @@ const timelineList = document.querySelector("#timeline-list");
 const segmentCount = document.querySelector("#segment-count");
 const activeSegmentLabel = document.querySelector("#active-segment");
 const characterState = document.querySelector("#character-state");
+const characterSelect = document.querySelector("#character-select");
+const expressionSelect = document.querySelector("#expression-select");
+const characterName = document.querySelector("#character-name");
+const characterKind = document.querySelector("#character-kind");
+const characterMotion = document.querySelector("#character-motion");
 const sidebar = document.querySelector("#sidebar");
 const sidebarToggle = document.querySelector("#sidebar-toggle");
 const sidebarClose = document.querySelector("#sidebar-close");
 const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
 
-const rig = new CharacterRig();
-const renderer = new CanvasCharacterRenderer(canvas, rig);
+const geometricRig = new CharacterRig();
+const layeredRig = new LayeredCharacterRig();
+const geometricRenderer = new CanvasCharacterRenderer(canvas, geometricRig);
+const layeredRenderer = new LayeredCharacterRenderer(canvas, layeredRig, FANTASY_NARRATOR_PACK);
+let activeRig = geometricRig;
+let activeRenderer = geometricRenderer;
+let activeCharacterId = "geometric";
+let layeredReady = false;
 let player = null;
 let manifest = null;
+
+const characterMeta = {
+  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", motion: "Respiração sutil" },
+  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", motion: "Cabelo e respiração" },
+};
 
 for (const narration of NARRATIONS) {
   const option = document.createElement("option");
   option.value = narration.url;
   option.textContent = narration.label;
   narrationSelect.appendChild(option);
+}
+
+function updateCharacterMeta() {
+  const meta = characterMeta[activeCharacterId];
+  characterName.textContent = meta.name;
+  characterKind.textContent = meta.kind;
+  characterMotion.textContent = meta.motion;
+}
+
+function selectCharacter(characterId) {
+  if (characterId === "fantasy" && !layeredReady) {
+    characterSelect.value = "geometric";
+    return;
+  }
+  activeCharacterId = characterId;
+  activeRig = characterId === "fantasy" ? layeredRig : geometricRig;
+  activeRenderer = characterId === "fantasy" ? layeredRenderer : geometricRenderer;
+  if (characterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
+  updateCharacterMeta();
+  updateUi(player?.state || "stopped");
+}
+
+async function prepareLayeredCharacter() {
+  const fantasyOption = characterSelect.querySelector('option[value="fantasy"]');
+  try {
+    validateCharacterPack(FANTASY_NARRATOR_PACK);
+    await layeredRenderer.load();
+    layeredReady = true;
+    fantasyOption.disabled = false;
+    fantasyOption.textContent = "Ari · guardião das histórias";
+  } catch (_error) {
+    fantasyOption.disabled = true;
+    fantasyOption.textContent = "Ari · asset indisponível";
+    characterKind.textContent = "Pack em camadas · indisponível";
+  }
 }
 
 function formatTime(milliseconds) {
@@ -199,6 +253,8 @@ pauseButton.addEventListener("click", () => player?.pause());
 stopButton.addEventListener("click", () => player?.stop());
 seekInput.addEventListener("input", () => player?.seek(Number(seekInput.value)));
 narrationSelect.addEventListener("change", () => loadNarration(narrationSelect.value));
+characterSelect.addEventListener("change", () => selectCharacter(characterSelect.value));
+expressionSelect.addEventListener("change", () => { if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value); });
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
 sidebarBackdrop?.addEventListener("click", () => setSidebarOpen(false));
@@ -207,16 +263,18 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape") se
 function frame(timeMs) {
   if (player) {
     player.tick();
-    rig.setSpeechAmplitude(player.amplitude());
-    rig.update(timeMs, player.state === "playing");
+    activeRig.setSpeechAmplitude(player.amplitude());
+    activeRig.update(timeMs, player.state === "playing");
     updateUi(player.state);
   } else {
-    rig.setSpeechAmplitude(0);
-    rig.update(timeMs, false);
+    activeRig.setSpeechAmplitude(0);
+    activeRig.update(timeMs, false);
   }
-  renderer.render();
+  activeRenderer.render();
   requestAnimationFrame(frame);
 }
 
+updateCharacterMeta();
+prepareLayeredCharacter();
 loadNarration(NARRATIONS[0].url);
 requestAnimationFrame(frame);

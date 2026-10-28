@@ -1,0 +1,56 @@
+/** Original Fabuloom demo pack: an adult fantasy storyteller with layered overlays. */
+export const FANTASY_NARRATOR_PACK = {
+  format: "fabuloom.character/0.1",
+  id: "fantasy-narrator-ari",
+  name: "Ari, o guardião das histórias",
+  layers: [
+    {
+      id: "portrait",
+      asset: "assets/characters/fantasy-narrator/portrait.png",
+      parent: null,
+      anchor: [0.5, 0.5],
+      position: [0.5, 0.56],
+      size: [0.56, 0.95],
+      z: 0,
+    },
+    {
+      id: "eyes",
+      asset: "assets/characters/fantasy-narrator/eyes.svg",
+      parent: "portrait",
+      anchor: [0.5, 0.5],
+      position: [0.48, 0.2],
+      size: [0.22, 0.055],
+      z: 2,
+    },
+    {
+      id: "mouth",
+      asset: "assets/characters/fantasy-narrator/mouth.svg",
+      parent: "portrait",
+      anchor: [0.5, 0.5],
+      position: [0.48, 0.33],
+      size: [0.13, 0.045],
+      z: 3,
+    },
+    {
+      id: "breath",
+      asset: "assets/characters/fantasy-narrator/breath.svg",
+      parent: "portrait",
+      anchor: [0.5, 0.5],
+      position: [0.5, 0.77],
+      size: [0.45, 0.3],
+      z: 4,
+    },
+  ],
+  expressions: [
+    { id: "neutral", overrides: {} },
+    { id: "smile", overrides: { mouth: "assets/characters/fantasy-narrator/mouth-smile.svg" } },
+  ],
+  bindings: {
+    head_rotation: "portrait",
+    eye_open: "eyes",
+    mouth_open: "mouth",
+    breathing: "breath",
+    hair_sway: "portrait",
+    expression: "mouth",
+  },
+};

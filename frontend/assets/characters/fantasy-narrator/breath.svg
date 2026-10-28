@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" role="img" aria-label="Brilho sutil da respiração">
+  <defs><radialGradient id="glow"><stop stop-color="#e1b76c" stop-opacity=".23"/><stop offset="1" stop-color="#8a6de0" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="210" cy="128" rx="180" ry="108" fill="url(#glow)"/>
+</svg>

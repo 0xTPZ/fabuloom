@@ -46,6 +46,25 @@ visual approximation, not phonetic alignment.
 
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
 
+### Layered character engine 007A.1
+
+`LayeredCharacterRenderer` is an optional Canvas backend for the data-only
+`fabuloom.character/0.1` pack contract. It resolves parent transforms in the
+parent asset's intrinsic frame, applies normalized pivots and sizes, sorts
+layers by `z`, and uses same-origin local image resources only. Expressions
+replace a layer asset without changing the pack identity.
+
+`LayeredCharacterRig` consumes the same provider-independent pose boundary as
+the geometric rig. Head rotation, hair sway, blinking, mouth openness,
+breathing, and expression selection are mapped to pack bindings. The existing
+geometric renderer remains the default and is selectable at runtime; audio
+clocking, Kokoro, and the manifest are not coupled to either character backend.
+
+The first demo uses an original generated adult fantasy narrator portrait as a
+base layer plus small vector overlays. This demonstrates the runtime contract,
+but complete production-grade painted layer separation remains a future asset
+authoring task.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

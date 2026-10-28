@@ -26,6 +26,8 @@ The V0.3 branch adds a local Canvas character-stage demonstrator with real
 manifest-backed playback and amplitude-driven mouth motion. Mission 006.1
 adds the responsive Studio UI foundation around that stage: a local-only shell,
 timeline, inspector, accessible transport controls, and original SVG branding.
+Mission 007A.1 adds an optional validated layered-character renderer and an
+original adult fantasy narrator pack while preserving the geometric rig.
 Piper, Animus, full editor, MP4 export, and cinematic animation are not
 implemented yet.
 

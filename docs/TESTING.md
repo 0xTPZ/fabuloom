@@ -54,6 +54,7 @@ TypeScript stripping:
 ```powershell
 node --experimental-strip-types .\frontend\tests\test_timeline.mjs
 node --experimental-strip-types .\frontend\tests\test_audio.mjs
+node --experimental-strip-types --test .\frontend\tests\test_layered_character.mjs
 python .\frontend\server.py
 ```
 
@@ -72,3 +73,11 @@ The UI foundation was also checked in a browser at these viewports:
 The browser check also confirmed keyboard-visible focus styles, the mobile
 sidebar open/close behavior, successful Play/Pause/Stop transitions, and no
 browser console errors or warnings during the local demo.
+
+Mission 007A.1 additionally validates the layered pack contract with
+`node --test .\frontend\tests\test_character_pack.mjs`, and checks the
+optional renderer with the dependency-free layered rig tests. Browser checks
+cover selection between the geometric and layered characters, expression
+switching, local PNG/SVG loading, Play/Pause/Stop while the layered character
+is active, desktop composition, mobile no-overflow, and empty console error /
+warning logs.

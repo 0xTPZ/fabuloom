@@ -34,6 +34,7 @@ export function validateCharacterPack(pack) {
     if (layer.parent !== null) identifier(layer.parent,"layer parent");
     point(layer.anchor,"layer anchor");
     point(layer.position,"layer position");
+    if (layer.size !== undefined) point(layer.size,"layer size");
     valid(Number.isInteger(layer.z) && layer.z >= -1000 && layer.z <= 1000,"Invalid z index");
   }
   for (const layer of pack.layers) {

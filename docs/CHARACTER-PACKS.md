@@ -1,6 +1,6 @@
-# Layered Character Packs (proposal V0.1)
+# Layered Character Packs (V0.1)
 
-Status: initial contract for Mission 007A, **not yet integrated with the Character Stage renderer**.
+Status: contract and optional Canvas renderer integrated on Mission 007A.1 / PR #4.
 
 ## Purpose
 
@@ -15,7 +15,12 @@ Fabuloom characters must be independent of Kokoro, the audio clock, the Canvas b
 - `expressions`: named replacement sprite assets for specific layers.
 - `bindings`: semantic animation channels pointing to layer IDs.
 
-All locations and pivots use normalized coordinates in [0, 1]. This describes **data structure only**; a renderer must explicitly specify transform composition and reference dimensions before rendering production assets.
+All locations and pivots use normalized coordinates in [0, 1]. The renderer
+uses each asset's intrinsic pixel frame as the reference for its children:
+`position` selects a point in the parent frame, `anchor` selects the asset
+point placed there, `size` (when supplied) scales relative to that frame, and
+`z` controls stable back-to-front order. A missing `size` uses a deterministic
+renderer default. This keeps the data contract independent of Canvas.
 
 The current list of animation channels is `head_rotation`, `eye_open`, `mouth_open`, `breathing`, `left_arm`, `right_arm`, `hair_sway`, and `expression`.
 
@@ -39,6 +44,27 @@ The current list of animation channels is `head_rotation`, `eye_open`, `mouth_op
 }
 ```
 
+## Character Stage integration
+
+`frontend/src/layered-character.ts` provides the optional
+`LayeredCharacterRenderer` and `LayeredCharacterRig`. It loads only validated
+same-origin local assets, resolves parent transforms, pivots and draw order,
+and maps the existing stage signals to head rotation, eye openness, mouth
+openness, breathing, hair sway, and expression overrides. The geometric
+`CharacterRig` remains available and is selectable beside the layered pack.
+
+The first original demo pack is
+`frontend/src/fantasy-narrator-pack.mjs`. Its generated portrait and small
+vector animation overlays live under
+`frontend/assets/characters/fantasy-narrator/`. The pack is intentionally
+provider-independent: it does not import Kokoro, Animus, or the audio player.
+
+The base portrait is currently a polished single illustrated layer with
+independent vector accents for the first runtime proof. Full production asset
+separation (painted body, head, hair, eyes, mouth, clothing and arms as
+independently authored art) remains a future character-authoring task; this
+demo does not claim that the generated portrait is a final production pack.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.
@@ -47,11 +73,10 @@ The validator is only a first defense. A future secure importer must enforce arc
 
 ## Next implementation steps
 
-1. Confirm the code and node tests run under the project's supported Node version.
-2. Specify deterministic transform rules, draw ordering, expression blending and sizes.
-3. Implement a separate layered renderer behind an existing Character Stage interface.
-4. Supply *licensed, original* layered sprites and a side-by-side toggle against the existing demo rig.
-5. Test playback, seek, reduced motion, mobile screens, loading errors and no-regression.
-6. Plan a dedicated character pack editor in Mission 007B.
+1. Expand the original demo into independently authored body, head, hair, eyes, mouth, clothing and arm assets.
+2. Add explicit loading progress and asset integrity metadata.
+3. Add stronger image decoding limits and a sandboxed importer for untrusted packs.
+4. Test playback, seek, reduced motion, mobile screens, loading errors and no-regression.
+5. Plan a dedicated character pack editor in Mission 007B.
 
 No private Topazioverse art, proprietary Animus code, model weights or personal data should be included by default. The open format should allow contributors to author their own characters.
