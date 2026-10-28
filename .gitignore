@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+.turbo/
+
+# Local project state
+.env
+.env.*
+*.local
+workspace/
+data/
+cache/
+tmp/
+logs/
+
+# Audio/video and model artifacts
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.mp4
+*.mov
+*.mkv
+*.onnx
+*.pth
+*.pt
+*.safetensors
+*.bin
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

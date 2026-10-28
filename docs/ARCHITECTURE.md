@@ -1,0 +1,51 @@
+# Architecture
+
+## Boundary
+
+Fabuloom Studio is a new project. TopazioReader and Card Game Studio may inform requirements, but they are not runtime dependencies and are not modified by this project.
+
+## Proposed layers
+
+```text
+Project / Script
+        |
+        v
+  Scene Director ---- Character Engine
+        |                    |
+        v                    v
+  Audio Timeline <------ TTS Providers
+        |
+        v
+  Video Compositor
+        |
+        v
+  Export Adapters
+```
+
+### Script editor
+
+The editor will represent books, chapters, scenes, speakers, narration, direction notes, and reusable character references. The first data model should be serializable and versioned before a rich UI is built.
+
+### TTS providers
+
+The provider contract should isolate text normalization, voice selection, synthesis, duration metadata, and errors. Kokoro is the first primary candidate; Piper is an offline fallback. Provider-specific models and environments must stay outside the public repository.
+
+### Character engine
+
+Characters should be described by stable identities and backend-neutral actions. A future Animus adapter may implement one backend, but Fabuloom must not import Animus internals directly.
+
+### Synchronization
+
+Audio segments should produce a manifest containing stable IDs, source text, voice ID, audio path, duration, and optional word/phoneme timing. Timing must be generated from actual media, not estimated only from character count.
+
+### Composition and export
+
+The compositor should combine voice, music, ambience, SFX, and animation through an explicit timeline. FFmpeg is the initial export boundary. Exporters should be deterministic and keep source assets unchanged.
+
+## Storage
+
+SQLite is the planned local index for projects and metadata. Large media and model files should be stored in project-local managed locations under the isolated Fabuloom workspace, with manifests and checksums rather than binary assets in Git.
+
+## License boundary
+
+Only original Fabuloom code is covered by the project MIT license. Every external integration needs a license/provenance record before distribution.
