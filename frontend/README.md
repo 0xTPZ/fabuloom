@@ -4,6 +4,12 @@ This is a local-only Canvas 2D prototype. It loads the real narration
 manifest from `E:\Fabuloom\workspace\exports`, decodes its WAV segments with
 Web Audio, and drives a reusable character rig from live RMS amplitude.
 
+The UI uses a small dark-blue/violet/gold design system defined in
+`style.css`. The shell contains a project sidebar, breadcrumb topbar, stage
+preview, manifest-backed timeline, character/voice inspector, diagnostics
+disclosure, and responsive transport controls. It is designed for desktop,
+tablet, and narrow mobile layouts and remains local-only.
+
 The visual rig does not import Kokoro or Animus. Its mouth signal is amplitude
 based and intentionally not phonetic alignment. Blinking, breathing, and head
 motion continue during pauses and do not depend on audio amplitude.
@@ -29,3 +35,6 @@ TypeScript stripping:
 ```powershell
 node --experimental-strip-types .\frontend\tests\test_timeline.mjs
 ```
+
+The original vector brand assets are in `frontend/assets/`. No bundler or
+global dependency is required for the local preview.

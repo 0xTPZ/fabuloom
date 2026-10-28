@@ -3,51 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fabuloom Character Stage</title>
+    <meta name="theme-color" content="#09111f" />
+    <meta name="description" content="Fabuloom Studio: palco local para narracao, ritmo e personagem." />
+    <title>Fabuloom Studio · Character Stage</title>
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">FABULOOM STUDIO · V0.3</p>
-          <h1>Character Stage</h1>
-          <p class="subtitle">Palco 2D local para narração, ritmo e personagem.</p>
+    <div class="app-shell">
+      <aside id="sidebar" class="sidebar" aria-label="Navegação principal">
+        <div class="sidebar-head">
+          <a class="brand" href="#studio" aria-label="Fabuloom Studio"><img src="./assets/logo.svg" alt="Fabuloom Studio" /></a>
+          <button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Fechar menu">×</button>
         </div>
-        <div class="badge"><span class="dot"></span> Local only</div>
-      </header>
-
-      <section class="stage-card" aria-label="Palco visual">
-        <canvas id="stage" width="960" height="540"></canvas>
-        <div class="stage-caption">
-          <span>Personagem demonstrativo · rig independente do provedor TTS</span>
-          <span id="state-label">stopped</span>
-        </div>
-      </section>
-
-      <section class="controls-card" aria-label="Controles de reprodução">
-        <label class="field-label" for="narration-select">Narração</label>
-        <select id="narration-select"></select>
-        <div class="transport">
-          <button id="play" class="primary">Play</button>
-          <button id="pause">Pause</button>
-          <button id="stop">Stop</button>
-          <span id="time-label" class="time">0:00 / 0:00</span>
-        </div>
-        <input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="Posição da narração" />
-        <p id="status-label" class="status">Inicializando palco local…</p>
-      </section>
-
-      <section class="diagnostics-card" aria-label="Diagnóstico">
-        <div>
-          <p class="eyebrow">DIAGNÓSTICO</p>
-          <h2>Sincronização de reprodução</h2>
-        </div>
-        <pre id="diagnostics">Carregando…</pre>
-      </section>
-
-      <footer>Amplitude RMS controla a abertura da boca; isso não é alinhamento fonético.</footer>
-    </main>
+        <div class="project-switcher"><span class="project-kicker">PROJETO ATIVO</span><strong>Histórias de Lia</strong><span class="project-meta"><span class="status-dot"></span> Salvo localmente</span><span class="project-chevron" aria-hidden="true">⌄</span></div>
+        <nav class="main-nav" aria-label="Seções do Studio">
+          <a class="nav-item" href="#dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+          <a class="nav-item" href="#projects"><span class="nav-icon">▦</span><span>Projetos</span></a>
+          <a class="nav-item" href="#script"><span class="nav-icon">≡</span><span>Editor de roteiro</span></a>
+          <a class="nav-item active" href="#studio" aria-current="page"><span class="nav-icon">✦</span><span>Character Stage</span><span class="nav-pill">V0.3</span></a>
+          <a class="nav-item" href="#library"><span class="nav-icon">▤</span><span>Biblioteca</span></a>
+          <a class="nav-item" href="#settings"><span class="nav-icon">⚙</span><span>Configurações</span></a>
+        </nav>
+        <div class="sidebar-foot"><div class="local-card"><span class="local-card-icon">⌁</span><div><strong>Modo local</strong><span>Seus arquivos ficam aqui.</span></div></div><span class="version-label">FABULOOM STUDIO V0.3</span></div>
+      </aside>
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Fechar menu" hidden></button>
+      <div class="workspace">
+        <header class="topbar">
+          <div class="topbar-left"><button id="sidebar-toggle" class="icon-button mobile-menu" type="button" aria-label="Abrir menu" aria-expanded="false">☰</button><div class="breadcrumbs"><span>Projetos</span><span class="breadcrumb-separator">/</span><strong>Histórias de Lia</strong><span class="breadcrumb-separator">/</span><strong>Character Stage</strong></div></div>
+          <div class="topbar-actions"><span class="save-state"><span class="status-dot"></span> Salvo há 2 min</span><span class="local-badge"><span>●</span> LOCAL ONLY</span><button class="icon-button" type="button" aria-label="Configurações">⚙</button><button class="avatar" type="button" aria-label="Perfil">A</button></div>
+        </header>
+        <main id="studio" class="content">
+          <section class="hero-row" aria-labelledby="page-title"><div><p class="eyebrow">CHARACTER STAGE <span class="eyebrow-dot">·</span> V0.3</p><h1 id="page-title">Dê movimento à<br /><em>sua história.</em></h1><p class="hero-subtitle">Um palco para dar voz, ritmo e presença aos seus personagens.</p></div><div class="hero-actions"><button class="secondary-button" type="button" disabled title="Disponível em uma próxima versão">＋ Nova cena</button><button class="more-button" type="button" aria-label="Mais ações">•••</button></div></section>
+          <div class="studio-grid">
+            <div class="main-column">
+              <section class="panel stage-panel" aria-label="Palco visual"><div class="panel-heading stage-heading"><div><span class="section-label">PREVIEW</span><h2>Palco visual</h2></div><span class="live-badge"><span class="live-dot"></span> AO VIVO</span></div><div class="stage-wrap"><canvas id="stage" width="960" height="540"></canvas><div class="stage-overlay"><span id="stage-status-text">Palco pronto</span><span class="overlay-time" id="overlay-time">00:00:00</span></div></div><div class="stage-footer"><div class="character-presence"><span class="presence-avatar">L</span><div><strong>Lia</strong><span>Personagem demonstrativo</span></div></div><span id="state-label" class="stage-state">stopped</span></div></section>
+              <section class="panel timeline-panel" aria-label="Linha do tempo da narração"><div class="panel-heading timeline-heading"><div><span class="section-label">TIMELINE</span><h2>Narração e ritmo</h2></div><div class="timeline-meta"><span id="segment-count">0 segmentos</span><span class="timeline-separator">·</span><span id="active-segment">Pronto para reproduzir</span></div></div><div class="timeline-ruler" aria-hidden="true"><span>00:00</span><span>00:15</span><span>00:30</span><span>00:45</span><span>01:00</span></div><div id="timeline-list" class="timeline-list"><div class="timeline-empty">Carregando a narração local…</div></div><div class="timeline-legend"><span><i class="legend-swatch narration-swatch"></i> Narração</span><span><i class="legend-swatch music-swatch"></i> Trilha sonora</span><span class="legend-note">Tempos medidos do áudio · sem alinhamento fonético</span></div></section>
+              <section class="panel transport-panel" aria-label="Controles de reprodução"><div class="transport-top"><div class="transport-buttons"><button id="play" class="transport-button primary" type="button"><span>▶</span> Play</button><button id="pause" class="transport-button" type="button"><span>Ⅱ</span> Pause</button><button id="stop" class="transport-button" type="button"><span>■</span> Stop</button></div><span id="time-label" class="time">0:00 / 0:00</span></div><div class="seek-row"><span>0:00</span><input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="Posição da narração" /><span id="seek-end">0:00</span></div><p id="status-label" class="status"><span class="status-dot"></span> Inicializando palco local…</p></section>
+            </div>
+            <aside class="inspector-column" aria-label="Inspetor do palco">
+              <section class="panel inspector-panel"><div class="panel-heading"><div><span class="section-label">INSPECTOR</span><h2>Personagem</h2></div><button class="panel-menu" type="button" aria-label="Opções do personagem">•••</button></div><div class="character-card"><div class="character-art">✦</div><div><strong>Lia</strong><span>Rig demonstrativo · 2D</span></div><span class="ready-indicator">●</span></div><div class="inspector-row"><span>Estado</span><strong id="character-state">Repouso</strong></div><div class="inspector-row"><span>Expressão</span><strong>Neutra</strong></div><div class="inspector-row"><span>Movimento</span><strong>Respiração sutil</strong></div></section>
+              <section class="panel voice-panel"><div class="panel-heading"><div><span class="section-label">NARRAÇÃO</span><h2>Voz e áudio</h2></div><span class="provider-chip">KOKORO</span></div><label class="field-label" for="narration-select">Arquivo de narração</label><select id="narration-select"></select><div class="voice-info"><span class="voice-avatar">P</span><div><strong>Português brasileiro</strong><span>Voz selecionada no manifesto</span></div></div><div class="audio-capability"><span>◉</span><span>Amplitude em tempo real</span><span class="capability-ok">Ativo</span></div></section>
+              <details class="panel diagnostics-panel"><summary><span><span class="section-label">DIAGNÓSTICO</span><strong>Detalhes técnicos</strong></span><span class="summary-chevron">⌄</span></summary><pre id="diagnostics">Carregando…</pre></details>
+            </aside>
+          </div>
+          <footer><span>Fabuloom Studio</span><span>Amplitude RMS controla a abertura da boca; isso não é alinhamento fonético.</span><span>© 2026</span></footer>
+        </main>
+      </div>
+    </div>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
