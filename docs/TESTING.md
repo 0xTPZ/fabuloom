@@ -18,8 +18,11 @@ The tests cover:
 - duplicate IDs and invalid references;
 - negative and out-of-bounds times;
 - forbidden audio overlap;
+- simultaneous audio on different tracks and half-open touching ranges;
 - allowed and forbidden animation overlap;
+- nested animation overlap detection;
 - audio manifest round-trip;
-- simulated TTS determinism and error handling.
+- simulated TTS determinism and error handling;
+- finite, non-boolean speed, volume, and pitch parameters.
 
 The simulated provider intentionally returns a placeholder URI and synthetic word timing. Passing these tests does not validate the quality or timing of a real TTS engine.

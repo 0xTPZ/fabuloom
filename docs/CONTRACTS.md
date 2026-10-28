@@ -35,18 +35,21 @@ Dialogues are either `dialogue` with a `speaker_id` or `narration` with a `narra
 
 `TTSProvider` is a protocol. The `SimulatedTTSProvider` implements it without models, network access, files, or GPU. Its URI and word timings are explicitly marked `simulated`/`synthetic` and must not be treated as real acoustic measurements.
 
+Synthesis speed and volume must be finite, non-boolean numbers greater than zero. Pitch must be a finite, non-boolean numeric offset; negative pitch is valid. `NaN`, positive/negative infinity, zero or negative speed/volume, and booleans are rejected with stable `TTSError` codes.
+
 ## Synchronization contract
 
 All time values are integer milliseconds. An `AudioSegment` stores `start_ms`, `end_ms`, and `duration_ms`; validation requires `duration_ms == end_ms - start_ms`.
 
 Each segment may contain word, phoneme, and viseme timing arrays. Their times are relative to the segment and are optional. When a provider has no phoneme or viseme data, the arrays remain empty; no precision is invented.
 
-`AudioManifest` combines audio segments and animation events for a timeline. The validator enforces:
+`AudioManifest` combines audio segments and animation events for a timeline. Intervals use the half-open convention `[start_ms, end_ms)`: touching ranges such as `[0, 100)` and `[100, 200)` are valid and do not overlap. The validator enforces:
 
 - no negative times;
 - no item beyond timeline duration;
 - no duplicate IDs in a manifest;
-- no overlap between audio segments;
+- no overlap between audio segments on the same `track_id`;
+- simultaneous segments on different tracks, including voice/music and SFX over other tracks;
 - animation events may overlap on separate tracks;
 - same-track overlap is allowed only when both events are `gesture`, `expression`, or `viseme`;
 - structural events such as `page_change` and `camera` cannot overlap on the same track.

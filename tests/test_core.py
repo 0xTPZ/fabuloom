@@ -17,6 +17,7 @@ from fabuloom_core import (
     Project,
     Scene,
     SimulatedTTSProvider,
+    SynthesisParameters,
     SynthesisRequest,
     Timeline,
     TimelineValidationError,
@@ -89,7 +90,7 @@ class ModelTests(unittest.TestCase):
 
 
 class TimelineTests(unittest.TestCase):
-    def segment(self, segment_id: str, start: int, end: int) -> AudioSegment:
+    def segment(self, segment_id: str, start: int, end: int, track_id: str = "voice") -> AudioSegment:
         return AudioSegment(
             id=segment_id,
             dialogue_id="dialogue-001",
@@ -100,6 +101,7 @@ class TimelineTests(unittest.TestCase):
             start_ms=start,
             end_ms=end,
             duration_ms=end - start,
+            track_id=track_id,
         )
 
     def test_negative_times_are_rejected_at_model_boundary(self):
@@ -112,6 +114,45 @@ class TimelineTests(unittest.TestCase):
             name="Timeline",
             duration_ms=1000,
             audio_segments=[self.segment("audio-001", 0, 600), self.segment("audio-002", 500, 900)],
+        )
+        with self.assertRaises(TimelineValidationError):
+            validate_timeline(timeline)
+
+    def test_different_audio_tracks_may_overlap(self):
+        timeline = Timeline(
+            id="timeline-001",
+            name="Timeline",
+            duration_ms=1000,
+            audio_segments=[
+                self.segment("audio-voice", 0, 1000, "voice"),
+                self.segment("audio-music", 100, 900, "music"),
+                self.segment("audio-sfx", 250, 350, "sfx"),
+            ],
+        )
+        validate_timeline(timeline)
+
+    def test_same_track_touching_ranges_use_half_open_intervals(self):
+        timeline = Timeline(
+            id="timeline-001",
+            name="Timeline",
+            duration_ms=1000,
+            audio_segments=[
+                self.segment("audio-001", 0, 500, "voice"),
+                self.segment("audio-002", 500, 1000, "voice"),
+            ],
+        )
+        validate_timeline(timeline)
+
+    def test_nested_animation_interval_cannot_hide_structural_overlap(self):
+        timeline = Timeline(
+            id="timeline-001",
+            name="Timeline",
+            duration_ms=1000,
+            animation_events=[
+                AnimationEvent(id="event-gesture", kind="gesture", start_ms=0, end_ms=1000),
+                AnimationEvent(id="event-expression", kind="expression", start_ms=100, end_ms=200),
+                AnimationEvent(id="event-page", kind="page_change", start_ms=300, end_ms=400),
+            ],
         )
         with self.assertRaises(TimelineValidationError):
             validate_timeline(timeline)
@@ -186,3 +227,56 @@ class TTSProviderTests(unittest.TestCase):
         with self.assertRaises(TTSError) as error:
             SimulatedTTSProvider().synthesize(request)
         self.assertEqual(error.exception.code, "EMPTY_TEXT")
+
+    def test_speed_rejects_non_finite_boolean_zero_and_negative_values(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True, 0, -1):
+            with self.subTest(value=value):
+                request = SynthesisRequest(
+                    id="request-001",
+                    text="Texto",
+                    voice_id="sim-narrator",
+                    language="pt-BR",
+                    parameters=SynthesisParameters(speed=value),
+                )
+                with self.assertRaises(TTSError) as error:
+                    SimulatedTTSProvider().synthesize(request)
+                self.assertEqual(error.exception.code, "INVALID_SPEED")
+
+    def test_volume_rejects_non_finite_boolean_zero_and_negative_values(self):
+        for value in (float("nan"), float("inf"), float("-inf"), False, 0, -1):
+            with self.subTest(value=value):
+                request = SynthesisRequest(
+                    id="request-001",
+                    text="Texto",
+                    voice_id="sim-narrator",
+                    language="pt-BR",
+                    parameters=SynthesisParameters(volume=value),
+                )
+                with self.assertRaises(TTSError) as error:
+                    SimulatedTTSProvider().synthesize(request)
+                self.assertEqual(error.exception.code, "INVALID_VOLUME")
+
+    def test_pitch_rejects_non_finite_and_boolean_values_but_allows_negative_offset(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=value):
+                request = SynthesisRequest(
+                    id="request-001",
+                    text="Texto",
+                    voice_id="sim-narrator",
+                    language="pt-BR",
+                    parameters=SynthesisParameters(pitch=value),
+                )
+                with self.assertRaises(TTSError) as error:
+                    SimulatedTTSProvider().synthesize(request)
+                self.assertEqual(error.exception.code, "INVALID_PITCH")
+
+        result = SimulatedTTSProvider().synthesize(
+            SynthesisRequest(
+                id="request-001",
+                text="Texto",
+                voice_id="sim-narrator",
+                language="pt-BR",
+                parameters=SynthesisParameters(pitch=-4.5),
+            )
+        )
+        self.assertTrue(result.metadata["simulated"])

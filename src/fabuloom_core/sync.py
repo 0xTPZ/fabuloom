@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from .models import (
     MODEL_FORMAT_VERSION,
     AnimationEvent,
     AudioSegment,
     Timeline,
+    validate_id,
+    validate_nonnegative,
     validate_format_version,
 )
 
@@ -34,6 +36,9 @@ class AudioManifest:
     format_version: str = MODEL_FORMAT_VERSION
 
     def __post_init__(self) -> None:
+        validate_id(self.id)
+        validate_id(self.timeline_id, "timeline_id")
+        validate_nonnegative(self.duration_ms, "duration_ms")
         validate_format_version(self.format_version)
 
     def validate(self) -> None:
@@ -51,9 +56,13 @@ class AudioManifest:
 def validate_timeline(timeline: Timeline) -> None:
     """Validate ranges, IDs, bounds, and overlap policy.
 
-    Audio segments cannot overlap on the same track. Animation events may
-    overlap on different tracks, or on the same track when both events are
-    explicitly overlap-safe kinds (gesture, expression, or viseme).
+    Audio segments cannot overlap on the same track. Different audio tracks
+    (for example voice, music, and sfx) may run simultaneously. Animation
+    events may overlap on different tracks, or on the same track when both
+    events are explicitly overlap-safe kinds (gesture, expression, or viseme).
+
+    Intervals use the half-open convention ``[start_ms, end_ms)``. Therefore,
+    an item ending at exactly the instant another starts does not overlap.
     """
 
     identifiers: set[str] = set()
@@ -68,7 +77,16 @@ def validate_timeline(timeline: Timeline) -> None:
                 f"{item.id} ends at {item.end_ms} ms beyond timeline duration {timeline.duration_ms} ms"
             )
 
-    _reject_overlaps(timeline.audio_segments, "audio segments", always_forbid=True)
+    grouped_audio: dict[str, list[AudioSegment]] = {}
+    for segment in timeline.audio_segments:
+        grouped_audio.setdefault(segment.track_id, []).append(segment)
+    for track_id, segments in grouped_audio.items():
+        _reject_overlaps(
+            segments,
+            f"audio segments on track {track_id!r}",
+            allow_overlap=lambda _left, _right: False,
+        )
+
     grouped_events: dict[str, list[AnimationEvent]] = {}
     for event in timeline.animation_events:
         grouped_events.setdefault(event.track_id, []).append(event)
@@ -76,7 +94,10 @@ def validate_timeline(timeline: Timeline) -> None:
         _reject_overlaps(
             events,
             f"animation events on track {track_id!r}",
-            always_forbid=False,
+            allow_overlap=lambda left, right: (
+                left.kind in OVERLAP_ALLOWED_EVENT_KINDS
+                and right.kind in OVERLAP_ALLOWED_EVENT_KINDS
+            ),
         )
 
     for segment in timeline.audio_segments:
@@ -92,18 +113,29 @@ def validate_timeline(timeline: Timeline) -> None:
                 )
 
 
-def _reject_overlaps(items: list[Any], label: str, always_forbid: bool) -> None:
+def _reject_overlaps(
+    items: list[Any],
+    label: str,
+    allow_overlap: Callable[[Any, Any], bool],
+) -> None:
+    """Reject forbidden intersections, including nested intervals.
+
+    The pairwise sweep checks every still-active interval rather than only
+    adjacent sorted entries. This catches a forbidden structural event hidden
+    inside a larger overlap-safe gesture or expression interval.
+    """
+
     ordered = sorted(items, key=lambda item: (item.start_ms, item.end_ms, item.id))
-    for previous, current in zip(ordered, ordered[1:]):
-        if current.start_ms >= previous.end_ms:
-            continue
-        if not always_forbid:
-            allowed = (
-                previous.kind in OVERLAP_ALLOWED_EVENT_KINDS
-                and current.kind in OVERLAP_ALLOWED_EVENT_KINDS
-            )
-            if allowed:
+    for index, left in enumerate(ordered):
+        for right in ordered[index + 1 :]:
+            if right.start_ms >= left.end_ms:
+                break
+            # Half-open intervals: a zero-length or otherwise non-intersecting
+            # right-hand interval does not overlap even when nested by bounds.
+            if not (left.start_ms < right.end_ms and right.start_ms < left.end_ms):
                 continue
-        raise TimelineValidationError(
-            f"overlap forbidden in {label}: {previous.id} and {current.id}"
-        )
+            if allow_overlap(left, right):
+                continue
+            raise TimelineValidationError(
+                f"overlap forbidden in {label}: {left.id} and {right.id}"
+            )

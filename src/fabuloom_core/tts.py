@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+import math
 from typing import Any, Protocol
 
-from .models import WordTiming, validate_nonempty
+from .models import WordTiming, validate_id, validate_nonempty, validate_nonnegative
 
 
 class TTSError(RuntimeError):
@@ -25,10 +26,15 @@ class SynthesisParameters:
     extras: dict[str, Any] = field(default_factory=dict)
 
     def validate(self) -> None:
-        if not isinstance(self.speed, (int, float)) or self.speed <= 0:
+        _validate_finite_number(self.speed, "speed", "INVALID_SPEED")
+        if self.speed <= 0:
             raise TTSError("INVALID_SPEED", "speed must be greater than zero")
-        if not isinstance(self.volume, (int, float)) or self.volume <= 0:
+        _validate_finite_number(self.volume, "volume", "INVALID_VOLUME")
+        if self.volume <= 0:
             raise TTSError("INVALID_VOLUME", "volume must be greater than zero")
+        # Pitch is a provider-neutral offset. Negative offsets are valid, but
+        # non-numeric, non-finite, and boolean values are not.
+        _validate_finite_number(self.pitch, "pitch", "INVALID_PITCH")
 
 
 @dataclass
@@ -41,12 +47,19 @@ class SynthesisRequest:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def validate(self) -> None:
-        validate_nonempty(self.id, "request.id")
+        validate_id(self.id, "request.id")
         if not isinstance(self.text, str) or not self.text.strip():
             raise TTSError("EMPTY_TEXT", "text must be non-empty")
         validate_nonempty(self.voice_id, "request.voice_id")
         validate_nonempty(self.language, "request.language")
         self.parameters.validate()
+
+
+def _validate_finite_number(value: Any, field_name: str, error_code: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TTSError(error_code, f"{field_name} must be a finite number")
+    if not math.isfinite(float(value)):
+        raise TTSError(error_code, f"{field_name} must be finite")
 
 
 @dataclass
@@ -61,6 +74,14 @@ class SynthesisResult:
     phoneme_timings: list[Any] = field(default_factory=list)
     viseme_timings: list[Any] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        validate_id(self.request_id, "request_id")
+        validate_nonempty(self.provider_id, "provider_id")
+        validate_nonempty(self.voice_id, "voice_id")
+        validate_nonempty(self.language, "language")
+        validate_nonempty(self.audio_uri, "audio_uri")
+        validate_nonnegative(self.duration_ms, "duration_ms")
 
 
 class TTSProvider(Protocol):
