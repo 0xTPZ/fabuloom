@@ -46,6 +46,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   prop interaction, measured `pm_santa` narration and real-engine MP4 export
   implemented in Mission 011. General scene authoring and final art remain
   future work.
+- Santa V4 cartoon refinement — original rounded rig-ready layers, preserved
+  V3 compatibility, browser-stage selection and real-engine MP4 comparison
+  implemented in Mission 011.1. Final painted art, broader gesture authoring
+  and human visual approval remain future work.
 
 ## Later
 

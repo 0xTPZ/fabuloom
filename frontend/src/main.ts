@@ -5,6 +5,8 @@ import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-charact
 import { validateCharacterPack } from "./character-pack.mjs";
 import { SantaV3Rig, SantaV3SceneRenderer } from "./santa-v3-engine.ts";
 import { SANTA_V3_PACK } from "./santa-v3-pack.mjs";
+import { SantaV4Rig, SantaV4SceneRenderer } from "./santa-v4-engine.ts";
+import { SANTA_V4_PACK } from "./santa-v4-pack.mjs";
 import { TOPAZIO_NARRATION_CATALOG, manifestVoiceId, narrationForCharacter, narrationForUrl } from "./topazio-narrations.mjs";
 import { TOPAZIO_NARRATOR_PACKS } from "./topazio-narrator-packs.mjs";
 import { validateManifest } from "./timeline.ts";
@@ -50,6 +52,8 @@ const geometricRenderer = new CanvasCharacterRenderer(canvas, geometricRig);
 const layeredRenderer = new LayeredCharacterRenderer(canvas, layeredRig, FANTASY_NARRATOR_PACK);
 const santaV3Rig = new SantaV3Rig();
 const santaV3Renderer = new SantaV3SceneRenderer(canvas, santaV3Rig);
+const santaV4Rig = new SantaV4Rig();
+const santaV4Renderer = new SantaV4SceneRenderer(canvas, santaV4Rig);
 const narratorKeys = Object.keys(TOPAZIO_NARRATOR_PACKS);
 const narratorRigs = Object.fromEntries(narratorKeys.map((key) => [key, new LayeredCharacterRig()]));
 const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
@@ -58,6 +62,7 @@ const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
 ]));
 const narratorReady = Object.fromEntries(narratorKeys.map((key) => [key, false]));
 let santaV3Ready = false;
+let santaV4Ready = false;
 let activeRig = narratorRigs.dora;
 let activeRenderer = narratorRenderers.dora;
 let activeCharacterId = "dora";
@@ -73,6 +78,7 @@ const characterMeta = {
   santa: { name: "Santa", kind: "Narrador oficial · Rig V2", presence: "Voz sábia · pm_santa", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
   alex: { name: "Alex", kind: "Narrador oficial · Rig V2", presence: "Voz confiante · pm_alex", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
   "santa-v3": { name: "Santa V3", kind: "Narrador oficial · Rig completo", presence: "Voz sábia · pm_santa", motion: "Corpo, braços, mãos, pernas, xícara e livro" },
+  "santa-v4": { name: "Santa V4", kind: "Narrador oficial · Cartoon 2.5D", presence: "Voz sábia · pm_santa", motion: "Cabeça, braços, mãos, pernas, barba, olhos e respiração" },
 };
 
 for (const narration of NARRATIONS) {
@@ -116,6 +122,10 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
     characterSelect.value = "santa";
     return Promise.resolve(false);
   }
+  if (characterId === "santa-v4" && !santaV4Ready) {
+    characterSelect.value = "santa";
+    return Promise.resolve(false);
+  }
   if (narratorKeys.includes(characterId) && !narratorReady[characterId]) {
     characterSelect.value = layeredReady ? "fantasy" : "geometric";
     return Promise.resolve(false);
@@ -130,16 +140,20 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
   } else if (characterId === "santa-v3") {
     activeRig = santaV3Rig;
     activeRenderer = santaV3Renderer;
+  } else if (characterId === "santa-v4") {
+    activeRig = santaV4Rig;
+    activeRenderer = santaV4Renderer;
   } else {
     activeRig = geometricRig;
     activeRenderer = geometricRenderer;
   }
   if (characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
   else if (characterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
+  else if (characterId === "santa-v4") santaV4Renderer.characterRenderer.setExpression(expressionSelect.value);
   updateCharacterMeta();
   updateUi(player?.state || "stopped");
-  if (!loadVoice || (!narratorKeys.includes(characterId) && characterId !== "santa-v3")) return Promise.resolve(true);
-  const narration = narrationForCharacter(characterId === "santa-v3" ? "santa" : characterId);
+  if (!loadVoice || (!narratorKeys.includes(characterId) && characterId !== "santa-v3" && characterId !== "santa-v4")) return Promise.resolve(true);
+  const narration = narrationForCharacter(characterId === "santa-v3" || characterId === "santa-v4" ? "santa" : characterId);
   if (!narration) return Promise.resolve(false);
   narrationSelect.value = narration.url;
   return loadNarration(narration);
@@ -157,6 +171,17 @@ async function prepareLayeredCharacters() {
     fantasyOption.disabled = true;
     fantasyOption.textContent = "Ari · asset indisponível";
     characterKind.textContent = "Pack em camadas · indisponível";
+  }
+  const santaV4Option = characterSelect.querySelector('option[value="santa-v4"]');
+  try {
+    validateCharacterPack(SANTA_V4_PACK);
+    await santaV4Renderer.characterRenderer.load();
+    santaV4Ready = true;
+    santaV4Option.disabled = false;
+    santaV4Option.textContent = "Santa V4 · pm_santa";
+  } catch (_error) {
+    santaV4Option.disabled = true;
+    santaV4Option.textContent = "Santa V4 · asset indisponível";
   }
   for (const key of narratorKeys) {
     const option = characterSelect.querySelector(`option[value="${key}"]`);
@@ -396,6 +421,7 @@ expressionSelect.addEventListener("change", () => {
   if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
   else if (narratorKeys.includes(activeCharacterId)) narratorRenderers[activeCharacterId].setExpression(expressionSelect.value);
   else if (activeCharacterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
+  else if (activeCharacterId === "santa-v4") santaV4Renderer.characterRenderer.setExpression(expressionSelect.value);
 });
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
@@ -412,9 +438,11 @@ function frame(timeMs) {
     activeRig.setSpeechAmplitude(0);
     activeRig.update(timeMs, false);
   }
-  if (activeCharacterId === "santa-v3") {
-    santaV3Rig.setSceneDuration(manifest?.duration_ms || 1);
-    santaV3Renderer.renderFrame({
+  if (activeCharacterId === "santa-v3" || activeCharacterId === "santa-v4") {
+    const sceneRenderer = activeCharacterId === "santa-v4" ? santaV4Renderer : santaV3Renderer;
+    const sceneRig = activeCharacterId === "santa-v4" ? santaV4Rig : santaV3Rig;
+    sceneRig.setSceneDuration(manifest?.duration_ms || 1);
+    sceneRenderer.renderFrame({
       timeMs,
       durationMs: manifest?.duration_ms || 1,
       speechAmplitude: player?.amplitude() || 0,

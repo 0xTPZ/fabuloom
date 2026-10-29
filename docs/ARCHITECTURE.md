@@ -162,6 +162,16 @@ leaking into the exported video and keeps Stage/export pose behavior aligned.
 The renderer remains independent of Kokoro and can receive another measured
 audio envelope or a future phoneme/viseme signal without changing the pack.
 
+### Santa V4 art refinement 011.1
+
+Santa V4 is a pack-level visual refinement, not a second animation engine.
+`SantaV4Rig` subclasses the existing deterministic Santa rig and
+`SantaV4SceneRenderer` supplies `SANTA_V4_PACK` to the V3 scene renderer through
+an explicit pack/title option. This keeps browser playback and offline capture
+on one pose implementation while preserving the V3 pack for comparison and
+compatibility. The new SVG layers are original and local; the runtime does not
+load the generated concept reference.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

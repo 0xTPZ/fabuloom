@@ -202,3 +202,25 @@ ffmpeg -hide_banner -loglevel error -i .\workspace\exports\videos\fabuloom-first
 The first reference export is a 1080x1920 H.264/AAC MP4. Its captions are
 segment-level captions based on measured audio boundaries; they are not word
 alignment.
+
+## Santa V4 cartoon refinement
+
+Mission 011.1 adds the dependency-free Santa V4 contract and transform tests:
+
+```powershell
+node --test .\frontend\tests\test_santa_v4.mjs .\frontend\tests\test_santa_v3.mjs
+```
+
+The refinement demonstration reuses the measured Santa V3 manifest and emits
+the V4 MP4, frame comparisons and report under the workspace export directory:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+python .\examples\santa_v4_video_demo.py `
+  --export-dir "E:\Fabuloom\workspace\exports" `
+  --overwrite
+```
+
+The command validates the local V4 pack, contiguous PNG frames, measured WAV
+duration, H.264/AAC output and V3/V4 comparison frame. It does not synthesize
+new audio. Word, phoneme and viseme timing remain unavailable.

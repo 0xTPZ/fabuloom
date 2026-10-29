@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="820" viewBox="0 0 560 820">
+  <defs>
+    <linearGradient id="coat" x2="0" y2="1"><stop stop-color="#1d3762"/><stop offset="1" stop-color="#071326"/></linearGradient>
+    <linearGradient id="panel" x2="1" y2="1"><stop stop-color="#284d82"/><stop offset="1" stop-color="#102546"/></linearGradient>
+  </defs>
+  <path d="M116 136Q154 78 214 72L280 116L346 72Q406 78 444 136Q490 236 466 674Q420 754 280 782Q140 754 94 674Q70 236 116 136Z" fill="url(#coat)" stroke="#050914" stroke-width="14"/>
+  <path d="M116 136Q150 98 196 92L244 146L198 690Q126 684 94 650Q72 280 116 136Z" fill="url(#panel)" opacity=".94"/>
+  <path d="M444 136Q410 98 364 92L316 146L362 690Q434 684 466 650Q488 280 444 136Z" fill="url(#panel)" opacity=".94"/>
+  <path d="M208 72L280 170L352 72L326 42L280 112L234 42Z" fill="#f0c967" stroke="#8b5d21" stroke-width="9"/>
+  <path d="M250 152H310V704H250Z" fill="#c99737"/>
+  <path d="M103 260Q280 326 457 260M90 510Q280 570 470 510" fill="none" stroke="#41689d" stroke-width="15" opacity=".8"/>
+  <path d="M220 172Q280 206 340 172" fill="none" stroke="#f7dc8b" stroke-width="10"/>
+  <path d="M244 214H316V288H244Z" fill="#102846" stroke="#f0c967" stroke-width="7"/>
+  <path d="M280 225L302 247L280 269L258 247Z" fill="#76d7ff" stroke="#f7dc8b" stroke-width="5"/>
+  <circle cx="280" cy="350" r="15" fill="#f7dc8b" stroke="#8b5d21" stroke-width="6"/>
+</svg>
