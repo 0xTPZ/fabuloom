@@ -103,3 +103,34 @@ counts. Browser checks cover automatic manifest selection, voice identity shown
 in the inspector, switching during playback, paused-state and seek behavior,
 safe stop/disposal, and empty error/warning logs. The audio-player unit test
 also verifies that disposal closes the context and clears decoded buffers.
+
+## First video demonstration
+
+The Mission 010 demo uses an already available local Kokoro runtime and does
+not install packages or download model weights. It writes generated artifacts
+only under the configured workspace export directory:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+$env:HF_DATASETS_OFFLINE = "1"
+python .\examples\first_video_demo.py `
+  --export-dir "E:\Fabuloom\workspace\exports" `
+  --background "E:\Fabuloom\workspace\exports\videos\fabuloom-first-video-background.png" `
+  --overwrite
+```
+
+After the first synthesis, `--reuse-manifest` re-renders the same text and
+voice without invoking TTS again. The exporter reports the measured segment
+manifest duration, the MP4 probe, the RMS mouth source, and the explicit
+absence of word/phoneme/viseme timing. Validate the finished file with:
+
+```powershell
+ffprobe -v error -show_entries format=duration,size:stream=index,codec_name,codec_type,width,height,pix_fmt,sample_rate,channels -of json .\workspace\exports\videos\fabuloom-first-video-dora.mp4
+ffmpeg -hide_banner -loglevel error -i .\workspace\exports\videos\fabuloom-first-video-dora.mp4 -f null -
+```
+
+The first reference export is a 1080x1920 H.264/AAC MP4. Its captions are
+segment-level captions based on measured audio boundaries; they are not word
+alignment.

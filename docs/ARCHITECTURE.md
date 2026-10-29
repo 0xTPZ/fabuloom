@@ -93,6 +93,18 @@ voice, disposes the prior `AudioTimelinePlayer` before switching, and reuses
 existing WAVs instead of synthesizing during selection. Playback controls,
 seek, timeline rendering and RMS analysis remain shared.
 
+### First video pipeline 010
+
+`examples/first_video_demo.py` is the first deterministic text-to-MP4 path. It
+uses the provider-neutral narration service to create or reuse a measured
+Kokoro manifest, composes the ordered WAV segments with their real millisecond
+positions, derives a per-frame RMS envelope for the visual mouth response, and
+passes the resulting layers to FFmpeg. The export contains the original Dora
+portrait, a reusable background, segment-level SRT captions, and a short
+identity outro. Word, phoneme, and viseme timestamps remain unavailable and are
+never synthesized. Generated audio, manifests, sprites, previews, and MP4s are
+workspace artifacts and remain outside Git.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:
@@ -137,7 +149,7 @@ Audio segments should produce a manifest containing stable IDs, source text, voi
 
 ### Composition and export
 
-The compositor should combine voice, music, ambience, SFX, and animation through an explicit timeline. FFmpeg is the initial export boundary. Exporters should be deterministic and keep source assets unchanged.
+The compositor should combine voice, music, ambience, SFX, and animation through an explicit timeline. FFmpeg is the initial export boundary. The Mission 010 demo is a deliberately small first exporter, not the complete editor/compositor. Exporters should be deterministic and keep source assets unchanged.
 
 ## Storage
 

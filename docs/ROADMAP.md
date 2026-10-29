@@ -31,7 +31,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
 - Timeline editor — deferred.
 - Character animation adapter boundary — demonstrator implemented in the local stage.
 - Audio-to-animation synchronization — amplitude-driven preview implemented; phonetic alignment deferred.
-- Preview composition — local Canvas stage implemented; export deferred.
+- Preview composition — local Canvas stage implemented; first deterministic
+  FFmpeg text-to-MP4 proof implemented in Mission 010; full compositor deferred.
+- First video proof — Dora / `pf_dora`, measured segment captions, and RMS
+  mouth response implemented; production editor and richer export controls
+  remain deferred.
 
 ## Later
 
