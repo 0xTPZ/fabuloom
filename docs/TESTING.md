@@ -259,3 +259,20 @@ landmark/pivot proximity for shoulders, elbows, wrists, knees and ankles,
 finite hierarchical transforms, bounded gait channels and continuity checks at
 walk/seated phase boundaries. Visual review remains mandatory because the long
 coat can conceal some seated knee motion even when the transforms are valid.
+
+Mission 012.5 adds `frontend/tests/test_animation_keyframes.mjs` and
+`frontend/tests/test_santa_v5_wave.mjs`. They cover clip validation, finite
+numeric parameters, easing/interpolation, additive channel composition,
+absolute-time determinism after seek, continuity, RMS/breathing composition,
+joint movement and landmark hierarchy checks for `WAVE_HELLO`.
+
+The visual DEV tool is `/santa-v5-calibration.html`; select `WAVE_HELLO` to
+inspect keyframes and use play, pause or seek. The five-pose board is
+`/santa-v5-wave-gallery.html`. The technical capture is generated with:
+
+```powershell
+& 'E:\Fabuloom\workspace\.venv\Scripts\python.exe' .\examples\santa_v5_wave_demo.py --overwrite
+```
+
+It produces a silent 5-second H.264 MP4 under
+`E:\Fabuloom\workspace\exports\videos\`.

@@ -261,3 +261,16 @@ SQLite is the planned local index for projects and metadata. Large media and mod
 ## License boundary
 
 Only original Fabuloom code is covered by the project MIT license. Kokoro model/package, runtime dependencies, voices, and generated media remain subject to their own licenses. Every external integration needs a license/provenance record before distribution; see `docs/KOKORO-INTEGRATION.md`.
+
+## Deterministic keyframe overlays
+
+`frontend/src/animation-keyframes.mjs` provides the independent
+`fabuloom.animation-keyframes/0.1` numeric clip format. It validates ordered
+keyframes, samples them by absolute time with easing, and composes additive
+channel layers without retaining playback state. Character adapters enforce
+their own limits and map channels to the layered hierarchy.
+
+Santa V5 consumes this boundary for `WAVE_HELLO`. The clip owns only the body
+channels it animates; breathing, blinking and RMS mouth motion remain in the
+base rig. This keeps Character Stage and frame capture on one source of truth
+and avoids a second animation implementation in FFmpeg.

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · WAVE_HELLO</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #07142a; color: #eef5ff; }
+      header { padding: 18px 24px; border-bottom: 1px solid #d6a84d55; }
+      h1 { margin: 0 0 4px; color: #f7d27a; font-size: 22px; }
+      header p { margin: 0; color: #b8c9df; }
+      main { max-width: 1180px; margin: 18px auto; padding: 0 18px 28px; }
+      .board { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; }
+      figure { margin: 0; padding: 8px; background: #0d2342; border: 1px solid #d6a84d55; border-radius: 10px; }
+      canvas { display: block; width: 100%; height: auto; background: #081a33; border-radius: 6px; }
+      figcaption { min-height: 3.6em; padding: 8px 2px 2px; color: #f7d27a; font-weight: 650; }
+      small { display: block; color: #b8c9df; font-weight: 400; }
+      @media (max-width: 820px) { .board { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · WAVE_HELLO</h1><p>Prancha de diagnóstico gerada pelo mesmo LayeredCharacterRenderer do Character Stage.</p></header>
+    <main><section id="board" class="board"></section></main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { landmarkConnectionSegments, resolveLandmarks } from "./src/character-landmarks.mjs";
+      import { SantaV5Rig, SANTA_V5_WAVE_HELLO_CLIP } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+
+      const samples = [
+        ["Repouso", 0],
+        ["Antecipação", 320],
+        ["Braço levantado", 1180],
+        ["Cumprimento", 2120],
+        ["Retorno", SANTA_V5_WAVE_HELLO_CLIP.durationMs],
+      ];
+      const board = document.querySelector("#board");
+      const point = (matrix, x, y) => ({ x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f });
+      const drawOverlay = (canvas, renderer) => {
+        const ctx = canvas.getContext("2d"); const plans = renderer.getLayerDrawPlan();
+        ctx.save(); ctx.strokeStyle = "rgba(88,220,255,.75)"; ctx.fillStyle = "#58dcff"; ctx.lineWidth = 2;
+        for (const segment of landmarkConnectionSegments(SANTA_V5_ANATOMICAL_LANDMARKS, plans)) { ctx.beginPath(); ctx.moveTo(segment.a.x, segment.a.y); ctx.lineTo(segment.b.x, segment.b.y); ctx.stroke(); }
+        for (const landmark of resolveLandmarks(SANTA_V5_ANATOMICAL_LANDMARKS, plans)) { ctx.beginPath(); ctx.arc(landmark.stage.x, landmark.stage.y, 5, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+      };
+      for (const [label, timeMs] of samples) {
+        const figure = document.createElement("figure"); const canvas = document.createElement("canvas"); canvas.width = 420; canvas.height = 956;
+        const caption = document.createElement("figcaption"); caption.innerHTML = `${label}<small>${timeMs} ms</small>`; figure.append(canvas, caption); board.append(figure);
+        const rig = new SantaV5Rig(); rig.setSceneDuration(20450); rig.setAnimation("WAVE_HELLO");
+        const renderer = new LayeredCharacterRenderer(canvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: true });
+        await renderer.load(); renderer.renderFrame({ timeMs, speechAmplitude: 0, isPlaying: false }); drawOverlay(canvas, renderer);
+      }
+      document.title = "completed";
+    </script>
+  </body>
+</html>
