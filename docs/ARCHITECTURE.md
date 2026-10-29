@@ -128,6 +128,23 @@ identity outro. Word, phoneme, and viseme timestamps remain unavailable and are
 never synthesized. Generated audio, manifests, sprites, previews, and MP4s are
 workspace artifacts and remain outside Git.
 
+### Rig-faithful video capture 010.2
+
+`examples/character_engine_video_demo.py` is the first exporter that uses the
+real layered engine end to end. A loopback-only `capture-character.html` page
+loads the Santa V2 pack and the same `LayeredCharacterRig` /
+`LayeredCharacterRenderer` used by Character Stage. `renderBackground: false`
+clears the Canvas before each frame, so the PNG sequence contains only the
+transparent character. The browser computes the mouth signal from the PCM-16
+WAV RMS envelope and posts one frame at a time to the local capture endpoint.
+
+The Python compositor validates the contiguous frame sequence, then FFmpeg
+overlays it on the vertical background and draws per-segment captions from
+the measured `start_ms` / `end_ms` boundaries. No second animation
+implementation exists in FFmpeg. The rig's `poseAt()` is clock-pure, making
+the same pose reproducible after seek or an out-of-order capture request.
+Word, phoneme and viseme timing remain unavailable and are not synthesized.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

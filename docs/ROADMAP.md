@@ -38,8 +38,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   remain deferred.
 - Animation-ready narrator packs — V2 Dora, Santa and Alex with independent
   anatomical layers and shared Stage rig implemented in Mission 010.1.
-- Rig-faithful video export — frame capture boundary implemented; FFmpeg bridge
-  and end-to-end validation remain the next export step.
+- Rig-faithful video export — transparent deterministic browser capture,
+  measured RMS mouth motion, per-segment captions and FFmpeg composition
+  validated with Santa V2 in Mission 010.2. Multi-scene composition and
+  richer camera direction remain future work.
 
 ## Later
 

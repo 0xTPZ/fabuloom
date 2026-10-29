@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FANTASY_NARRATOR_PACK } from "../src/fantasy-narrator-pack.mjs";
 import { validateCharacterPack } from "../src/character-pack.mjs";
-import { buildLayerDrawPlan, frameSchedule, LayeredCharacterRig } from "../src/layered-character.ts";
+import { buildLayerDrawPlan, frameSchedule, LayeredCharacterRenderer, LayeredCharacterRig } from "../src/layered-character.ts";
 
 test("fantasy narrator pack validates and resolves layered transforms", () => {
   validateCharacterPack(FANTASY_NARRATOR_PACK);
@@ -75,6 +75,27 @@ test("layered rig produces a blink and subtle secondary motion", () => {
   rig.update(4380, false);
   assert.ok(rig.pose().eye_open < 1);
   assert.notEqual(rig.pose().hair_sway, 0);
+});
+
+test("rig poses are deterministic after seek and expose independent gestures", () => {
+  const rig = new LayeredCharacterRig();
+  rig.setSpeechAmplitude(0.6);
+  const forward = rig.poseAt(1800, true);
+  rig.poseAt(7200, true);
+  const afterSeek = rig.poseAt(1800, true);
+  assert.deepEqual(afterSeek, forward);
+  assert.notEqual(forward.left_arm, rig.poseAt(3400, true).left_arm);
+  assert.notEqual(forward.right_arm, rig.poseAt(4600, true).right_arm);
+  assert.equal(forward.mouth_open, 0.6);
+  assert.equal(rig.poseAt(1800, false).mouth_open, 0);
+});
+
+test("transparent renderer option is explicit and preserves default stage background", () => {
+  const canvas = { width: 160, height: 120, getContext: () => ({}) };
+  const defaultRenderer = new LayeredCharacterRenderer(canvas, new LayeredCharacterRig(), FANTASY_NARRATOR_PACK);
+  const transparentRenderer = new LayeredCharacterRenderer(canvas, new LayeredCharacterRig(), FANTASY_NARRATOR_PACK, { renderBackground: false });
+  assert.equal(defaultRenderer.renderBackground, true);
+  assert.equal(transparentRenderer.renderBackground, false);
 });
 
 test("frame schedule is deterministic and bounded", () => {

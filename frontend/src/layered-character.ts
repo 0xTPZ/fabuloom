@@ -109,33 +109,42 @@ export class LayeredCharacterRig {
       left_arm: 0,
       right_arm: 0,
     };
-    this.nextBlinkAt = 4200;
-    this.blinkStartedAt = -1;
   }
 
   setSpeechAmplitude(amplitude) { this.speechAmplitude = clamp(amplitude); }
   setExpression(expressionId) { this.currentExpression = expressionId; }
 
-  update(timeMs, isPlaying) {
-    const seconds = timeMs / 1000;
+  /**
+   * Resolve a pose from absolute time only. Keeping this function pure with
+   * respect to the clock makes seek and out-of-order frame capture repeatable.
+   */
+  poseAt(timeMs, isPlaying) {
+    const safeTimeMs = Number.isFinite(timeMs) ? Math.max(0, timeMs) : 0;
+    const seconds = safeTimeMs / 1000;
     const breathing = (Math.sin(seconds * Math.PI * 1.8) + 1) / 2;
-    const headRotation = Math.sin(seconds * 0.48) * 0.024 + Math.sin(seconds * 0.21) * 0.012;
+    const headRotation = Math.sin(seconds * 0.48) * 0.038 + Math.sin(seconds * 0.21) * 0.016;
     const hairSway = Math.sin(seconds * 0.67) * 0.009;
-    const leftArm = Math.sin(seconds * 0.42 + 0.8) * 0.018;
-    const rightArm = Math.sin(seconds * 0.39 + 2.1) * 0.014;
+    const pulse = (center, width, amount) => {
+      const phase = ((safeTimeMs / 1000) % 8 + 8) % 8;
+      return Math.exp(-(((phase - center) / width) ** 2)) * amount;
+    };
+    // Two repeatable presenter gestures are deliberately larger than idle
+    // sway, while remaining small enough to look natural over long narration.
+    const leftArm = Math.sin(seconds * 0.42 + 0.8) * 0.018
+      + pulse(1.8, 0.42, 0.20)
+      + pulse(6.8, 0.48, -0.075);
+    const rightArm = Math.sin(seconds * 0.39 + 2.1) * 0.014
+      + pulse(4.6, 0.46, -0.22)
+      + pulse(7.5, 0.42, 0.09);
     const browRaise = isPlaying ? (Math.sin(seconds * 0.9) + 1) * 0.12 : 0;
-    if (timeMs >= this.nextBlinkAt && this.blinkStartedAt < 0) {
-      this.blinkStartedAt = timeMs;
-      this.nextBlinkAt = timeMs + 3800 + ((Math.sin(seconds * 1.7) + 1) * 700);
-    }
     let eyeOpen = 1;
-    if (this.blinkStartedAt >= 0) {
-      const elapsed = timeMs - this.blinkStartedAt;
+    const blinkPhase = safeTimeMs % 5200;
+    if (blinkPhase >= 4200 && blinkPhase <= 4460) {
+      const elapsed = blinkPhase - 4200;
       if (elapsed <= 130) eyeOpen = 1 - elapsed / 130;
-      else if (elapsed <= 260) eyeOpen = (elapsed - 130) / 130;
-      else this.blinkStartedAt = -1;
+      else eyeOpen = (elapsed - 130) / 130;
     }
-    this.currentPose = {
+    return {
       breathing,
       head_rotation: headRotation,
       eye_open: eyeOpen,
@@ -145,6 +154,10 @@ export class LayeredCharacterRig {
       left_arm: leftArm,
       right_arm: rightArm,
     };
+  }
+
+  update(timeMs, isPlaying) {
+    this.currentPose = this.poseAt(timeMs, isPlaying);
   }
 
   pose() { return { ...this.currentPose }; }
@@ -169,6 +182,7 @@ export class LayeredCharacterRenderer {
     this.rig = rig;
     this.pack = validateCharacterPack(pack);
     this.assetRoot = options.assetRoot || globalThis.document?.baseURI || "http://127.0.0.1/";
+    this.renderBackground = options.renderBackground !== false;
     this.images = new Map();
     this.loaded = false;
     this.expression = "neutral";
@@ -225,7 +239,11 @@ export class LayeredCharacterRenderer {
     const ctx = this.context;
     const width = this.canvas.width;
     const height = this.canvas.height;
-    drawStageBackground(ctx, width, height);
+    if (this.renderBackground) {
+      drawStageBackground(ctx, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
     if (!this.loaded) return;
     const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
     const plans = buildLayerDrawPlan(this.pack, width, height, this.rig.pose(), assetSizes);

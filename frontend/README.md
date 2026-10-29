@@ -65,7 +65,10 @@ global dependency is required for the local preview.
 `src/layered-character.ts` exposes `frameSchedule`,
 `LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. They use
 the same rig and Canvas renderer as the Stage, update the pose at deterministic
-timestamps, and stream PNG frames through a callback without accumulating the
-whole sequence in memory. A future local FFmpeg bridge can consume those
-frames and mux the measured narration. The current first-video exporter is
-kept unchanged until that bridge receives its own integration validation.
+timestamps, and stream transparent PNG frames through a callback without
+accumulating the whole sequence in memory. `capture-character.html` is the
+local browser bridge used by `examples/character_engine_video_demo.py`: it
+loads Santa V2, computes the PCM-16 RMS envelope from the measured WAV, and
+posts frames only to the loopback capture endpoint. FFmpeg composes those
+same frames over the background; the original portrait exporter remains a
+compatibility reference.
