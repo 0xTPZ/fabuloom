@@ -215,3 +215,14 @@ matrix converts it into stage coordinates; this avoids treating the center of
 an image box as an anatomical joint. Additional V5 channels (`pelvis_x`,
 `pelvis_rotation` and foot offsets) remain additive to `fabuloom.character/0.1`
 and are validated like the existing animation bindings.
+
+### V5 wave expression and arm IK
+
+The Santa V5 pack includes a `wave` expression that overrides only
+`right_hand` with the palm-facing `hand-right-wave.png` asset; the original
+`hand-right.png` remains the neutral asset. `WAVE_HELLO` controls a normalized
+hand target through the independent `two-bone-ik.mjs` module. The runtime
+calibrates the right-arm layer pivots to the shoulder, elbow and wrist
+landmarks, then refines the analytic solution against the pack's non-uniform
+render scales. This is a compatible pose/asset extension, not a new character
+format or a second skeleton.

@@ -276,3 +276,17 @@ inspect keyframes and use play, pause or seek. The five-pose board is
 
 It produces a silent 5-second H.264 MP4 under
 `E:\Fabuloom\workspace\exports\videos\`.
+
+Mission 012.6 adds the dependency-free IK and rendered-endpoint checks:
+
+```powershell
+node --test .\frontend\tests\test_two_bone_ik.mjs .\frontend\tests\test_santa_v5_wave.mjs .\frontend\tests\test_santa_v5_art.mjs .\frontend\tests\test_santa_v5_calibration.mjs
+```
+
+These tests cover reachable and unreachable targets, elbow preference and
+limits, deterministic angle helpers, normalized target overrides, expression
+asset preservation, transformed shoulder/elbow/hand pivots, seek stability,
+and the measured rendered hand error at a full wave pose. The regenerated
+technical MP4 is checked with FFprobe as 150 frames at 30 FPS, 1080x1920,
+H.264, silent and 5.000 seconds. The five-pose board and previous-versus-IK
+comparison remain workspace-only review artifacts.

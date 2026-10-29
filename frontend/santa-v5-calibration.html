@@ -49,6 +49,14 @@
           <div><button id="export">Exportar parâmetros</button><button id="reset" class="secondary">Recarregar pack</button></div>
         </div>
         <div class="panel">
+          <strong>IK do braço direito · WAVE_HELLO</strong>
+          <label><span>Alvo X</span><input id="ik-target-x" type="range" min="0" max="1" step="0.001" /><input id="ik-target-x-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Alvo Y</span><input id="ik-target-y" type="range" min="0" max="1" step="0.001" /><input id="ik-target-y-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Cotovelo</span><select id="ik-elbow-preference"><option value="outward">afastado do tronco</option><option value="down">para baixo</option><option value="inward">para dentro</option></select><span></span></label>
+          <label><span>Controle manual</span><input id="ik-manual" type="checkbox" /><span>arraste o alvo no palco</span></label>
+          <pre id="ik-diagnostics">IK aguardando WAVE_HELLO…</pre>
+        </div>
+        <div class="panel">
           <strong>Transformação da camada</strong>
           <label><span>Posição X</span><input id="position-x" type="range" min="0" max="1" step="0.001" /><input id="position-x-value" type="number" min="0" max="1" step="0.001" /></label>
           <label><span>Posição Y</span><input id="position-y" type="range" min="0" max="1" step="0.001" /><input id="position-y-value" type="number" min="0" max="1" step="0.001" /></label>
@@ -65,7 +73,7 @@
     <script type="module">
       import { buildLayerDrawPlan, LayeredCharacterRenderer } from "./src/layered-character.ts";
       import { landmarkConnectionSegments, resolveLandmarks, transformPoint } from "./src/character-landmarks.mjs";
-      import { diagnoseSantaV5Calibration, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
+      import { diagnoseSantaV5Calibration, SANTA_V5_ANATOMICAL_LANDMARKS, SANTA_V5_RIGHT_ARM_IK_CALIBRATION } from "./src/santa-v5-calibration.mjs";
       import { SantaV5Rig, SANTA_V5_WAVE_HELLO_CLIP } from "./src/santa-v5-engine.ts";
       import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
 
@@ -84,6 +92,8 @@
       let wavePlaying = false;
       let waveFrame = 0;
       let waveStartedAt = 0;
+      let draggingIKTarget = false;
+      let elbowPreference = "outward";
 
       for (const layer of workingPack.layers) { const option = document.createElement("option"); option.value = layer.id; option.textContent = `${layer.id} · ${layer.role}`; layerSelect.appendChild(option); }
 
@@ -103,6 +113,18 @@
       const waveTime = document.querySelector("#wave-time");
       const waveTimeValue = document.querySelector("#wave-time-value");
       const waveKeyframes = document.querySelector("#wave-keyframes");
+      const ikDiagnostics = document.querySelector("#ik-diagnostics");
+      const ikManual = document.querySelector("#ik-manual");
+      const ikTargetX = document.querySelector("#ik-target-x");
+      const ikTargetY = document.querySelector("#ik-target-y");
+      const ikPreference = document.querySelector("#ik-elbow-preference");
+      const ikPreferenceVectors = { outward: { x: 1, y: 0.55 }, down: { x: 0.15, y: 1 }, inward: { x: -1, y: 0.55 } };
+      const ikField = (axis) => [document.querySelector(`#ik-target-${axis}`), document.querySelector(`#ik-target-${axis}-value`)];
+      const setIKField = (axis, value) => { for (const input of ikField(axis)) input.value = Number(value).toFixed(3); };
+      const readIKTarget = () => ({ x: clamp(ikTargetX.value, 0, 1), y: clamp(ikTargetY.value, 0, 1) });
+      const applyIKTarget = () => { const target = readIKTarget(); ikManual.checked = true; rig.setRightHandTarget({ ...target, weight: 1, elbowPreference: ikPreferenceVectors[elbowPreference] }); rig.setAnimation("WAVE_HELLO"); render(); };
+      const syncIKFields = (ik) => { if (!ik || draggingIKTarget) return; setIKField("x", ik.normalizedTarget.x); setIKField("y", ik.normalizedTarget.y); };
+      setIKField("x", SANTA_V5_RIGHT_ARM_IK_CALIBRATION.waveTarget.x / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameWidth); setIKField("y", SANTA_V5_RIGHT_ARM_IK_CALIBRATION.waveTarget.y / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameHeight);
       waveKeyframes.textContent = SANTA_V5_WAVE_HELLO_CLIP.keyframes.map((keyframe) => `${String(keyframe.timeMs).padStart(4, " ")} ms  ${JSON.stringify(keyframe.channels)}`).join("\n");
       const setWaveTime = (value) => { timeMs = clamp(value, 0, SANTA_V5_WAVE_HELLO_CLIP.durationMs); waveTime.value = String(Math.round(timeMs)); waveTimeValue.value = String(Math.round(timeMs)); };
       const stopWaveLoop = () => { wavePlaying = false; cancelAnimationFrame(waveFrame); };
@@ -126,6 +148,14 @@
       document.querySelector("#wave-reset").addEventListener("click", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); waveStartedAt = 0; setWaveTime(0); render(); });
       waveTime.addEventListener("input", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); setWaveTime(waveTime.value); render(); });
       waveTimeValue.addEventListener("input", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); setWaveTime(waveTimeValue.value); render(); });
+      for (const axis of ["x", "y"]) for (const input of ikField(axis)) input.addEventListener("input", applyIKTarget);
+      ikPreference.addEventListener("change", () => { elbowPreference = ikPreference.value; if (ikManual.checked) applyIKTarget(); else render(); });
+      ikManual.addEventListener("change", () => { if (ikManual.checked) applyIKTarget(); else { rig.clearRightHandTarget(); render(); } });
+      const setIKFromPointer = (event) => { const rect = canvas.getBoundingClientRect(); const x = clamp((event.clientX - rect.left) / rect.width, 0, 1); const y = clamp((event.clientY - rect.top) / rect.height, 0, 1); setIKField("x", x); setIKField("y", y); applyIKTarget(); };
+      canvas.addEventListener("pointerdown", (event) => { const ik = rig.rightHandIK(); if (!ik || rig.animationId() !== "WAVE_HELLO") return; const rect = canvas.getBoundingClientRect(); const x = ik.normalizedTarget.x * rect.width; const y = ik.normalizedTarget.y * rect.height; if (Math.hypot(event.clientX - rect.left - x, event.clientY - rect.top - y) > 32) return; draggingIKTarget = true; canvas.setPointerCapture(event.pointerId); setIKFromPointer(event); });
+      canvas.addEventListener("pointermove", (event) => { if (draggingIKTarget) setIKFromPointer(event); });
+      const releaseIK = (event) => { draggingIKTarget = false; if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId); };
+      canvas.addEventListener("pointerup", releaseIK); canvas.addEventListener("pointercancel", releaseIK);
       document.querySelector("#reset").addEventListener("click", () => location.reload());
       for (const input of pair("amplitude")) input.addEventListener("input", () => { setPair("amplitude", clamp(readValue("amplitude"), 0, 1)); render(); });
       document.querySelector("#export").addEventListener("click", () => { const payload = { format: workingPack.format, character_id: workingPack.id, source: "santa-v5-calibration.html", landmarks: SANTA_V5_ANATOMICAL_LANDMARKS, layers: workingPack.layers.map(({ id, parent, position, size, anchor }) => ({ id, parent, position, size, anchor })) }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "santa-v5-calibrated-parameters.json"; link.click(); URL.revokeObjectURL(url); });
@@ -144,6 +174,30 @@
         for (const landmark of resolved) { const layerId = pivotLayer[landmark.id]; const plan = plans.find((entry) => entry.layer.id === layerId); if (!plan) continue; const pivot = transformPoint(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); maxPivotDelta = Math.max(maxPivotDelta, Math.hypot(pivot.x - landmark.stage.x, pivot.y - landmark.stage.y)); }
         return { count: resolved.length, maxPivotDelta };
       }
+      function layerPivot(plans, id) {
+        const plan = plans.find((entry) => entry.layer.id === id); if (!plan) return null;
+        return transformPoint(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]);
+      }
+      function drawIKOverlay(plans) {
+        const ik = rig.rightHandIK();
+        if (!ik || rig.animationId() !== "WAVE_HELLO") { ikDiagnostics.textContent = "IK aguardando WAVE_HELLO…"; return; }
+        const shoulder = layerPivot(plans, "right_upper_arm"); const elbow = layerPivot(plans, "right_forearm"); const wrist = layerPivot(plans, "right_hand");
+        const sx = canvas.width / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameWidth; const sy = canvas.height / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameHeight;
+        const target = { x: ik.requestedTarget.x * sx, y: ik.requestedTarget.y * sy };
+        ctx.save(); ctx.lineWidth = 6; ctx.strokeStyle = "rgba(247,210,122,.94)"; ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(elbow.x, elbow.y); ctx.lineTo(wrist.x, wrist.y); ctx.stroke();
+        ctx.strokeStyle = "rgba(88,220,255,.80)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(shoulder.x, shoulder.y, ik.maximumDistance * ((sx + sy) / 2), 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(shoulder.x, shoulder.y, ik.minimumDistance * ((sx + sy) / 2), 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "#ff8a8a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(target.x - 14, target.y); ctx.lineTo(target.x + 14, target.y); ctx.moveTo(target.x, target.y - 14); ctx.lineTo(target.x, target.y + 14); ctx.stroke(); ctx.beginPath(); ctx.arc(target.x, target.y, 12, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "#f7d27a"; ctx.font = "600 16px Segoe UI"; ctx.fillText("alvo", target.x + 16, target.y - 10); ctx.restore();
+        const renderedError = Math.hypot(wrist.x - target.x, wrist.y - target.y);
+        ikDiagnostics.textContent = [
+          `alvo: (${ik.normalizedTarget.x.toFixed(3)}, ${ik.normalizedTarget.y.toFixed(3)}) · peso ${(ik.weight * 100).toFixed(0)}%`,
+          `ombro: ${(ik.shoulderAngle * 180 / Math.PI).toFixed(1)}° · cotovelo: ${(ik.elbowAngle * 180 / Math.PI).toFixed(1)}°`,
+          `erro do solver: ${ik.error.toFixed(2)} px · erro no render: ${renderedError.toFixed(2)} px`,
+          `alcance: ${ik.minimumDistance.toFixed(1)}–${ik.maximumDistance.toFixed(1)} px · ${ik.reachable ? "alvo alcançável" : "alvo limitado"}`,
+          `preferência: ${elbowPreference} · origem: forward model do rig em 1080×1920`,
+        ].join("\n");
+        syncIKFields(ik);
+      }
       function drawOverlay(plans) {
         if (document.querySelector("#overlay").checked && master.complete) { ctx.save(); ctx.globalAlpha = 0.28; ctx.drawImage(master, 0, 0, canvas.width, canvas.height); ctx.restore(); }
         const showBounds = document.querySelector("#bounds").checked; const showPivots = document.querySelector("#pivots").checked;
@@ -153,7 +207,7 @@
           if (showPivots || active) { const pivot = point(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); ctx.save(); ctx.strokeStyle = active ? "#ff8a8a" : "rgba(255,159,159,.55)"; ctx.lineWidth = active ? 3 : 1; ctx.beginPath(); ctx.moveTo(pivot.x - 8, pivot.y); ctx.lineTo(pivot.x + 8, pivot.y); ctx.moveTo(pivot.x, pivot.y - 8); ctx.lineTo(pivot.x, pivot.y + 8); ctx.stroke(); ctx.restore(); }
         }
       }
-      function render() { rig.setSceneDuration(20450); rig.setSpeechAmplitude(clamp(readValue("amplitude"), 0, 1)); if (rig.animationId() !== "WAVE_HELLO") rig.clearAnimation(); rig.update(timeMs, wavePlaying || timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const landmarkReport = drawLandmarks(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nlandmarks: ${landmarkReport.count}\nanimação: ${rig.animationId() || "cena base"}\ntempo: ${Math.round(timeMs)} ms${wavePlaying ? " · reproduzindo" : ""}\ndelta máximo pivô/landmark: ${landmarkReport.maxPivotDelta.toFixed(1)} px\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\ncruzes: pivôs transformados\nlinha/círculos ciano: landmarks anatômicos (amarelo = estimativa baixa)`; }
+      function render() { rig.setSceneDuration(20450); rig.setSpeechAmplitude(clamp(readValue("amplitude"), 0, 1)); if (rig.animationId() !== "WAVE_HELLO") rig.clearAnimation(); const expression = rig.animationId() === "WAVE_HELLO" ? "wave" : "neutral"; if (renderer.expression !== expression) renderer.setExpression(expression); rig.update(timeMs, wavePlaying || timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const landmarkReport = drawLandmarks(plans); drawIKOverlay(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nlandmarks: ${landmarkReport.count}\nanimação: ${rig.animationId() || "cena base"}\ntempo: ${Math.round(timeMs)} ms${wavePlaying ? " · reproduzindo" : ""}\ndelta máximo pivô/landmark: ${landmarkReport.maxPivotDelta.toFixed(1)} px\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\ncruzes: pivôs transformados\nlinha/círculos ciano: landmarks anatômicos (amarelo = estimativa baixa)`; }
       master.onload = render;
       await renderer.load(); layerSelect.value = selectedId; updateControls(); render();
     </script>

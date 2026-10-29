@@ -208,6 +208,29 @@ source image or invents hidden-joint precision. V5 gait and seated corrections
 are deterministic pose-channel adjustments; no physics system or second
 renderer was introduced.
 
+### Santa V5 arm IK boundary 012.6
+
+`frontend/src/two-bone-ik.mjs` is independent of Santa, TTS and the browser.
+It uses Canvas coordinates (+X right, +Y down, clockwise angles), supports
+reach clamping, elbow preference and joint limits, and returns analytic angles,
+joint positions and residual error. The Santa adapter consumes the existing
+landmarks and pack hierarchy rather than introducing a second skeleton.
+
+Because the painted arm layers use non-uniform X/Y scales, the Santa adapter
+also applies a deterministic forward-model refinement to the analytic result.
+The refinement models the actual upper-arm and forearm affine scales used by
+`LayeredCharacterRenderer`; it is not physics and does not replace the shared
+renderer. At full WAVE_HELLO poses the rendered hand pivot is verified against
+the requested target, while the clip's `weight` intentionally produces smooth
+rest/target blending during approach and return.
+
+The `wave` expression changes only the right-hand asset to the palm-facing
+variant. `SantaV5SceneRenderer`, the technical capture and the DEV calibration
+page all select the same expression and rig path. The calibration page exposes
+the target and elbow preference for diagnostics, including a pointer-drag
+override; these controls are development-only and are not a general character
+editor.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

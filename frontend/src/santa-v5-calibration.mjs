@@ -71,6 +71,43 @@ export const SANTA_V5_ANATOMICAL_LANDMARKS = Object.freeze([
   { id: "rightAnkle", layer: "right_shin", local: [0.5, 0.72], confidence: "medium", note: "ponto de encontro estimado com o cano da bota" },
 ]);
 
+/**
+ * Effective right-arm chain measured from the rendered neutral pack at
+ * 1080x1920. The layer pivots are calibrated to the anatomical landmarks, so
+ * an IK target controls the actual hand attachment point rather than a visual
+ * approximation inside the painted asset. Angles use the Canvas convention
+ * documented by `two-bone-ik.mjs`.
+ */
+export const SANTA_V5_RIGHT_ARM_IK_CALIBRATION = Object.freeze({
+  frameWidth: 1080,
+  frameHeight: 1920,
+  shoulder: Object.freeze({ x: 782.352, y: 399.36 }),
+  elbow: Object.freeze({ x: 772.65792, y: 666.8544 }),
+  wrist: Object.freeze({ x: 767.2777056, y: 841.8551808 }),
+  handTarget: Object.freeze({ x: 767.2777056, y: 841.8551808 }),
+  upperLength: 267.6700005947742,
+  forearmLength: 175.08346577446878,
+  baseShoulderAngle: 1.60702078383754,
+  baseElbowAngle: -0.005490192729581844,
+  elbowPreference: Object.freeze({ x: 1, y: 0.55 }),
+  restTarget: Object.freeze({ x: 767.2777056, y: 841.8551808 }),
+  waveTarget: Object.freeze({ x: 840, y: 300 }),
+});
+
+/**
+ * Affine geometry used by the real layered renderer for the right-arm chain.
+ * The non-uniform scales are intentional: the painted arm pieces fit their
+ * source boxes differently on X and Y. The IK adapter uses this metadata to
+ * refine the analytic two-bone solution against the actual rendered endpoint.
+ */
+export const SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY = Object.freeze({
+  rootScale: Object.freeze({ x: 0.6258121158911326, y: 1.0010137581462708 }),
+  upperScale: Object.freeze({ x: 0.37818359375, y: 0.3866080729166667 }),
+  forearmScale: Object.freeze({ x: 0.74, y: 0.46 }),
+  upperOffset: Object.freeze({ x: -40.96, y: 691.2 }),
+  forearmOffset: Object.freeze({ x: -30.72, y: 983.04 }),
+});
+
 const finiteUnit = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
 /**

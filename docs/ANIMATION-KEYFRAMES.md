@@ -16,21 +16,27 @@ for channel limits and for mapping channels to their own hierarchy.
 
 ## Santa V5 example
 
-`SANTA_V5_WAVE_HELLO_CLIP` is the first consumer. It coordinates the right
-upper arm, forearm, hand, head and torso through anticipation, elevation,
-three small hand reversals and a gradual return. It is selected with:
+`SANTA_V5_WAVE_HELLO_CLIP` is the first consumer. It coordinates a normalized
+right-hand target, IK weight, wrist oscillation and head motion through
+anticipation, elevation, three small hand reversals and a gradual return. It
+is selected with:
 
 ```js
 rig.setAnimation("WAVE_HELLO");
 const pose = rig.poseAt(2120, false);
 ```
 
-The clip is additive over the base rig, so breathing, blinking and RMS mouth
-animation remain available. A named clip temporarily owns the body channels
-that it animates, preventing the long scene choreography from fighting the
-gesture. No IK or mesh deformation is introduced in this version.
+The clip is additive over the base rig, so blinking and RMS mouth animation
+remain available. During WAVE_HELLO, the calibrated torso scale is held at its
+neutral value so the target remains deterministic. `SantaV5Rig` first solves a
+provider-independent two-bone IK request and then applies a small deterministic
+forward-model refinement for the pack's non-uniform painted-layer scales. This
+keeps the real rendered hand pivot, rather than only the analytic angles,
+within the measured target error. No mesh deformation or physics is used.
 
 The DEV page `/santa-v5-calibration.html` exposes the clip with play, pause,
 seek, keyframe inspection, landmark and pivot overlays. The five-pose gallery
 and the 5-second technical capture use the same `SantaV5Rig` and
-`LayeredCharacterRenderer`.
+`LayeredCharacterRenderer`; the wave expression swaps only the right-hand
+asset for the palm-facing `hand-right-wave.png` variant and preserves the
+original `hand-right.png` asset.

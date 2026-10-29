@@ -50,7 +50,7 @@
         const caption = document.createElement("figcaption"); caption.innerHTML = `${label}<small>${timeMs} ms</small>`; figure.append(canvas, caption); board.append(figure);
         const rig = new SantaV5Rig(); rig.setSceneDuration(20450); rig.setAnimation("WAVE_HELLO");
         const renderer = new LayeredCharacterRenderer(canvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: true });
-        await renderer.load(); renderer.renderFrame({ timeMs, speechAmplitude: 0, isPlaying: false }); drawOverlay(canvas, renderer);
+        await renderer.load(); renderer.setExpression("wave"); renderer.renderFrame({ timeMs, speechAmplitude: 0, isPlaying: false }); drawOverlay(canvas, renderer);
       }
       document.title = "completed";
     </script>

@@ -32,6 +32,7 @@
         const rig = new SantaV5Rig(); rig.setSceneDuration(20450); rig.setAnimation("WAVE_HELLO");
         const renderer = new LayeredCharacterRenderer(characterCanvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: false });
         await renderer.load();
+        renderer.setExpression("wave");
         const result = await captureLayeredFrames(renderer, { durationMs, fps, isPlaying: false, amplitudeAt: () => 0, onFrame: async ({ index, timeMs }) => sendFrame({ index, timeMs, blob: await blobFromFrame(renderer, outputCanvas) }) });
         const completion = { character: SANTA_V5_PACK.id, animation_id: "WAVE_HELLO", animation_format: FABULOOM_KEYFRAME_FORMAT, duration_ms: durationMs, canvas: { width: outputCanvas.width, height: outputCanvas.height }, fps, frame_count: result.frameCount, timing_source: "absolute_keyframe_time", audio: "none", purpose: "wave_hello_technical_demo" };
         const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });

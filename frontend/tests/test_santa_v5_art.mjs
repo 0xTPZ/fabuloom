@@ -11,6 +11,7 @@ test("Santa V5 final rig pack validates its fine-grained local assets", () => {
   assert.equal(SANTA_V5_PACK.voice_id, "pm_santa");
   assert.equal(SANTA_V5_PACK.language, "pt-BR");
   assert.equal(SANTA_V5_PACK.art_status, "production-rig-v1");
+  assert.ok(SANTA_V5_PACK.expressions.some((expression) => expression.id === "wave" && expression.overrides.right_hand.endsWith("hand-right-wave.png")));
   for (const role of ["torso", "pelvis", "neck", "head", "hair_front", "hair_back", "eyes", "eyelids", "brows", "mouth", "upper_arm", "forearm", "hand", "upper_leg", "lower_leg", "foot", "accessory"]) {
     assert.ok(SANTA_V5_PACK.layers.some((layer) => layer.role === role), `missing role ${role}`);
   }
@@ -19,6 +20,15 @@ test("Santa V5 final rig pack validates its fine-grained local assets", () => {
     assert.equal(existsSync(path), true, `missing asset ${layer.asset}`);
     assert.equal(readFileSync(path).subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `not a PNG: ${layer.asset}`);
   }
+});
+
+test("Santa V5 wave expression keeps the original hand and adds a valid palm-facing asset", () => {
+  const original = new URL("../assets/characters/topazio-narrators-v5/santa/hand-right.png", import.meta.url);
+  const wave = new URL("../assets/characters/topazio-narrators-v5/santa/hand-right-wave.png", import.meta.url);
+  assert.equal(existsSync(original), true);
+  assert.equal(existsSync(wave), true);
+  assert.equal(readFileSync(wave).subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(readFileSync(original).subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
 });
 
 test("Santa V5 keeps the independent anatomical hierarchy explicit", () => {
