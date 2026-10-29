@@ -122,6 +122,31 @@ blink, RMS mouth, breathing, arm/hand hierarchy and expressions, then confirm
 no console errors or warnings. The original portrait exporter remains covered
 by the Mission 010 render/probe checks.
 
+Mission 011 adds dependency-free Santa V3 contract and scene tests:
+
+```powershell
+node --test .\frontend\tests\test_santa_v3.mjs
+```
+
+The real local demonstration reuses the existing offline Kokoro environment
+and captures the same `SantaV3Rig` / `SantaV3SceneRenderer` used by the
+browser stage:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+$env:HF_DATASETS_OFFLINE = "1"
+python .\examples\santa_v3_video_demo.py `
+  --export-dir "E:\Fabuloom\workspace\exports" `
+  --reuse-manifest --overwrite
+```
+
+The command verifies contiguous PNG frames, measured WAV timing, a 1080x1920
+H.264/AAC MP4, a three-frame comparison image and an FFmpeg-readable output.
+The scene contains no invented word, phoneme or viseme timestamps. Human
+visual review remains required for final animation approval.
+
 ## Character Engine video demonstration
 
 The Mission 010.2 exporter uses a local Kokoro runtime and writes the Santa V2

@@ -3,6 +3,8 @@ import { CanvasCharacterRenderer, CharacterRig } from "./character.ts";
 import { FANTASY_NARRATOR_PACK } from "./fantasy-narrator-pack.mjs";
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { validateCharacterPack } from "./character-pack.mjs";
+import { SantaV3Rig, SantaV3SceneRenderer } from "./santa-v3-engine.ts";
+import { SANTA_V3_PACK } from "./santa-v3-pack.mjs";
 import { TOPAZIO_NARRATION_CATALOG, manifestVoiceId, narrationForCharacter, narrationForUrl } from "./topazio-narrations.mjs";
 import { TOPAZIO_NARRATOR_PACKS } from "./topazio-narrator-packs.mjs";
 import { validateManifest } from "./timeline.ts";
@@ -46,6 +48,8 @@ const geometricRig = new CharacterRig();
 const layeredRig = new LayeredCharacterRig();
 const geometricRenderer = new CanvasCharacterRenderer(canvas, geometricRig);
 const layeredRenderer = new LayeredCharacterRenderer(canvas, layeredRig, FANTASY_NARRATOR_PACK);
+const santaV3Rig = new SantaV3Rig();
+const santaV3Renderer = new SantaV3SceneRenderer(canvas, santaV3Rig);
 const narratorKeys = Object.keys(TOPAZIO_NARRATOR_PACKS);
 const narratorRigs = Object.fromEntries(narratorKeys.map((key) => [key, new LayeredCharacterRig()]));
 const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
@@ -53,6 +57,7 @@ const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
   new LayeredCharacterRenderer(canvas, narratorRigs[key], TOPAZIO_NARRATOR_PACKS[key]),
 ]));
 const narratorReady = Object.fromEntries(narratorKeys.map((key) => [key, false]));
+let santaV3Ready = false;
 let activeRig = narratorRigs.dora;
 let activeRenderer = narratorRenderers.dora;
 let activeCharacterId = "dora";
@@ -67,6 +72,7 @@ const characterMeta = {
   dora: { name: "Dora", kind: "Narradora oficial · Rig V2", presence: "Voz acolhedora · pf_dora", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
   santa: { name: "Santa", kind: "Narrador oficial · Rig V2", presence: "Voz sábia · pm_santa", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
   alex: { name: "Alex", kind: "Narrador oficial · Rig V2", presence: "Voz confiante · pm_alex", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
+  "santa-v3": { name: "Santa V3", kind: "Narrador oficial · Rig completo", presence: "Voz sábia · pm_santa", motion: "Corpo, braços, mãos, pernas, xícara e livro" },
 };
 
 for (const narration of NARRATIONS) {
@@ -106,6 +112,10 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
     characterSelect.value = "geometric";
     return Promise.resolve(false);
   }
+  if (characterId === "santa-v3" && !santaV3Ready) {
+    characterSelect.value = "santa";
+    return Promise.resolve(false);
+  }
   if (narratorKeys.includes(characterId) && !narratorReady[characterId]) {
     characterSelect.value = layeredReady ? "fantasy" : "geometric";
     return Promise.resolve(false);
@@ -117,15 +127,19 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
   } else if (narratorKeys.includes(characterId)) {
     activeRig = narratorRigs[characterId];
     activeRenderer = narratorRenderers[characterId];
+  } else if (characterId === "santa-v3") {
+    activeRig = santaV3Rig;
+    activeRenderer = santaV3Renderer;
   } else {
     activeRig = geometricRig;
     activeRenderer = geometricRenderer;
   }
   if (characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
+  else if (characterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
   updateCharacterMeta();
   updateUi(player?.state || "stopped");
-  if (!loadVoice || !narratorKeys.includes(characterId)) return Promise.resolve(true);
-  const narration = narrationForCharacter(characterId);
+  if (!loadVoice || (!narratorKeys.includes(characterId) && characterId !== "santa-v3")) return Promise.resolve(true);
+  const narration = narrationForCharacter(characterId === "santa-v3" ? "santa" : characterId);
   if (!narration) return Promise.resolve(false);
   narrationSelect.value = narration.url;
   return loadNarration(narration);
@@ -156,6 +170,17 @@ async function prepareLayeredCharacters() {
       option.disabled = true;
       option.textContent = `${characterMeta[key].name} · asset indisponível`;
     }
+  }
+  const santaV3Option = characterSelect.querySelector('option[value="santa-v3"]');
+  try {
+    validateCharacterPack(SANTA_V3_PACK);
+    await santaV3Renderer.characterRenderer.load();
+    santaV3Ready = true;
+    santaV3Option.disabled = false;
+    santaV3Option.textContent = "Santa V3 · pm_santa";
+  } catch (_error) {
+    santaV3Option.disabled = true;
+    santaV3Option.textContent = "Santa V3 · asset indisponível";
   }
   if (narratorReady.dora) await selectCharacter("dora");
   else if (layeredReady) await selectCharacter("fantasy", { loadVoice: false });
@@ -370,6 +395,7 @@ characterSelect.addEventListener("change", () => { void selectCharacter(characte
 expressionSelect.addEventListener("change", () => {
   if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
   else if (narratorKeys.includes(activeCharacterId)) narratorRenderers[activeCharacterId].setExpression(expressionSelect.value);
+  else if (activeCharacterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
 });
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
@@ -386,7 +412,17 @@ function frame(timeMs) {
     activeRig.setSpeechAmplitude(0);
     activeRig.update(timeMs, false);
   }
-  activeRenderer.render();
+  if (activeCharacterId === "santa-v3") {
+    santaV3Rig.setSceneDuration(manifest?.duration_ms || 1);
+    santaV3Renderer.renderFrame({
+      timeMs,
+      durationMs: manifest?.duration_ms || 1,
+      speechAmplitude: player?.amplitude() || 0,
+      isPlaying: player?.state === "playing",
+    });
+  } else {
+    activeRenderer.render();
+  }
   requestAnimationFrame(frame);
 }
 

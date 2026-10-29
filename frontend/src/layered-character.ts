@@ -39,7 +39,24 @@ function layerRotation(layer, pack, pose) {
   if (pack.bindings.hair_sway === layer.id) rotation += pose.hair_sway;
   if (pack.bindings.left_arm === layer.id) rotation += pose.left_arm;
   if (pack.bindings.right_arm === layer.id) rotation += pose.right_arm;
+  for (const [channel, target] of Object.entries(pack.bindings)) {
+    if (target === layer.id && channel.endsWith("_rotation") && channel !== "head_rotation") {
+      rotation += Number(pose[channel]) || 0;
+    }
+  }
   return rotation;
+}
+
+function layerTranslation(layer, pack, pose, frameWidth, frameHeight) {
+  let x = 0;
+  let y = 0;
+  for (const [channel, target] of Object.entries(pack.bindings)) {
+    if (target !== layer.id) continue;
+    const value = Number(pose[channel]) || 0;
+    if (channel.endsWith("_x")) x += value * frameWidth;
+    if (channel.endsWith("_y")) y += value * frameHeight;
+  }
+  return [x, y];
 }
 
 /**
@@ -64,6 +81,8 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
 
     let local = IDENTITY;
     local = multiply(local, translate(frameWidth * position[0], frameHeight * position[1]));
+    const [offsetX, offsetY] = layerTranslation(layer, pack, pose, frameWidth, frameHeight);
+    if (offsetX || offsetY) local = multiply(local, translate(offsetX, offsetY));
     local = multiply(local, rotate(layerRotation(layer, pack, pose)));
     let animatedY = 1;
     if (pack.bindings.eye_open === layer.id) animatedY = Math.max(0.08, clamp(pose.eye_open));

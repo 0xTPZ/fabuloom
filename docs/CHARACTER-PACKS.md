@@ -22,7 +22,7 @@ point placed there, `size` (when supplied) scales relative to that frame, and
 `z` controls stable back-to-front order. A missing `size` uses a deterministic
 renderer default. This keeps the data contract independent of Canvas.
 
-The current list of animation channels is `head_rotation`, `eye_open`, `mouth_open`, `breathing`, `left_arm`, `right_arm`, `hair_sway`, `brow_raise`, and `expression`.
+The current list of animation channels is `head_rotation`, `eye_open`, `mouth_open`, `breathing`, `left_arm`, `right_arm`, `hair_sway`, `brow_raise`, `expression`, plus the additive V3 joint channels `torso_rotation`, `torso_y`, `pelvis_y`, `left_arm_rotation`, `right_arm_rotation`, `left_forearm_rotation`, `right_forearm_rotation`, `left_hand_rotation`, `right_hand_rotation`, `left_thigh_rotation`, `right_thigh_rotation`, `left_shin_rotation`, `right_shin_rotation`, and `left_foot_rotation` / `right_foot_rotation`.
 
 ### Animation-ready profile
 
@@ -123,6 +123,24 @@ local exporter can stream each Canvas PNG frame to FFmpeg while using the same
 rig pose, measured audio clock and RMS amplitude as the Stage. The current
 Mission 010 exporter remains the reference portrait exporter until that frame
 stream is connected to the final MP4 pipeline.
+
+### Santa V3 scene rig
+
+Mission 011 adds `frontend/src/santa-v3-pack.mjs` and
+`frontend/src/santa-v3-engine.ts`. Santa V3 keeps the public character/0.1
+descriptor but adds pelvis, upper-leg, lower-leg and foot roles and binds each
+major arm and leg joint independently. `SantaV3Rig.poseAt()` is clock-pure and
+`SantaV3SceneRenderer` composes the same layered renderer with a deterministic
+table, chair, book and cup scene. The scene director contains continuous
+walk, sit, reach, drink, return, read and explain phases; props are driven by
+the same absolute-time plan, not by a separate FFmpeg animation.
+
+The V3 capture page streams 1080x1920 PNG frames from the browser renderer to
+the loopback-only capture endpoint. Kokoro supplies only measured PCM RMS for
+the mouth; phoneme and viseme timestamps remain unavailable. The assets are
+original lightweight SVG technical layers and reuse only the already-approved
+Santa facial artwork. This is an animation-ready demonstrator, not final
+cinematic illustration or a character editor.
 
 ## Validation and security
 

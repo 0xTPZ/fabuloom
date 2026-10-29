@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom Santa V3 deterministic capture</title>
+    <style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="1080" height="1920"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { captureSantaV3Frames, SantaV3Rig, SantaV3SceneRenderer } from "./src/santa-v3-engine.ts";
+      import { SANTA_V3_PACK } from "./src/santa-v3-pack.mjs";
+      import { validateCharacterPack } from "./src/character-pack.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const manifestUrl = params.get("manifest");
+      const fps = Number(params.get("fps") || 30);
+      const status = document.querySelector("#status");
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+      const safeAudioUrl = (uri) => { const filename = String(uri).split(/[\\/]/).pop(); if (!filename || filename.includes("..")) throw new Error(`unsafe audio URI: ${uri}`); return `/exports/${encodeURIComponent(filename)}`; };
+      const ascii = (view, offset, length) => String.fromCharCode(...new Uint8Array(view.buffer, view.byteOffset + offset, length));
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url); if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+        const buffer = await response.arrayBuffer(); const view = new DataView(buffer); if (view.byteLength < 44 || ascii(view, 0, 4) !== "RIFF" || ascii(view, 8, 4) !== "WAVE") throw new Error(`invalid WAV header for ${url}`);
+        let offset = 12, sampleRate = 0, channels = 0, bits = 0, dataOffset = -1, dataLength = 0;
+        while (offset + 8 <= view.byteLength) { const id = ascii(view, offset, 4); const length = view.getUint32(offset + 4, true); const start = offset + 8; if (id === "fmt " && length >= 16) { if (view.getUint16(start, true) !== 1) throw new Error("only PCM WAV is supported"); channels = view.getUint16(start + 2, true); sampleRate = view.getUint32(start + 4, true); bits = view.getUint16(start + 14, true); } else if (id === "data") { dataOffset = start; dataLength = Math.min(length, view.byteLength - start); } offset = start + length + (length % 2); }
+        if (sampleRate <= 0 || channels !== 1 || bits !== 16 || dataOffset < 0) throw new Error(`capture requires mono PCM-16 WAV: ${url}`);
+        const samples = new Float32Array(Math.floor(dataLength / 2)); for (let i = 0; i < samples.length; i += 1) samples[i] = view.getInt16(dataOffset + i * 2, true) / 32768;
+        return { sampleRate, samples };
+      }
+      function composeSamples(manifest, wavs, sampleRate) { const total = Math.max(1, Math.round(manifest.duration_ms * sampleRate / 1000)); const samples = new Float32Array(total); for (const [index, segment] of manifest.segments.entries()) { const start = Math.max(0, Math.round(segment.start_ms * sampleRate / 1000)); if (start < total) samples.set(wavs[index].samples.subarray(0, total - start), start); } return samples; }
+      function makeRmsReader(samples, sampleRate) { const half = Math.max(1, Math.round(sampleRate * .018)); return (timeMs) => { const center = Math.round(timeMs / 1000 * sampleRate); const start = Math.max(0, center - half); const end = Math.min(samples.length, center + half); if (end <= start) return 0; let sum = 0; for (let i = start; i < end; i += 1) sum += samples[i] * samples[i]; return Math.max(0, Math.min(1, (Math.sqrt(sum / (end - start)) - .012) * 7)); }; }
+      async function sendFrame({ index, timeMs, blob }) { const response = await fetch(`/capture/${encodeURIComponent(session)}/${String(index).padStart(6, "0")}.png`, { method: "POST", headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`); }
+      async function main() {
+        if (!session || !manifestUrl) fail("session and manifest are required"); if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps"); validateCharacterPack(SANTA_V3_PACK);
+        const response = await fetch(manifestUrl); if (!response.ok) fail(`manifest request failed with HTTP ${response.status}`); const manifest = await response.json();
+        if (!Number.isInteger(manifest.duration_ms) || manifest.duration_ms <= 0 || !Array.isArray(manifest.segments) || !manifest.segments.length) fail("manifest has no measured segments");
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(safeAudioUrl(segment.audio_uri)))); const sampleRate = wavs[0].sampleRate; if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
+        const amplitudeAt = makeRmsReader(composeSamples(manifest, wavs, sampleRate), sampleRate); const canvas = document.querySelector("#capture-canvas");
+        const renderer = new SantaV3SceneRenderer(canvas, new SantaV3Rig(), { assetRoot: new URL("./", location.href).href }); await renderer.load();
+        const result = await captureSantaV3Frames(renderer, { durationMs: manifest.duration_ms, fps, amplitudeAt, onFrame: sendFrame });
+        const completion = { character: "santa-v3", voice_id: manifest.metadata?.voice_id || manifest.segments[0]?.voice_id || null, duration_ms: manifest.duration_ms, sample_rate: sampleRate, canvas: { width: canvas.width, height: canvas.height }, fps, frame_count: result.frameCount, animation_format: result.animation_format, timing_source: "measured_wav_segments", mouth_source: "pcm16_rms_envelope", word_phoneme_viseme_timing: "unavailable" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) }); if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>

@@ -50,6 +50,14 @@ and the video exporter share the same rig. Mission 010.2 validates the bridge
 with Santa V2, real Kokoro `pm_santa` audio, transparent deterministic Canvas
 frames, measured segment captions, and a 1080x1920 H.264/AAC MP4. The original
 portrait export remains preserved as a compatibility reference.
+Mission 011 adds Santa V3, a full-body original technical character pack with
+independent pelvis, head, arms, hands, legs and feet. `SantaV3Rig` drives a
+continuous walk/sit/reach/drink/read/explain sequence, while
+`SantaV3SceneRenderer` reuses the layered renderer for deterministic 1080x1920
+browser capture. A real Kokoro `pm_santa` narration, RMS mouth response and
+the same rig produce `workspace\\exports\\videos\\fabuloom-santa-v3.mp4`.
+The result is a reusable animation demonstrator; final painted art, phonetic
+alignment and a general scene editor remain future work.
 
 ## Technology direction
 
