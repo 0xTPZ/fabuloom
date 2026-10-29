@@ -18,4 +18,5 @@ export class SantaV4SceneRenderer extends SantaV3SceneRenderer {
   }
 }
 
-export { captureSantaV3Frames, SANTA_V4_PACK };
+export const captureSantaV4Frames = captureSantaV3Frames;
+export { SANTA_V4_PACK };

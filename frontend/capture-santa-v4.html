@@ -9,7 +9,7 @@
     <canvas id="capture-canvas" width="1080" height="1920"></canvas>
     <pre id="status">initializing</pre>
     <script type="module">
-      import { captureSantaV3Frames, SantaV4Rig, SantaV4SceneRenderer } from "./src/santa-v4-engine.ts";
+      import { captureSantaV4Frames, SantaV4Rig, SantaV4SceneRenderer } from "./src/santa-v4-engine.ts";
       import { SANTA_V4_PACK } from "./src/santa-v4-pack.mjs";
       import { validateCharacterPack } from "./src/character-pack.mjs";
 
@@ -41,7 +41,7 @@
         const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(safeAudioUrl(segment.audio_uri)))); const sampleRate = wavs[0].sampleRate; if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
         const amplitudeAt = makeRmsReader(composeSamples(manifest, wavs, sampleRate), sampleRate); const canvas = document.querySelector("#capture-canvas");
         const renderer = new SantaV4SceneRenderer(canvas, new SantaV4Rig(), { assetRoot: new URL("./", location.href).href }); await renderer.load();
-        const result = await captureSantaV3Frames(renderer, { durationMs: manifest.duration_ms, fps, amplitudeAt, onFrame: sendFrame });
+        const result = await captureSantaV4Frames(renderer, { durationMs: manifest.duration_ms, fps, amplitudeAt, onFrame: sendFrame });
         const completion = { character: "santa-v4", voice_id: manifest.metadata?.voice_id || manifest.segments[0]?.voice_id || null, duration_ms: manifest.duration_ms, sample_rate: sampleRate, canvas: { width: canvas.width, height: canvas.height }, fps, frame_count: result.frameCount, animation_format: result.animation_format, timing_source: "measured_wav_segments", mouth_source: "pcm16_rms_envelope", word_phoneme_viseme_timing: "unavailable" };
         const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) }); if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
       }
