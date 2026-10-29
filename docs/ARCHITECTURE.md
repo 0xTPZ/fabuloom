@@ -70,6 +70,21 @@ the smaller expressive accents are vector layers. This is suitable for the
 runtime proof and future migration, but the remaining painted layer authoring
 is deliberately tracked as an art-quality follow-up.
 
+### Official narrator trio 009
+
+The current Character Stage demonstrator defaults to three small, validated
+layered packs: Dora (`pf_dora`), Santa (`pm_santa`), and Alex (`pm_alex`). Each
+uses a portrait root plus independent eyes, eyelids, brows, and mouth layers,
+with the same provider-independent rig channels for head motion, breathing,
+blinking, brow motion, expression, and RMS mouth response. The portraits are
+original generated assets with a shared navy, pale-blue, and gold narrator
+uniform language; no private Topazioverse artwork or model assets are included.
+
+The voice IDs are metadata only: the character engine does not call Kokoro and
+remains usable with any narration manifest. Ari and Lia remain selectable
+technical references. A full character editor and external pack importer are
+explicitly deferred to a later mission.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

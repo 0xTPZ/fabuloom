@@ -3,6 +3,7 @@ import { CanvasCharacterRenderer, CharacterRig } from "./character.ts";
 import { FANTASY_NARRATOR_PACK } from "./fantasy-narrator-pack.mjs";
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { validateCharacterPack } from "./character-pack.mjs";
+import { TOPAZIO_NARRATOR_PACKS } from "./topazio-narrator-packs.mjs";
 import { validateManifest } from "./timeline.ts";
 
 const NARRATIONS = [
@@ -43,16 +44,26 @@ const geometricRig = new CharacterRig();
 const layeredRig = new LayeredCharacterRig();
 const geometricRenderer = new CanvasCharacterRenderer(canvas, geometricRig);
 const layeredRenderer = new LayeredCharacterRenderer(canvas, layeredRig, FANTASY_NARRATOR_PACK);
-let activeRig = geometricRig;
-let activeRenderer = geometricRenderer;
-let activeCharacterId = "geometric";
+const narratorKeys = Object.keys(TOPAZIO_NARRATOR_PACKS);
+const narratorRigs = Object.fromEntries(narratorKeys.map((key) => [key, new LayeredCharacterRig()]));
+const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
+  key,
+  new LayeredCharacterRenderer(canvas, narratorRigs[key], TOPAZIO_NARRATOR_PACKS[key]),
+]));
+const narratorReady = Object.fromEntries(narratorKeys.map((key) => [key, false]));
+let activeRig = narratorRigs.dora;
+let activeRenderer = narratorRenderers.dora;
+let activeCharacterId = "dora";
 let layeredReady = false;
 let player = null;
 let manifest = null;
 
 const characterMeta = {
-  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", presence: "Personagem demonstrativo", motion: "Respiração sutil" },
+  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", presence: "Referência técnica", motion: "Respiração sutil" },
   fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", presence: "Narrador ilustrado", motion: "Cabeça, braços, cabelo e respiração" },
+  dora: { name: "Dora", kind: "Narradora oficial · Kokoro", presence: "Voz acolhedora · pf_dora", motion: "Cabeça, olhos, boca e respiração" },
+  santa: { name: "Santa", kind: "Narrador oficial · Kokoro", presence: "Voz sábia · pm_santa", motion: "Cabeça, olhos, boca e respiração" },
+  alex: { name: "Alex", kind: "Narrador oficial · Kokoro", presence: "Voz confiante · pm_alex", motion: "Cabeça, olhos, boca e respiração" },
 };
 
 for (const narration of NARRATIONS) {
@@ -77,15 +88,27 @@ function selectCharacter(characterId) {
     characterSelect.value = "geometric";
     return;
   }
+  if (narratorKeys.includes(characterId) && !narratorReady[characterId]) {
+    characterSelect.value = layeredReady ? "fantasy" : "geometric";
+    return;
+  }
   activeCharacterId = characterId;
-  activeRig = characterId === "fantasy" ? layeredRig : geometricRig;
-  activeRenderer = characterId === "fantasy" ? layeredRenderer : geometricRenderer;
-  if (characterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
+  if (characterId === "fantasy") {
+    activeRig = layeredRig;
+    activeRenderer = layeredRenderer;
+  } else if (narratorKeys.includes(characterId)) {
+    activeRig = narratorRigs[characterId];
+    activeRenderer = narratorRenderers[characterId];
+  } else {
+    activeRig = geometricRig;
+    activeRenderer = geometricRenderer;
+  }
+  if (characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
   updateCharacterMeta();
   updateUi(player?.state || "stopped");
 }
 
-async function prepareLayeredCharacter() {
+async function prepareLayeredCharacters() {
   const fantasyOption = characterSelect.querySelector('option[value="fantasy"]');
   try {
     validateCharacterPack(FANTASY_NARRATOR_PACK);
@@ -98,6 +121,22 @@ async function prepareLayeredCharacter() {
     fantasyOption.textContent = "Ari · asset indisponível";
     characterKind.textContent = "Pack em camadas · indisponível";
   }
+  for (const key of narratorKeys) {
+    const option = characterSelect.querySelector(`option[value="${key}"]`);
+    try {
+      validateCharacterPack(TOPAZIO_NARRATOR_PACKS[key]);
+      await narratorRenderers[key].load();
+      narratorReady[key] = true;
+      option.disabled = false;
+      option.textContent = `${characterMeta[key].name} · ${TOPAZIO_NARRATOR_PACKS[key].voice_id}`;
+    } catch (_error) {
+      option.disabled = true;
+      option.textContent = `${characterMeta[key].name} · asset indisponível`;
+    }
+  }
+  if (narratorReady.dora) selectCharacter("dora");
+  else if (layeredReady) selectCharacter("fantasy");
+  else selectCharacter("geometric");
 }
 
 function formatTime(milliseconds) {
@@ -260,7 +299,10 @@ stopButton.addEventListener("click", () => player?.stop());
 seekInput.addEventListener("input", () => player?.seek(Number(seekInput.value)));
 narrationSelect.addEventListener("change", () => loadNarration(narrationSelect.value));
 characterSelect.addEventListener("change", () => selectCharacter(characterSelect.value));
-expressionSelect.addEventListener("change", () => { if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value); });
+expressionSelect.addEventListener("change", () => {
+  if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
+  else if (narratorKeys.includes(activeCharacterId)) narratorRenderers[activeCharacterId].setExpression(expressionSelect.value);
+});
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
 sidebarBackdrop?.addEventListener("click", () => setSidebarOpen(false));
@@ -281,6 +323,6 @@ function frame(timeMs) {
 }
 
 updateCharacterMeta();
-prepareLayeredCharacter();
+prepareLayeredCharacters();
 loadNarration(NARRATIONS[0].url);
 requestAnimationFrame(frame);

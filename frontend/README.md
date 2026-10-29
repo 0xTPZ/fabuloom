@@ -21,6 +21,13 @@ anatomical hierarchy, expressions, blinking, head motion, brow motion, arm
 gestures, mouth openness, breathing, and subtle hair sway are handled by
 `src/layered-character.ts`.
 
+The primary demonstrators are now the simple official narrator trio: Dora
+(`pf_dora`), Santa (`pm_santa`), and Alex (`pm_alex`). Their shared original
+uniform language and portrait-based layers are independent of Kokoro at
+runtime; the voice IDs are metadata used to keep the visual identities aligned
+with the narration voices. Ari and Lia remain available as technical
+references.
+
 ## Run locally
 
 From `E:\Fabuloom\studio`:

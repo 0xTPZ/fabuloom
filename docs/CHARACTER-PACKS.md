@@ -71,6 +71,26 @@ while facial accents, hair motion and hands are independent SVG layers. This
 is a functional runtime rig and an asset-authoring bridge, not a claim that
 every painted pixel is production-ready for a final long-form character pack.
 
+### Official narrator trio
+
+Mission 009 adds three intentionally simple official demonstrators:
+
+| Pack | Kokoro voice metadata | Role |
+| --- | --- | --- |
+| Dora | `pf_dora` | welcoming, serene narrator |
+| Santa | `pm_santa` | mature, wise narrator |
+| Alex | `pm_alex` | young, confident narrator |
+
+The packs live in `frontend/src/topazio-narrator-packs.mjs` and reuse the
+provider-neutral v0.1 contract. Their original transparent portraits are in
+`frontend/assets/characters/topazio-narrators/`; they share a navy, pale-blue,
+and gold uniform language with a subtle gem ornament. The three character
+choices are the primary stage demonstrators, while Ari and Lia remain
+references for the richer and geometric rigs.
+
+These assets are a maintainable visual foundation, not final production art.
+The editor and external character-pack import remain outside this mission.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.

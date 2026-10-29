@@ -31,6 +31,11 @@ original adult fantasy narrator pack while preserving the geometric rig.
 Mission 007A.2 refines Ari into a 16-node anatomical rig with independent
 head, face, hair, arms, hands and accessory transforms; the torso remains the
 breathing root and is not rotated by head motion.
+Mission 009 adds three official demonstrator narrators — Dora (`pf_dora`),
+Santa (`pm_santa`), and Alex (`pm_alex`) — using a shared original
+Topazioverse-inspired navy, pale-blue, and gold uniform language. They are
+simple, reusable layered packs for the current Character Stage, not final art;
+the character editor and external pack import remain deferred.
 Piper, Animus, full editor, MP4 export, and cinematic animation are not
 implemented yet.
 

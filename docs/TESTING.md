@@ -83,3 +83,15 @@ is active, desktop composition, mobile no-overflow, and empty console error /
 warning logs. Mission 007A.2 additionally covers the 16-node Ari anatomical
 hierarchy, head-only rotation isolation, inherited facial transforms, arm /
 hair / brow bindings, and the refined original layer assets.
+
+Mission 009 adds the official narrator-pack checks:
+
+```powershell
+node --test .\frontend\tests\test_topazio_narrators.mjs
+```
+
+The test validates Dora, Santa, and Alex pack metadata, PT-BR Kokoro voice
+identifiers, v0.1 contract validation, and finite layered draw plans. Browser
+validation should additionally select each narrator, verify the shared stage
+layout and inspector metadata, exercise expression and transport controls,
+seek through the manifest, and confirm no console errors or warnings.
