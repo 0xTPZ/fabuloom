@@ -211,9 +211,9 @@ function drawCup(ctx, x, y, angle = 0) {
   ctx.restore();
 }
 
-function propState(scene) {
+function propState(scene, handAnchor = null) {
   const tableCup = { x: 820, y: 1248 };
-  const handCup = { x: scene.characterX + 470, y: scene.characterY + 520 };
+  const handCup = handAnchor || { x: scene.characterX + 470, y: scene.characterY + 520 };
   const mouthCup = { x: scene.characterX + 350, y: scene.characterY + 380 };
   if (scene.cupState === "table") return { ...tableCup, angle: 0, held: false };
   if (scene.cupState === "reaching") {
@@ -226,6 +226,10 @@ function propState(scene) {
     return { x: lerp(handCup.x, mouthCup.x, p), y: lerp(handCup.y, mouthCup.y, p), angle: -0.08, held: true };
   }
   return { ...tableCup, angle: 0, held: false };
+}
+
+function pointFromMatrix(matrix, x, y) {
+  return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f };
 }
 
 export class SantaV3SceneRenderer {
@@ -253,7 +257,16 @@ export class SantaV3SceneRenderer {
     this.rig.setSpeechAmplitude(speechAmplitude);
     this.characterRenderer.renderFrame({ timeMs, speechAmplitude, isPlaying });
     const ctx = this.context; const width = this.canvas.width; const height = this.canvas.height;
-    const scene = santaV3SceneAt(timeMs, durationMs); const props = propState(scene);
+    const scene = santaV3SceneAt(timeMs, durationMs);
+    const handPlan = this.characterRenderer.getLayerDrawPlan().find((entry) => entry.layer.id === "right_hand");
+    const characterScaleY = this.characterDrawHeight / this.characterCanvas.height;
+    const localHand = handPlan
+      ? pointFromMatrix(handPlan.matrix, handPlan.intrinsic[0] * 0.5, handPlan.intrinsic[1] * 0.38)
+      : null;
+    const handAnchor = localHand
+      ? { x: scene.characterX + localHand.x, y: scene.characterY + localHand.y * characterScaleY }
+      : null;
+    const props = propState(scene, handAnchor);
     drawBackground(ctx, width, height);
     drawChair(ctx, 230, 1325); drawTable(ctx, 540, 1320); drawBook(ctx, 700, 1236);
     ctx.drawImage(this.characterCanvas, scene.characterX, scene.characterY, this.characterCanvas.width, this.characterDrawHeight);

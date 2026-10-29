@@ -156,21 +156,26 @@ Santa V4 is intentionally independent from Santa V3. `SantaV4Rig` and
 only the pack and stage title change. The concept reference generated during
 the art pass is a design reference, not a runtime layer or a published model.
 
-### Santa V5 production-art preview
+### Santa V5 production rig
 
-Mission 012 starts a higher-fidelity art pass using original transparent PNG
-assets under `frontend/assets/characters/topazio-narrators-v5/santa/`. The
-master and production pieces follow the approved Santa identity with a larger
-expressive head, natural shoulders and limbs, tailored uniform construction,
-fabric texture, gold trim, expressive hands, gray hair, glasses and beard.
+Mission 012.1 promotes the original transparent PNG direction to the first
+fine-grained V5 rig pass. `frontend/src/santa-v5-pack.mjs` keeps the
+`fabuloom.character/0.1` contract and exposes separate neck, head, hair,
+facial overlays, upper arms, forearms, hands, thighs, shins and feet. Pivots
+and parent transforms are explicit; `SantaV5Rig` reuses the proven V3
+animation catalogue and adds only deterministic mouth, wrist and foot polish.
 
-`frontend/src/santa-v5-pack.mjs` is intentionally labeled
-`production-art-preview`. It is useful for checking scale, silhouette and
-basic head/torso/limb transforms in `frontend/santa-v5-preview.html`, but it
-does not claim final fine-grained rig readiness because some generated pieces
-still combine adjacent joints. Santa V4 remains the main approved technical
-reference until the owner reviews the art and the remaining layer separation is
-completed.
+The pack is selectable in Character Stage as `Santa V5 · pm_santa`. The
+offline exporter `examples/santa_v5_video_demo.py` loads the same
+`SantaV5SceneRenderer` used by the Stage, so the MP4 does not contain a second
+animation implementation. The scene renderer exposes the resolved layer plan
+and anchors the cup to `right_hand` when that layer exists. The RMS mouth
+signal remains an amplitude approximation; word, phoneme and viseme times are
+not fabricated.
+
+The pack is a first production rig pass, not a claim of finished cinematic art.
+Generated PNGs are original Fabuloom assets made for this pass; model weights,
+private media and concept references remain outside the public repository.
 
 ## Validation and security
 

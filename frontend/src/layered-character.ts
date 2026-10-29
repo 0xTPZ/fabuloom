@@ -249,6 +249,17 @@ export class LayeredCharacterRenderer {
     return this.canvas;
   }
 
+  /**
+   * Expose the resolved plan used by render(). Scene composition can anchor a
+   * prop to the same transformed hand or other layer without recreating the
+   * hierarchy with a second set of coordinates.
+   */
+  getLayerDrawPlan() {
+    if (!this.loaded) return [];
+    const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
+    return buildLayerDrawPlan(this.pack, this.canvas.width, this.canvas.height, this.rig.pose(), assetSizes);
+  }
+
   resolvedAsset(layer) {
     const expression = this.pack.expressions.find((candidate) => candidate.id === this.expression);
     return expression?.overrides?.[layer.id] || layer.asset;
@@ -264,8 +275,7 @@ export class LayeredCharacterRenderer {
       ctx.clearRect(0, 0, width, height);
     }
     if (!this.loaded) return;
-    const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
-    const plans = buildLayerDrawPlan(this.pack, width, height, this.rig.pose(), assetSizes);
+    const plans = this.getLayerDrawPlan();
     for (const plan of plans) {
       const asset = this.resolvedAsset(plan.layer);
       const record = this.images.get(asset);

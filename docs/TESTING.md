@@ -225,16 +225,25 @@ The command validates the local V4 pack, contiguous PNG frames, measured WAV
 duration, H.264/AAC output and V3/V4 comparison frame. It does not synthesize
 new audio. Word, phoneme and viseme timing remain unavailable.
 
-## Santa V5 art preview
+## Santa V5 rig and video capture
 
-Mission 012 adds offline asset-contract tests without generating a video:
+Mission 012.1 validates the final V5 layer contract, deterministic transforms,
+independent head/torso motion and visible hand channels:
 
 ```powershell
 node --test .\frontend\tests\test_santa_v5_art.mjs
 ```
 
 For visual review, start the loopback stage server and open
-`/santa-v5-preview.html`. The preview checks a neutral composition, a visible
-arm transform and an independent head transform using the existing layered
-renderer. The pack is marked as an art preview; it must not be treated as the
-final Santa V5 rig until the remaining joint separation is approved.
+`/santa-v5-preview.html`. The preview uses the same fine-grained pack as the
+Stage. To produce the measured local demonstration and frame comparisons:
+
+```powershell
+$env:PYTHONPATH = 'E:\Fabuloom\studio\src'
+& 'E:\Fabuloom\workspace\.venv\Scripts\python.exe' .\examples\santa_v5_video_demo.py --overwrite
+```
+
+The capture validates a contiguous 30 FPS PNG sequence, 1080x1920 composition,
+the real measured `pm_santa` WAV duration, and FFprobe H.264/AAC output. The
+comparison artifacts are written under `E:\Fabuloom\workspace\exports\videos`.
+RMS mouth motion is intentionally not phoneme or viseme alignment.

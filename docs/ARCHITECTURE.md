@@ -172,6 +172,27 @@ on one pose implementation while preserving the V3 pack for comparison and
 compatibility. The new SVG layers are original and local; the runtime does not
 load the generated concept reference.
 
+### Santa V5 rig finalization 012.1
+
+Santa V5 continues the same single-engine rule. `SantaV5Rig` subclasses the
+deterministic Santa rig and `SantaV5SceneRenderer` supplies the V5 pack to the
+existing scene renderer. The pack is more granular than the V5 art preview:
+head, neck, hair, facial overlays, upper/lower limb segments, hands and feet
+each have their own parent and pivot. The head is a child of the neck, while
+the neck is a child of the torso, so head rotation cannot rotate the torso.
+
+`LayeredCharacterRenderer.getLayerDrawPlan()` exposes the exact resolved
+matrices already used for drawing. Scene props use this read-only plan to
+anchor the cup to the transformed `right_hand` layer, avoiding a second,
+divergent hand trajectory. The fallback remains for older packs without an
+explicit hand. Browser Stage and offline capture therefore share the same
+rig, asset transforms, RMS mouth signal and deterministic frame schedule.
+
+`frontend/capture-santa-v5.html` is loopback-only through the existing local
+server. `examples/santa_v5_video_demo.py` reuses measured audio, captures PNG
+frames in the browser, and lets FFmpeg encode the final H.264/AAC file. No
+weights or generated media are committed to the public repository.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:
