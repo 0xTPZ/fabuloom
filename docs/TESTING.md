@@ -54,6 +54,7 @@ TypeScript stripping:
 ```powershell
 node --experimental-strip-types .\frontend\tests\test_timeline.mjs
 node --experimental-strip-types .\frontend\tests\test_audio.mjs
+node --experimental-strip-types --test .\frontend\tests\test_layered_character.mjs
 python .\frontend\server.py
 ```
 
@@ -72,3 +73,33 @@ The UI foundation was also checked in a browser at these viewports:
 The browser check also confirmed keyboard-visible focus styles, the mobile
 sidebar open/close behavior, successful Play/Pause/Stop transitions, and no
 browser console errors or warnings during the local demo.
+
+Mission 007A.1 additionally validates the layered pack contract with
+`node --test .\frontend\tests\test_character_pack.mjs`, and checks the
+optional renderer with the dependency-free layered rig tests. Browser checks
+cover selection between the geometric and layered characters, expression
+switching, local PNG/SVG loading, Play/Pause/Stop while the layered character
+is active, desktop composition, mobile no-overflow, and empty console error /
+warning logs. Mission 007A.2 additionally covers the 16-node Ari anatomical
+hierarchy, head-only rotation isolation, inherited facial transforms, arm /
+hair / brow bindings, and the refined original layer assets.
+
+Mission 009 adds the official narrator-pack checks:
+
+```powershell
+node --test .\frontend\tests\test_topazio_narrators.mjs
+```
+
+The test validates Dora, Santa, and Alex pack metadata, PT-BR Kokoro voice
+identifiers, v0.1 contract validation, and finite layered draw plans. Browser
+validation should additionally select each narrator, verify the shared stage
+layout and inspector metadata, exercise expression and transport controls,
+seek through the manifest, and confirm no console errors or warnings.
+
+Mission 009.1 also validates the real local narration set. The generated
+manifests must contain exactly one voice each (`pf_dora`, `pm_santa`, or
+`pm_alex`), 24 kHz mono PCM-16 WAV segments, and durations matching WAV frame
+counts. Browser checks cover automatic manifest selection, voice identity shown
+in the inspector, switching during playback, paused-state and seek behavior,
+safe stop/disposal, and empty error/warning logs. The audio-player unit test
+also verifies that disposal closes the context and clears decoded buffers.

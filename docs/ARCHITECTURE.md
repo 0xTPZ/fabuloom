@@ -46,6 +46,53 @@ visual approximation, not phonetic alignment.
 
 The synchronization layer stores integer milliseconds. Audio segments cannot overlap on the same track. Animation overlap is policy-based: gestures, expressions, and visemes may overlap; structural events such as page changes and camera cuts may not overlap on the same track.
 
+### Layered character engine 007A.2
+
+`LayeredCharacterRenderer` is an optional Canvas backend for the data-only
+`fabuloom.character/0.1` pack contract. It resolves parent transforms in the
+parent asset's intrinsic frame, applies normalized pivots and sizes, sorts
+layers by `z`, and uses same-origin local image resources only. Expressions
+replace a layer asset without changing the pack identity.
+
+`LayeredCharacterRig` consumes the same provider-independent pose boundary as
+the geometric rig. Head rotation, hair sway, blinking, brow motion, mouth
+openness, breathing, arm gestures, and expression selection are mapped to
+pack bindings. The head is a child of the torso but is the rotation target;
+therefore facial descendants move with the head without rotating the torso.
+The existing geometric renderer remains the default and is selectable at
+runtime; audio clocking, Kokoro, and the manifest are not coupled to either
+character backend.
+
+Ari's refined pack contains separate original torso/head bitmaps and explicit
+anatomical nodes for hair, face, arms, hands and accessories. The arm sleeve
+assets currently use controlled crops from the original costume source and
+the smaller expressive accents are vector layers. This is suitable for the
+runtime proof and future migration, but the remaining painted layer authoring
+is deliberately tracked as an art-quality follow-up.
+
+### Official narrator trio 009
+
+The current Character Stage demonstrator defaults to three small, validated
+layered packs: Dora (`pf_dora`), Santa (`pm_santa`), and Alex (`pm_alex`). Each
+uses a portrait root plus independent eyes, eyelids, brows, and mouth layers,
+with the same provider-independent rig channels for head motion, breathing,
+blinking, brow motion, expression, and RMS mouth response. The portraits are
+original generated assets with a shared navy, pale-blue, and gold narrator
+uniform language; no private Topazioverse artwork or model assets are included.
+
+The voice IDs are metadata only: the character engine does not call Kokoro and
+remains usable with any narration manifest. Ari and Lia remain selectable
+technical references. A full character editor and external pack importer are
+explicitly deferred to a later mission.
+
+Mission 009.1 adds a local narration catalog in
+`frontend/src/topazio-narrations.mjs`. Each official narrator maps to one
+pre-generated manifest and its expected Kokoro `voice_id`. The stage validates
+the loaded manifest against that expected voice, displays the actual loaded
+voice, disposes the prior `AudioTimelinePlayer` before switching, and reuses
+existing WAVs instead of synthesizing during selection. Playback controls,
+seek, timeline rendering and RMS analysis remain shared.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

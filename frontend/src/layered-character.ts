@@ -1,0 +1,224 @@
+/** Optional 2.5D layered character renderer. It consumes data-only packs. */
+
+import { validateCharacterPack } from "./character-pack.mjs";
+
+const IDENTITY = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+
+function multiply(left, right) {
+  return {
+    a: left.a * right.a + left.c * right.b,
+    b: left.b * right.a + left.d * right.b,
+    c: left.a * right.c + left.c * right.d,
+    d: left.b * right.c + left.d * right.d,
+    e: left.a * right.e + left.c * right.f + left.e,
+    f: left.b * right.e + left.d * right.f + left.f,
+  };
+}
+
+function translate(x, y) { return { a: 1, b: 0, c: 0, d: 1, e: x, f: y }; }
+function rotate(angle) { const cos = Math.cos(angle); const sin = Math.sin(angle); return { a: cos, b: sin, c: -sin, d: cos, e: 0, f: 0 }; }
+function scale(x, y) { return { a: x, b: 0, c: 0, d: y, e: 0, f: 0 }; }
+function clamp(value, min = 0, max = 1) { return Math.max(min, Math.min(max, Number(value) || 0)); }
+
+function sourceSizeFor(layer, assetSizes) {
+  return assetSizes.get(layer.asset) || layer.source_size || [1024, 1024];
+}
+
+function layerRotation(layer, pack, pose) {
+  let rotation = 0;
+  if (pack.bindings.head_rotation === layer.id) rotation += pose.head_rotation;
+  if (pack.bindings.hair_sway === layer.id) rotation += pose.hair_sway;
+  if (pack.bindings.left_arm === layer.id) rotation += pose.left_arm;
+  if (pack.bindings.right_arm === layer.id) rotation += pose.right_arm;
+  return rotation;
+}
+
+/**
+ * Resolve normalized pack coordinates into deterministic Canvas transforms.
+ * Parent coordinates are expressed in the parent's rendered frame.
+ */
+export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new Map()) {
+  const plans = new Map();
+  const layers = [...pack.layers].sort((left, right) => left.z - right.z);
+
+  const resolve = (layer) => {
+    if (plans.has(layer.id)) return plans.get(layer.id);
+    const parent = layer.parent === null ? null : resolve(pack.layers.find((candidate) => candidate.id === layer.parent));
+    const intrinsic = sourceSizeFor(layer, assetSizes);
+    const frameWidth = parent ? parent.intrinsic[0] : width;
+    const frameHeight = parent ? parent.intrinsic[1] : height;
+    const requestedSize = Array.isArray(layer.size) ? layer.size : parent ? [1, 1] : [0.7, 0.9];
+    const drawWidth = frameWidth * requestedSize[0];
+    const drawHeight = frameHeight * requestedSize[1];
+    const position = layer.position || [0.5, 0.5];
+    const anchor = layer.anchor || [0.5, 0.5];
+
+    let local = IDENTITY;
+    local = multiply(local, translate(frameWidth * position[0], frameHeight * position[1]));
+    local = multiply(local, rotate(layerRotation(layer, pack, pose)));
+    let animatedY = 1;
+    if (pack.bindings.eye_open === layer.id) animatedY = Math.max(0.08, clamp(pose.eye_open));
+    if (pack.bindings.mouth_open === layer.id) animatedY = 0.58 + clamp(pose.mouth_open) * 0.95;
+    if (pack.bindings.breathing === layer.id) {
+      local = multiply(local, translate(0, (pose.breathing - 0.5) * frameHeight * 0.012));
+    }
+    if (pack.bindings.brow_raise === layer.id) {
+      local = multiply(local, translate(0, -clamp(pose.brow_raise) * frameHeight * 0.018));
+    }
+    const breathingScale = pack.bindings.breathing === layer.id
+      ? 1 + (clamp(pose.breathing) - 0.5) * 0.018
+      : 1;
+    local = multiply(local, scale(drawWidth / intrinsic[0], (drawHeight / intrinsic[1]) * animatedY * breathingScale));
+    local = multiply(local, translate(-anchor[0] * intrinsic[0], -anchor[1] * intrinsic[1]));
+
+    const plan = {
+      layer,
+      matrix: parent ? multiply(parent.matrix, local) : local,
+      drawWidth,
+      drawHeight,
+      intrinsic,
+      opacity: layer.opacity === undefined ? 1 : clamp(layer.opacity),
+    };
+    plans.set(layer.id, plan);
+    return plan;
+  };
+
+  return layers.map(resolve);
+}
+
+export class LayeredCharacterRig {
+  constructor() {
+    this.speechAmplitude = 0;
+    this.currentExpression = "neutral";
+    this.currentPose = {
+      breathing: 0,
+      head_rotation: 0,
+      eye_open: 1,
+      mouth_open: 0,
+      hair_sway: 0,
+      brow_raise: 0,
+      left_arm: 0,
+      right_arm: 0,
+    };
+    this.nextBlinkAt = 4200;
+    this.blinkStartedAt = -1;
+  }
+
+  setSpeechAmplitude(amplitude) { this.speechAmplitude = clamp(amplitude); }
+  setExpression(expressionId) { this.currentExpression = expressionId; }
+
+  update(timeMs, isPlaying) {
+    const seconds = timeMs / 1000;
+    const breathing = (Math.sin(seconds * Math.PI * 1.8) + 1) / 2;
+    const headRotation = Math.sin(seconds * 0.48) * 0.024 + Math.sin(seconds * 0.21) * 0.012;
+    const hairSway = Math.sin(seconds * 0.67) * 0.009;
+    const leftArm = Math.sin(seconds * 0.42 + 0.8) * 0.018;
+    const rightArm = Math.sin(seconds * 0.39 + 2.1) * 0.014;
+    const browRaise = isPlaying ? (Math.sin(seconds * 0.9) + 1) * 0.12 : 0;
+    if (timeMs >= this.nextBlinkAt && this.blinkStartedAt < 0) {
+      this.blinkStartedAt = timeMs;
+      this.nextBlinkAt = timeMs + 3800 + ((Math.sin(seconds * 1.7) + 1) * 700);
+    }
+    let eyeOpen = 1;
+    if (this.blinkStartedAt >= 0) {
+      const elapsed = timeMs - this.blinkStartedAt;
+      if (elapsed <= 130) eyeOpen = 1 - elapsed / 130;
+      else if (elapsed <= 260) eyeOpen = (elapsed - 130) / 130;
+      else this.blinkStartedAt = -1;
+    }
+    this.currentPose = {
+      breathing,
+      head_rotation: headRotation,
+      eye_open: eyeOpen,
+      mouth_open: isPlaying ? this.speechAmplitude : 0,
+      hair_sway: hairSway,
+      brow_raise: browRaise,
+      left_arm: leftArm,
+      right_arm: rightArm,
+    };
+  }
+
+  pose() { return { ...this.currentPose }; }
+}
+
+function drawStageBackground(ctx, width, height) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, "#182b49");
+  gradient.addColorStop(1, "#080f1d");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "rgba(109, 160, 255, 0.10)";
+  ctx.beginPath();
+  ctx.ellipse(width * 0.5, height * 0.89, width * 0.31, height * 0.075, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+export class LayeredCharacterRenderer {
+  constructor(canvas, rig, pack, options = {}) {
+    this.canvas = canvas;
+    this.context = canvas.getContext("2d");
+    this.rig = rig;
+    this.pack = validateCharacterPack(pack);
+    this.assetRoot = options.assetRoot || globalThis.document?.baseURI || "http://127.0.0.1/";
+    this.images = new Map();
+    this.loaded = false;
+    this.expression = "neutral";
+  }
+
+  async load() {
+    const assets = new Set(this.pack.layers.map((layer) => layer.asset));
+    for (const expression of this.pack.expressions) {
+      for (const asset of Object.values(expression.overrides)) assets.add(asset);
+    }
+    await Promise.all([...assets].map((asset) => this.loadImage(asset)));
+    this.loaded = true;
+    return this;
+  }
+
+  loadImage(asset) {
+    if (this.images.has(asset)) return this.images.get(asset).promise;
+    const record = { image: null, size: [0, 0], promise: null };
+    this.images.set(asset, record);
+    const promise = new Promise((resolve, reject) => {
+      const image = new Image();
+      record.image = image;
+      image.onload = () => { record.size = [image.naturalWidth || image.width, image.naturalHeight || image.height]; resolve(image); };
+      image.onerror = () => reject(new Error(`could not load character asset: ${asset}`));
+      image.src = new URL(asset, this.assetRoot).href;
+    });
+    record.promise = promise;
+    return promise;
+  }
+
+  setExpression(expressionId) {
+    if (!this.pack.expressions.some((expression) => expression.id === expressionId)) throw new Error(`Unknown character expression: ${expressionId}`);
+    this.expression = expressionId;
+    this.rig.setExpression(expressionId);
+  }
+
+  resolvedAsset(layer) {
+    const expression = this.pack.expressions.find((candidate) => candidate.id === this.expression);
+    return expression?.overrides?.[layer.id] || layer.asset;
+  }
+
+  render() {
+    const ctx = this.context;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    drawStageBackground(ctx, width, height);
+    if (!this.loaded) return;
+    const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
+    const plans = buildLayerDrawPlan(this.pack, width, height, this.rig.pose(), assetSizes);
+    for (const plan of plans) {
+      const asset = this.resolvedAsset(plan.layer);
+      const record = this.images.get(asset);
+      if (!record?.image) continue;
+      ctx.save();
+      const matrix = plan.matrix;
+      ctx.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+      ctx.globalAlpha = plan.opacity;
+      ctx.drawImage(record.image, 0, 0, plan.intrinsic[0], plan.intrinsic[1]);
+      ctx.restore();
+    }
+  }
+}

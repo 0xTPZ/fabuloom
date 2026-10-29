@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1145" height="1374" viewBox="0 0 1145 1374">
+  <defs><linearGradient id="neck" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#6f3e35" stop-opacity=".24"/><stop offset=".52" stop-color="#b87354" stop-opacity=".18"/><stop offset="1" stop-color="#3a2030" stop-opacity=".32"/></linearGradient></defs>
+  <path fill="url(#neck)" d="M484 121h177c-9 128-12 220 28 345-47 104-176 119-241 7 34-123 42-223 36-352Z"/>
+</svg>

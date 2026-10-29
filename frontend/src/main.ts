@@ -1,10 +1,13 @@
 import { AudioTimelinePlayer } from "./audio.ts";
 import { CanvasCharacterRenderer, CharacterRig } from "./character.ts";
+import { FANTASY_NARRATOR_PACK } from "./fantasy-narrator-pack.mjs";
+import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
+import { validateCharacterPack } from "./character-pack.mjs";
+import { TOPAZIO_NARRATION_CATALOG, manifestVoiceId, narrationForCharacter, narrationForUrl } from "./topazio-narrations.mjs";
+import { TOPAZIO_NARRATOR_PACKS } from "./topazio-narrator-packs.mjs";
 import { validateManifest } from "./timeline.ts";
 
-const NARRATIONS = [
-  { id: "kokoro-story-demo-0051", label: "Lia e a lanterna azul — demonstração", url: "/exports/kokoro-story-demo-0051.json" },
-];
+const NARRATIONS = TOPAZIO_NARRATION_CATALOG;
 
 const canvas = document.querySelector("#stage");
 const narrationSelect = document.querySelector("#narration-select");
@@ -23,21 +26,140 @@ const timelineList = document.querySelector("#timeline-list");
 const segmentCount = document.querySelector("#segment-count");
 const activeSegmentLabel = document.querySelector("#active-segment");
 const characterState = document.querySelector("#character-state");
+const characterSelect = document.querySelector("#character-select");
+const expressionSelect = document.querySelector("#expression-select");
+const characterName = document.querySelector("#character-name");
+const characterKind = document.querySelector("#character-kind");
+const characterMotion = document.querySelector("#character-motion");
+const presenceAvatar = document.querySelector("#presence-avatar");
+const presenceName = document.querySelector("#presence-name");
+const presenceKind = document.querySelector("#presence-kind");
+const voiceAvatar = document.querySelector("#voice-avatar");
+const voiceLanguage = document.querySelector("#voice-language");
+const voiceLoaded = document.querySelector("#voice-loaded");
 const sidebar = document.querySelector("#sidebar");
 const sidebarToggle = document.querySelector("#sidebar-toggle");
 const sidebarClose = document.querySelector("#sidebar-close");
 const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
 
-const rig = new CharacterRig();
-const renderer = new CanvasCharacterRenderer(canvas, rig);
+const geometricRig = new CharacterRig();
+const layeredRig = new LayeredCharacterRig();
+const geometricRenderer = new CanvasCharacterRenderer(canvas, geometricRig);
+const layeredRenderer = new LayeredCharacterRenderer(canvas, layeredRig, FANTASY_NARRATOR_PACK);
+const narratorKeys = Object.keys(TOPAZIO_NARRATOR_PACKS);
+const narratorRigs = Object.fromEntries(narratorKeys.map((key) => [key, new LayeredCharacterRig()]));
+const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
+  key,
+  new LayeredCharacterRenderer(canvas, narratorRigs[key], TOPAZIO_NARRATOR_PACKS[key]),
+]));
+const narratorReady = Object.fromEntries(narratorKeys.map((key) => [key, false]));
+let activeRig = narratorRigs.dora;
+let activeRenderer = narratorRenderers.dora;
+let activeCharacterId = "dora";
+let layeredReady = false;
 let player = null;
 let manifest = null;
+let narrationLoadToken = 0;
+
+const characterMeta = {
+  geometric: { name: "Lia", kind: "Rig geométrico · Canvas", presence: "Referência técnica", motion: "Respiração sutil" },
+  fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", presence: "Narrador ilustrado", motion: "Cabeça, braços, cabelo e respiração" },
+  dora: { name: "Dora", kind: "Narradora oficial · Kokoro", presence: "Voz acolhedora · pf_dora", motion: "Cabeça, olhos, boca e respiração" },
+  santa: { name: "Santa", kind: "Narrador oficial · Kokoro", presence: "Voz sábia · pm_santa", motion: "Cabeça, olhos, boca e respiração" },
+  alex: { name: "Alex", kind: "Narrador oficial · Kokoro", presence: "Voz confiante · pm_alex", motion: "Cabeça, olhos, boca e respiração" },
+};
 
 for (const narration of NARRATIONS) {
   const option = document.createElement("option");
   option.value = narration.url;
   option.textContent = narration.label;
   narrationSelect.appendChild(option);
+}
+
+function updateCharacterMeta() {
+  const meta = characterMeta[activeCharacterId];
+  characterName.textContent = meta.name;
+  characterKind.textContent = meta.kind;
+  characterMotion.textContent = meta.motion;
+  if (presenceAvatar) presenceAvatar.textContent = meta.name.slice(0, 1);
+  if (presenceName) presenceName.textContent = meta.name;
+  if (presenceKind) presenceKind.textContent = meta.presence;
+}
+
+function setVoiceInfo({ voiceId = null, providerId = null, language = "pt-BR", state = "waiting" } = {}) {
+  if (voiceLanguage) voiceLanguage.textContent = language === "pt-BR" ? "Português brasileiro" : language;
+  if (voiceAvatar) voiceAvatar.textContent = voiceId ? voiceId.slice(-1).toUpperCase() : "P";
+  if (!voiceLoaded) return;
+  if (state === "loading") {
+    voiceLoaded.textContent = `Carregando voz: ${voiceId || "desconhecida"}…`;
+  } else if (state === "error") {
+    voiceLoaded.textContent = `Falha ao carregar voz: ${voiceId || "desconhecida"}`;
+  } else if (voiceId) {
+    voiceLoaded.textContent = `Voz carregada: ${voiceId} · ${providerId || "provedor desconhecido"}`;
+  } else {
+    voiceLoaded.textContent = "Voz carregada: aguardando manifesto…";
+  }
+}
+
+function selectCharacter(characterId, { loadVoice = true } = {}) {
+  if (characterId === "fantasy" && !layeredReady) {
+    characterSelect.value = "geometric";
+    return Promise.resolve(false);
+  }
+  if (narratorKeys.includes(characterId) && !narratorReady[characterId]) {
+    characterSelect.value = layeredReady ? "fantasy" : "geometric";
+    return Promise.resolve(false);
+  }
+  activeCharacterId = characterId;
+  if (characterId === "fantasy") {
+    activeRig = layeredRig;
+    activeRenderer = layeredRenderer;
+  } else if (narratorKeys.includes(characterId)) {
+    activeRig = narratorRigs[characterId];
+    activeRenderer = narratorRenderers[characterId];
+  } else {
+    activeRig = geometricRig;
+    activeRenderer = geometricRenderer;
+  }
+  if (characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
+  updateCharacterMeta();
+  updateUi(player?.state || "stopped");
+  if (!loadVoice || !narratorKeys.includes(characterId)) return Promise.resolve(true);
+  const narration = narrationForCharacter(characterId);
+  if (!narration) return Promise.resolve(false);
+  narrationSelect.value = narration.url;
+  return loadNarration(narration);
+}
+
+async function prepareLayeredCharacters() {
+  const fantasyOption = characterSelect.querySelector('option[value="fantasy"]');
+  try {
+    validateCharacterPack(FANTASY_NARRATOR_PACK);
+    await layeredRenderer.load();
+    layeredReady = true;
+    fantasyOption.disabled = false;
+    fantasyOption.textContent = "Ari · guardião das histórias";
+  } catch (_error) {
+    fantasyOption.disabled = true;
+    fantasyOption.textContent = "Ari · asset indisponível";
+    characterKind.textContent = "Pack em camadas · indisponível";
+  }
+  for (const key of narratorKeys) {
+    const option = characterSelect.querySelector(`option[value="${key}"]`);
+    try {
+      validateCharacterPack(TOPAZIO_NARRATOR_PACKS[key]);
+      await narratorRenderers[key].load();
+      narratorReady[key] = true;
+      option.disabled = false;
+      option.textContent = `${characterMeta[key].name} · ${TOPAZIO_NARRATOR_PACKS[key].voice_id}`;
+    } catch (_error) {
+      option.disabled = true;
+      option.textContent = `${characterMeta[key].name} · asset indisponível`;
+    }
+  }
+  if (narratorReady.dora) await selectCharacter("dora");
+  else if (layeredReady) await selectCharacter("fantasy", { loadVoice: false });
+  else await selectCharacter("geometric", { loadVoice: false });
 }
 
 function formatTime(milliseconds) {
@@ -132,11 +254,18 @@ function showDiagnostics() {
   }
   const first = manifest.segments[0] || {};
   const metadata = first.metadata || {};
+  const voiceId = manifestVoiceId(manifest);
+  setVoiceInfo({
+    voiceId,
+    providerId: first.provider_id || metadata.provider_id,
+    language: first.language || metadata.language || "pt-BR",
+    state: voiceId ? "ready" : "error",
+  });
   diagnostics.textContent = [
     `manifesto: ${manifest.id}`,
     `segmentos: ${manifest.segments.length}`,
     `provedor: ${first.provider_id || metadata.provider_id || "desconhecido"}`,
-    `voz: ${first.voice_id || "desconhecida"}`,
+    `voz carregada: ${voiceId || "desconhecida"}`,
     `modelo: ${metadata.model_id || "não informado"}`,
     `revisão: ${metadata.model_revision || "não informada"}`,
     `tempo temporal: ${metadata.temporal_source || "measured_wav"}`,
@@ -145,39 +274,68 @@ function showDiagnostics() {
   ].join("\n");
 }
 
-async function loadNarration(url) {
-  if (player) player.dispose();
+async function loadNarration(narration) {
+  const loadToken = ++narrationLoadToken;
+  const previousPlayer = player;
   player = null;
   manifest = null;
-  setStatus("Carregando manifesto e áudio…");
+  setVoiceInfo({ voiceId: narration.voiceId, language: "pt-BR", state: "loading" });
+  setStatus(`Carregando ${narration.characterName} · ${narration.voiceId}…`);
   updateUi("stopped");
+  if (previousPlayer) {
+    try {
+      await previousPlayer.dispose();
+    } catch (error) {
+      setStatus(`Reprodução anterior encerrada com aviso: ${error.message}`);
+    }
+  }
+  if (loadToken !== narrationLoadToken) return false;
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(narration.url);
     if (!response.ok) throw new Error(`manifesto HTTP ${response.status}`);
-    manifest = validateManifest(await response.json());
-    renderTimeline(manifest);
-    player = new AudioTimelinePlayer(manifest, {
+    const nextManifest = validateManifest(await response.json());
+    const actualVoiceId = manifestVoiceId(nextManifest);
+    if (actualVoiceId !== narration.voiceId) {
+      throw new Error(`manifesto carregou ${actualVoiceId || "uma voz desconhecida"}, esperado ${narration.voiceId}`);
+    }
+    if (nextManifest.segments.some((segment) => segment.voice_id !== actualVoiceId)) {
+      throw new Error("manifesto contém segmentos de vozes diferentes");
+    }
+    const nextPlayer = new AudioTimelinePlayer(nextManifest, {
       onStateChange: (state, error) => {
         if (error) setStatus(error.message);
-        else if (state === "playing") setStatus("Reproduzindo narração local.");
-        else if (state === "paused") setStatus("Narração pausada; relógio preservado.");
-        else if (state === "stopped") setStatus("Narração parada.");
-        else if (state === "ended") setStatus("Narração concluída.");
+        else if (state === "playing") setStatus(`Reproduzindo ${actualVoiceId}.`);
+        else if (state === "paused") setStatus(`Narração ${actualVoiceId} pausada; relógio preservado.`);
+        else if (state === "stopped") setStatus(`Narração ${actualVoiceId} parada.`);
+        else if (state === "ended") setStatus(`Narração ${actualVoiceId} concluída.`);
         updateUi(state);
       },
     });
-    await player.load();
-    setStatus("Pronto para reprodução local.");
+    await nextPlayer.load();
+    if (loadToken !== narrationLoadToken) {
+      await nextPlayer.dispose();
+      return false;
+    }
+    manifest = nextManifest;
+    player = nextPlayer;
+    narrationSelect.value = narration.url;
+    renderTimeline(manifest);
     showDiagnostics();
+    setStatus(`Voz ${actualVoiceId} pronta para reprodução.`);
     updateUi("stopped");
+    return true;
   } catch (error) {
+    if (loadToken !== narrationLoadToken) return false;
     player = null;
     manifest = null;
-    setStatus(`Falha: ${error.message}`);
-    diagnostics.textContent = "Não foi possível carregar esta narração.";
-    if (timelineList) timelineList.replaceChildren(Object.assign(document.createElement("div"), { className: "timeline-empty", textContent: "Falha ao carregar a narração." }));
+    setVoiceInfo({ voiceId: narration.voiceId, language: "pt-BR", state: "error" });
+    setStatus(`Falha ao carregar ${narration.voiceId}: ${error.message}`);
+    diagnostics.textContent = `Não foi possível carregar a voz ${narration.voiceId}.`;
+    if (timelineList) timelineList.replaceChildren(Object.assign(document.createElement("div"), { className: "timeline-empty", textContent: `Falha ao carregar ${narration.characterName}: ${error.message}` }));
     if (segmentCount) segmentCount.textContent = "0 segmentos";
     updateUi("error");
+    return false;
   }
 }
 
@@ -198,7 +356,21 @@ playButton.addEventListener("click", async () => {
 pauseButton.addEventListener("click", () => player?.pause());
 stopButton.addEventListener("click", () => player?.stop());
 seekInput.addEventListener("input", () => player?.seek(Number(seekInput.value)));
-narrationSelect.addEventListener("change", () => loadNarration(narrationSelect.value));
+narrationSelect.addEventListener("change", () => {
+  const narration = narrationForUrl(narrationSelect.value);
+  if (!narration) return;
+  void (async () => {
+    if (narration.characterId !== activeCharacterId) {
+      await selectCharacter(narration.characterId, { loadVoice: false });
+    }
+    await loadNarration(narration);
+  })();
+});
+characterSelect.addEventListener("change", () => { void selectCharacter(characterSelect.value); });
+expressionSelect.addEventListener("change", () => {
+  if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
+  else if (narratorKeys.includes(activeCharacterId)) narratorRenderers[activeCharacterId].setExpression(expressionSelect.value);
+});
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
 sidebarBackdrop?.addEventListener("click", () => setSidebarOpen(false));
@@ -207,16 +379,22 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape") se
 function frame(timeMs) {
   if (player) {
     player.tick();
-    rig.setSpeechAmplitude(player.amplitude());
-    rig.update(timeMs, player.state === "playing");
+    activeRig.setSpeechAmplitude(player.amplitude());
+    activeRig.update(timeMs, player.state === "playing");
     updateUi(player.state);
   } else {
-    rig.setSpeechAmplitude(0);
-    rig.update(timeMs, false);
+    activeRig.setSpeechAmplitude(0);
+    activeRig.update(timeMs, false);
   }
-  renderer.render();
+  activeRenderer.render();
   requestAnimationFrame(frame);
 }
 
-loadNarration(NARRATIONS[0].url);
+async function initializeStage() {
+  updateCharacterMeta();
+  setVoiceInfo({ language: "pt-BR", state: "waiting" });
+  await prepareLayeredCharacters();
+}
+
+void initializeStage();
 requestAnimationFrame(frame);

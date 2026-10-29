@@ -63,6 +63,26 @@ WAV durations; punctuation and paragraph gaps are explicit composition pauses,
 not invented speech timestamps. Re-running the same demo requires
 `--overwrite`.
 
+Mission 009.1 provides one pre-generated local narration for each official
+stage narrator. Generate all three with one reused Kokoro pipeline:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+$env:HF_DATASETS_OFFLINE = "1"
+python E:\Fabuloom\studio\examples\kokoro_narrator_trio_demo.py --overwrite
+```
+
+The command writes only to `E:\Fabuloom\workspace\exports`:
+`kokoro-story-demo-0091-dora.json` with `pf_dora`,
+`kokoro-story-demo-0091-santa.json` with `pm_santa`, and
+`kokoro-story-demo-0091-alex.json` with `pm_alex`, plus their measured WAV
+segments. The Character Stage selects the matching existing manifest; changing
+characters never invokes synthesis again. A failed or missing manifest is
+shown as a voice-specific loading error and the previous player is disposed
+before the next one is loaded.
+
 ## Dependencies and licensing
 
 The tested optional environment used Kokoro 0.9.4, SoundFile 0.14.0,

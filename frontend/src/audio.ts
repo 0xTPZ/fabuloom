@@ -131,11 +131,13 @@ export class AudioTimelinePlayer {
     return findSegmentAt(this.manifest.segments, this.positionMs);
   }
 
-  dispose() {
+  async dispose() {
     this.stop();
     if (this.context && typeof this.context.close === "function") {
-      this.context.close();
+      await this.context.close();
     }
+    this.context = null;
+    this.buffers.clear();
   }
 
   nowMs() {
