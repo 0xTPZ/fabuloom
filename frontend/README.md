@@ -28,6 +28,12 @@ runtime; the voice IDs are metadata used to keep the visual identities aligned
 with the narration voices. Ari and Lia remain available as technical
 references.
 
+The local narration catalog in `src/topazio-narrations.mjs` maps each official
+character to a pre-generated manifest in `E:\Fabuloom\workspace\exports`.
+The inspector reports the voice actually found in the loaded manifest, and a
+character change stops/disposes the previous player before loading the matching
+existing WAV set. Synthesis is never triggered by a character selection.
+
 ## Run locally
 
 From `E:\Fabuloom\studio`:

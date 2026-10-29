@@ -78,4 +78,8 @@ const failingPlayer = new AudioTimelinePlayer(manifest, {
 await assert.rejects(() => failingPlayer.load(), /could not load narration audio/);
 assert.equal(failingPlayer.state, "error");
 
+await player.dispose();
+assert.equal(player.context, null);
+assert.equal(player.buffers.size, 0);
+
 console.log("frontend audio player tests: ok");

@@ -85,6 +85,14 @@ remains usable with any narration manifest. Ari and Lia remain selectable
 technical references. A full character editor and external pack importer are
 explicitly deferred to a later mission.
 
+Mission 009.1 adds a local narration catalog in
+`frontend/src/topazio-narrations.mjs`. Each official narrator maps to one
+pre-generated manifest and its expected Kokoro `voice_id`. The stage validates
+the loaded manifest against that expected voice, displays the actual loaded
+voice, disposes the prior `AudioTimelinePlayer` before switching, and reuses
+existing WAVs instead of synthesizing during selection. Playback controls,
+seek, timeline rendering and RMS analysis remain shared.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

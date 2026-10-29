@@ -3,9 +3,18 @@ import test from "node:test";
 import { buildLayerDrawPlan, LayeredCharacterRig } from "../src/layered-character.ts";
 import { validateCharacterPack } from "../src/character-pack.mjs";
 import { TOPAZIO_NARRATOR_PACKS } from "../src/topazio-narrator-packs.mjs";
+import { TOPAZIO_NARRATION_CATALOG, manifestVoiceId, narrationForCharacter, narrationForUrl } from "../src/topazio-narrations.mjs";
 
 test("the three Topazio narrators share a compact validated rig", () => {
   assert.deepEqual(Object.keys(TOPAZIO_NARRATOR_PACKS), ["dora", "santa", "alex"]);
+  assert.deepEqual(TOPAZIO_NARRATION_CATALOG.map((item) => item.characterId), ["dora", "santa", "alex"]);
+  for (const item of TOPAZIO_NARRATION_CATALOG) {
+    assert.equal(narrationForCharacter(item.characterId), item);
+    assert.equal(narrationForUrl(item.url), item);
+    assert.match(item.url, /kokoro-story-demo-0091-(dora|santa|alex)\.json$/);
+  }
+  assert.equal(manifestVoiceId({ metadata: { voice_id: "pf_dora" }, segments: [] }), "pf_dora");
+  assert.equal(manifestVoiceId({ metadata: {}, segments: [{ voice_id: "pm_santa" }] }), "pm_santa");
   for (const [key, pack] of Object.entries(TOPAZIO_NARRATOR_PACKS)) {
     assert.equal(validateCharacterPack(pack), pack);
     assert.equal(pack.layers.length, 5);

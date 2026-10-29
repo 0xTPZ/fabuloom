@@ -95,3 +95,11 @@ identifiers, v0.1 contract validation, and finite layered draw plans. Browser
 validation should additionally select each narrator, verify the shared stage
 layout and inspector metadata, exercise expression and transport controls,
 seek through the manifest, and confirm no console errors or warnings.
+
+Mission 009.1 also validates the real local narration set. The generated
+manifests must contain exactly one voice each (`pf_dora`, `pm_santa`, or
+`pm_alex`), 24 kHz mono PCM-16 WAV segments, and durations matching WAV frame
+counts. Browser checks cover automatic manifest selection, voice identity shown
+in the inspector, switching during playback, paused-state and seek behavior,
+safe stop/disposal, and empty error/warning logs. The audio-player unit test
+also verifies that disposal closes the context and clears decoded buffers.
