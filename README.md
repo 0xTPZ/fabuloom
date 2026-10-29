@@ -36,8 +36,13 @@ Santa (`pm_santa`), and Alex (`pm_alex`) — using a shared original
 Topazioverse-inspired navy, pale-blue, and gold uniform language. They are
 simple, reusable layered packs for the current Character Stage, not final art;
 the character editor and external pack import remain deferred.
-Piper, Animus, full editor, MP4 export, and cinematic animation are not
-implemented yet.
+Mission 010 now adds the first deterministic local text-to-MP4 demonstration:
+the original story *A Última Luz* is narrated by Dora with real Kokoro
+`pf_dora` audio, measured segment captions, an RMS-driven mouth approximation,
+and a 1080x1920 H.264/AAC export. This is a reusable proof-of-pipeline, not
+the final editor, compositor, or cinematic animation system. Piper, Animus,
+the full editor, word/phoneme alignment, and production export tooling remain
+future work.
 
 ## Technology direction
 

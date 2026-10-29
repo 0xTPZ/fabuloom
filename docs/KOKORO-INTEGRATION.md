@@ -83,6 +83,21 @@ characters never invokes synthesis again. A failed or missing manifest is
 shown as a voice-specific loading error and the previous player is disposed
 before the next one is loaded.
 
+## Mission 010 first video
+
+`examples/first_video_demo.py` demonstrates the complete first local path from
+the original story text *A Última Luz* to a vertical MP4. It uses Dora and
+`pf_dora`, composes the five measured narration segments, derives the mouth
+signal from the audio RMS envelope, and uses the measured segment boundaries
+for SRT captions. It does not invent word, phoneme, or viseme timestamps.
+
+The first reference export is intentionally small and reusable: a portrait,
+an original night-temple background, FFmpeg composition, and a Fabuloom /
+Topazioverse outro. It is a demonstration exporter rather than the final
+editor or cinematic compositor. The generated WAV, JSON manifest, SRT, and MP4
+stay in the local workspace export directory and are not published with the
+source repository.
+
 ## Dependencies and licensing
 
 The tested optional environment used Kokoro 0.9.4, SoundFile 0.14.0,
