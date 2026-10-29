@@ -156,6 +156,22 @@ Santa V4 is intentionally independent from Santa V3. `SantaV4Rig` and
 only the pack and stage title change. The concept reference generated during
 the art pass is a design reference, not a runtime layer or a published model.
 
+### Santa V5 production-art preview
+
+Mission 012 starts a higher-fidelity art pass using original transparent PNG
+assets under `frontend/assets/characters/topazio-narrators-v5/santa/`. The
+master and production pieces follow the approved Santa identity with a larger
+expressive head, natural shoulders and limbs, tailored uniform construction,
+fabric texture, gold trim, expressive hands, gray hair, glasses and beard.
+
+`frontend/src/santa-v5-pack.mjs` is intentionally labeled
+`production-art-preview`. It is useful for checking scale, silhouette and
+basic head/torso/limb transforms in `frontend/santa-v5-preview.html`, but it
+does not claim final fine-grained rig readiness because some generated pieces
+still combine adjacent joints. Santa V4 remains the main approved technical
+reference until the owner reviews the art and the remaining layer separation is
+completed.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.

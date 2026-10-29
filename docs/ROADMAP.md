@@ -50,6 +50,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   V3 compatibility, browser-stage selection and real-engine MP4 comparison
   implemented in Mission 011.1. Final painted art, broader gesture authoring
   and human visual approval remain future work.
+- Santa V5 production art — higher-fidelity original transparent character
+  pieces, turnaround sheet and static rig preview started in Mission 012.
+  Fine-grained joint separation, owner art approval and later Stage/video
+  integration remain pending; no MP4 is claimed for this milestone.
 
 ## Later
 

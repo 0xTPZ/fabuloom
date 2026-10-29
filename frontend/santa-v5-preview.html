@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Santa V5 art production preview</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, sans-serif; }
+      body { margin: 0; background: #07142a; color: #f7e2a0; }
+      main { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 18px; max-width: 1100px; margin: 24px auto; padding: 0 18px; }
+      figure { margin: 0; padding: 12px; background: #0d2342; border: 1px solid #d6a84d66; border-radius: 12px; }
+      canvas { display: block; width: 100%; height: auto; background: linear-gradient(#10294e, #050913); border-radius: 8px; }
+      figcaption { padding-top: 10px; font-weight: 600; }
+      .note { max-width: 1100px; margin: 18px auto 0; padding: 0 18px; color: #d7e4f8; }
+    </style>
+  </head>
+  <body>
+    <p class="note">Santa V5 — prévia artística experimental. As imagens são peças de produção independentes; o pack ainda não é a versão final de rig fino.</p>
+    <main>
+      <figure><canvas id="neutral" width="680" height="1140"></canvas><figcaption>Pose neutra</figcaption></figure>
+      <figure><canvas id="gesture" width="680" height="1140"></canvas><figcaption>Rotação de braços</figcaption></figure>
+      <figure><canvas id="head" width="680" height="1140"></canvas><figcaption>Rotação independente da cabeça</figcaption></figure>
+    </main>
+    <script type="module">
+      import { LayeredCharacterRenderer, LayeredCharacterRig } from "./src/layered-character.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      const render = async (id, timeMs, posePatch = {}) => {
+        const canvas = document.querySelector(`#${id}`);
+        const rig = new LayeredCharacterRig();
+        const renderer = new LayeredCharacterRenderer(canvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href });
+        await renderer.load();
+        renderer.renderFrame({ timeMs, speechAmplitude: 0, isPlaying: false });
+        if (Object.keys(posePatch).length) {
+          rig.currentPose = { ...rig.pose(), ...posePatch };
+          renderer.render();
+        }
+      };
+      Promise.all([
+        render("neutral", 0),
+        render("gesture", 4600, { left_arm_rotation: 0.24, right_arm_rotation: -0.22 }),
+        render("head", 0, { head_rotation: 0.18 }),
+      ]).catch((error) => { document.body.dataset.error = error.message; console.error(error); });
+    </script>
+  </body>
+</html>

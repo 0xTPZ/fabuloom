@@ -224,3 +224,17 @@ python .\examples\santa_v4_video_demo.py `
 The command validates the local V4 pack, contiguous PNG frames, measured WAV
 duration, H.264/AAC output and V3/V4 comparison frame. It does not synthesize
 new audio. Word, phoneme and viseme timing remain unavailable.
+
+## Santa V5 art preview
+
+Mission 012 adds offline asset-contract tests without generating a video:
+
+```powershell
+node --test .\frontend\tests\test_santa_v5_art.mjs
+```
+
+For visual review, start the loopback stage server and open
+`/santa-v5-preview.html`. The preview checks a neutral composition, a visible
+arm transform and an independent head transform using the existing layered
+renderer. The pack is marked as an art preview; it must not be treated as the
+final Santa V5 rig until the remaining joint separation is approved.
