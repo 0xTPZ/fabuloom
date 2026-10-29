@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · calibração DEV</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #07142a; color: #eef5ff; }
+      header { padding: 18px 24px; border-bottom: 1px solid #d6a84d55; }
+      h1 { margin: 0 0 4px; color: #f7d27a; font-size: 22px; }
+      header p { margin: 0; color: #b8c9df; }
+      main { display: grid; grid-template-columns: minmax(320px, 700px) minmax(300px, 420px); gap: 18px; max-width: 1160px; margin: 18px auto; padding: 0 18px 28px; }
+      .stage { position: relative; min-height: 760px; display: grid; place-items: start center; background: #050b18; border: 1px solid #d6a84d55; border-radius: 12px; padding: 12px; }
+      canvas { width: min(100%, 520px); height: auto; background: #081a33; border-radius: 8px; }
+      .panel { background: #0d2342; border: 1px solid #d6a84d55; border-radius: 12px; padding: 16px; }
+      .panel + .panel { margin-top: 12px; }
+      label { display: grid; grid-template-columns: 105px 1fr 68px; align-items: center; gap: 8px; margin: 8px 0; color: #c8d6ea; }
+      select, input[type=number] { min-width: 0; width: 100%; box-sizing: border-box; background: #07142a; color: #eef5ff; border: 1px solid #7690b4; border-radius: 5px; padding: 5px; }
+      input[type=range] { width: 100%; accent-color: #f7d27a; }
+      input[disabled] { opacity: .4; }
+      button { margin: 4px 4px 4px 0; padding: 7px 10px; color: #07142a; background: #f7d27a; border: 0; border-radius: 5px; cursor: pointer; font-weight: 650; }
+      button.secondary { color: #eef5ff; background: #23436b; }
+      .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .checks label { display: flex; gap: 7px; margin: 3px 0; }
+      pre { max-height: 180px; overflow: auto; padding: 10px; background: #07142a; border-radius: 6px; white-space: pre-wrap; color: #b8c9df; }
+      .good { color: #9de8b5; } .warn { color: #f7d27a; } .bad { color: #ff9f9f; }
+      @media (max-width: 820px) { main { grid-template-columns: 1fr; } .stage { min-height: 0; } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · calibração DEV</h1><p>Ferramenta local para alinhar pivôs, margens transparentes, escalas e articulações. Não altera os PNGs.</p></header>
+    <main>
+      <section class="stage"><canvas id="canvas" width="680" height="1550"></canvas></section>
+      <section>
+        <div class="panel">
+          <label><span>Camada</span><select id="layer"></select><span></span></label>
+          <div class="checks">
+            <label><input id="overlay" type="checkbox" checked /> arte original</label>
+            <label><input id="bounds" type="checkbox" checked /> limites</label>
+            <label><input id="pivots" type="checkbox" checked /> pivôs</label>
+          </div>
+          <div><button id="neutral">Neutro</button><button id="walk" class="secondary">Caminhada</button><button id="sit" class="secondary">Sentado</button><button id="gesture" class="secondary">Braço</button><button id="drink" class="secondary">Xícara</button><button id="extreme" class="secondary">Extremo</button></div>
+          <div><button id="export">Exportar parâmetros</button><button id="reset" class="secondary">Recarregar pack</button></div>
+        </div>
+        <div class="panel">
+          <strong>Transformação da camada</strong>
+          <label><span>Posição X</span><input id="position-x" type="range" min="0" max="1" step="0.001" /><input id="position-x-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Posição Y</span><input id="position-y" type="range" min="0" max="1" step="0.001" /><input id="position-y-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Escala X</span><input id="size-x" type="range" min="0.01" max="1" step="0.001" /><input id="size-x-value" type="number" min="0.01" max="1" step="0.001" /></label>
+          <label><span>Escala Y</span><input id="size-y" type="range" min="0.01" max="1" step="0.001" /><input id="size-y-value" type="number" min="0.01" max="1" step="0.001" /></label>
+          <label><span>Pivô X</span><input id="anchor-x" type="range" min="0" max="1" step="0.001" /><input id="anchor-x-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Pivô Y</span><input id="anchor-y" type="range" min="0" max="1" step="0.001" /><input id="anchor-y-value" type="number" min="0" max="1" step="0.001" /></label>
+          <label><span>Ângulo</span><input id="rotation" type="range" min="-3.14" max="3.14" step="0.001" value="0" /><input id="rotation-value" type="number" min="-3.14" max="3.14" step="0.001" value="0" /></label>
+        </div>
+        <div class="panel"><strong>Diagnóstico</strong><pre id="diagnostics">carregando…</pre></div>
+      </section>
+    </main>
+    <script type="module">
+      import { buildLayerDrawPlan, LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { diagnoseSantaV5Calibration } from "./src/santa-v5-calibration.mjs";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+
+      const clone = (value) => JSON.parse(JSON.stringify(value));
+      const canvas = document.querySelector("#canvas");
+      const ctx = canvas.getContext("2d");
+      const workingPack = clone(SANTA_V5_PACK);
+      const rig = new SantaV5Rig();
+      const renderer = new LayeredCharacterRenderer(canvas, rig, workingPack, { assetRoot: new URL("./", location.href).href, renderBackground: false });
+      const master = new Image(); master.src = new URL("assets/characters/topazio-narrators-v5/santa/master-front.png", location.href).href;
+      const layerSelect = document.querySelector("#layer");
+      const diagnostics = document.querySelector("#diagnostics");
+      const poseTimes = { neutral: 0, walk: 1800, sit: 5000, gesture: 15000, drink: 9600, extreme: 8000 };
+      let timeMs = 0;
+      let selectedId = "torso";
+
+      for (const layer of workingPack.layers) { const option = document.createElement("option"); option.value = layer.id; option.textContent = `${layer.id} · ${layer.role}`; layerSelect.appendChild(option); }
+
+      const fields = ["position-x", "position-y", "size-x", "size-y", "anchor-x", "anchor-y"];
+      const pair = (name) => [document.querySelector(`#${name}`), document.querySelector(`#${name}-value`)];
+      const setPair = (name, value, disabled = false) => { for (const input of pair(name)) { input.value = Number(value).toFixed(3); input.disabled = disabled; } };
+      const updateControls = () => {
+        const layer = workingPack.layers.find((item) => item.id === selectedId);
+        setPair("position-x", layer.position[0]); setPair("position-y", layer.position[1]); setPair("size-x", layer.size[0]); setPair("size-y", layer.size[1]); setPair("anchor-x", layer.anchor[0]); setPair("anchor-y", layer.anchor[1]);
+        const channel = Object.entries(workingPack.bindings).find(([name, target]) => target === selectedId && name.endsWith("_rotation"))?.[0];
+        const angle = channel ? Number(rig.pose()[channel] || 0) : 0;
+        setPair("rotation", angle, !channel);
+        document.querySelector("#rotation").dataset.channel = channel || "";
+      };
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
+      const readValue = (name) => Number(document.querySelector(`#${name}`).value);
+      const applyControl = (name, target, index, min, max) => {
+        const value = clamp(readValue(name), min, max); const layer = workingPack.layers.find((item) => item.id === selectedId); layer[target][index] = value; setPair(name, value); render();
+      };
+      for (const name of fields) {
+        const target = name.startsWith("position") ? "position" : name.startsWith("size") ? "size" : "anchor";
+        const index = name.endsWith("x") ? 0 : 1;
+        for (const input of pair(name)) input.addEventListener("input", () => applyControl(name, target, index, target === "size" ? 0.01 : 0, 1));
+      }
+      document.querySelector("#rotation").addEventListener("input", () => { const channel = document.querySelector("#rotation").dataset.channel; if (!channel) return; const value = Number(document.querySelector("#rotation").value); rig.currentPose = { ...rig.pose(), [channel]: value }; setPair("rotation", value); render(); });
+      document.querySelector("#rotation-value").addEventListener("input", () => { document.querySelector("#rotation").value = document.querySelector("#rotation-value").value; document.querySelector("#rotation").dispatchEvent(new Event("input")); });
+      layerSelect.addEventListener("change", () => { selectedId = layerSelect.value; updateControls(); render(); });
+      for (const id of ["overlay", "bounds", "pivots"]) document.querySelector(`#${id}`).addEventListener("change", render);
+      for (const [id, value] of Object.entries(poseTimes)) document.querySelector(`#${id}`).addEventListener("click", () => { timeMs = value; updateControls(); render(); });
+      document.querySelector("#reset").addEventListener("click", () => location.reload());
+      document.querySelector("#export").addEventListener("click", () => { const payload = { format: workingPack.format, character_id: workingPack.id, source: "santa-v5-calibration.html", layers: workingPack.layers.map(({ id, parent, position, size, anchor }) => ({ id, parent, position, size, anchor })) }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "santa-v5-calibrated-parameters.json"; link.click(); URL.revokeObjectURL(url); });
+
+      function point(matrix, x, y) { return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }; }
+      function polygon(plan) { return [[0, 0], [plan.intrinsic[0], 0], [plan.intrinsic[0], plan.intrinsic[1]], [0, plan.intrinsic[1]]].map(([x, y]) => point(plan.matrix, x, y)); }
+      function drawOverlay(plans) {
+        if (document.querySelector("#overlay").checked && master.complete) { ctx.save(); ctx.globalAlpha = 0.28; ctx.drawImage(master, 0, 0, canvas.width, canvas.height); ctx.restore(); }
+        const showBounds = document.querySelector("#bounds").checked; const showPivots = document.querySelector("#pivots").checked;
+        for (const plan of plans) {
+          const active = plan.layer.id === selectedId; const points = polygon(plan);
+          if (showBounds || active) { ctx.save(); ctx.strokeStyle = active ? "#f7d27a" : "rgba(134,190,255,.30)"; ctx.lineWidth = active ? 3 : 1; ctx.beginPath(); points.forEach((item, index) => index ? ctx.lineTo(item.x, item.y) : ctx.moveTo(item.x, item.y)); ctx.closePath(); ctx.stroke(); ctx.restore(); }
+          if (showPivots || active) { const pivot = point(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); ctx.save(); ctx.strokeStyle = active ? "#ff8a8a" : "rgba(255,159,159,.55)"; ctx.lineWidth = active ? 3 : 1; ctx.beginPath(); ctx.moveTo(pivot.x - 8, pivot.y); ctx.lineTo(pivot.x + 8, pivot.y); ctx.moveTo(pivot.x, pivot.y - 8); ctx.lineTo(pivot.x, pivot.y + 8); ctx.stroke(); ctx.restore(); }
+        }
+      }
+      function render() { rig.setSceneDuration(20450); rig.update(timeMs, timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\nmarcas: pivôs transformados`; }
+      master.onload = render;
+      await renderer.load(); layerSelect.value = selectedId; updateControls(); render();
+    </script>
+  </body>
+</html>

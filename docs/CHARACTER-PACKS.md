@@ -192,3 +192,16 @@ The validator is only a first defense. A future secure importer must enforce arc
 5. Plan a dedicated character pack editor in Mission 007B.
 
 No private Topazioverse art, proprietary Animus code, model weights or personal data should be included by default. The open format should allow contributors to author their own characters.
+
+### V5 calibration metadata
+
+Santa V5 keeps the `fabuloom.character/0.1` pack format. Its normalized
+`position`, `size` and `anchor` values are the authoritative rig parameters;
+`frontend/src/santa-v5-calibration.mjs` contains measured alpha bounds only for
+diagnostics. Alpha bounds do not change the source PNGs.
+
+The calibration tool exposes the same hierarchy consumed by
+`LayeredCharacterRenderer`, including parent transforms, draw order and
+transformed pivots. A V5 adapter constrains only action amplitudes that exceed
+the painted overlap zones. This preserves the V3/V4 formats and keeps the
+runtime provider-independent.

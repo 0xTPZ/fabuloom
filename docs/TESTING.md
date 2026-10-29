@@ -247,3 +247,9 @@ The capture validates a contiguous 30 FPS PNG sequence, 1080x1920 composition,
 the real measured `pm_santa` WAV duration, and FFprobe H.264/AAC output. The
 comparison artifacts are written under `E:\Fabuloom\workspace\exports\videos`.
 RMS mouth motion is intentionally not phoneme or viseme alignment.
+
+Mission 012.3 adds `frontend/tests/test_santa_v5_calibration.mjs`. It checks
+the measured alpha metadata, action-specific amplitude limits, deterministic
+draw plans and independent head/hand transforms. The visual tools are local
+DEV pages; their screenshots and the silent 8-second reel are generated under
+the workspace export directory and are not committed.

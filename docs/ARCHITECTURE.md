@@ -193,6 +193,15 @@ server. `examples/santa_v5_video_demo.py` reuses measured audio, captures PNG
 frames in the browser, and lets FFmpeg encode the final H.264/AAC file. No
 weights or generated media are committed to the public repository.
 
+### Santa V5 calibration boundary
+
+Santa V5 calibration follows the same single-engine boundary. `SantaV5Rig`
+performs only asset-specific amplitude limits after the shared V3 scene sampler;
+the browser stage, the calibration tool and the offline calibration capture all
+consume `LayeredCharacterRenderer`. Diagnostic overlays are development-only
+and are not part of exported character frames. FFmpeg receives deterministic
+PNG frames only after the browser rig has resolved parent transforms.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

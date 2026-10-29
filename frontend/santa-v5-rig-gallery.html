@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · poses de calibração</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #07142a; color: #eef5ff; }
+      header { padding: 18px 24px; border-bottom: 1px solid #d6a84d55; }
+      h1 { margin: 0 0 4px; color: #f7d27a; font-size: 22px; }
+      header p { margin: 0; color: #b8c9df; }
+      main { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 14px; max-width: 1100px; margin: 18px auto; padding: 0 18px 24px; }
+      figure { margin: 0; padding: 10px; background: #0d2342; border: 1px solid #d6a84d55; border-radius: 10px; }
+      canvas { display: block; width: 100%; height: auto; background: #091a33; border-radius: 6px; }
+      figcaption { padding: 9px 2px 1px; color: #f7d27a; font-weight: 650; }
+      @media (max-width: 760px) { main { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · poses de calibração</h1><p>Quadros gerados pelo mesmo rig do palco. Cruz vermelha: pivôs. Retângulos azuis: caixas intrínsecas das camadas.</p></header>
+    <main id="gallery"></main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+
+      const poses = [
+        ["Neutro", 0], ["Caminhada", 1500], ["Sentado", 5000],
+        ["Braço", 15600], ["Xícara", 9600], ["Extremo controlado", 8000],
+      ];
+      const gallery = document.querySelector("#gallery");
+      function point(matrix, x, y) { return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }; }
+      function corners(plan) { return [[0, 0], [plan.intrinsic[0], 0], [plan.intrinsic[0], plan.intrinsic[1]], [0, plan.intrinsic[1]]].map(([x, y]) => point(plan.matrix, x, y)); }
+      function drawDiagnostics(context, plans) {
+        context.save();
+        for (const plan of plans) {
+          const polygon = corners(plan); context.strokeStyle = "rgba(134,190,255,.28)"; context.lineWidth = 1; context.beginPath(); polygon.forEach((item, index) => index ? context.lineTo(item.x, item.y) : context.moveTo(item.x, item.y)); context.closePath(); context.stroke();
+          const pivot = point(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); context.strokeStyle = "rgba(255,159,159,.62)"; context.beginPath(); context.moveTo(pivot.x - 5, pivot.y); context.lineTo(pivot.x + 5, pivot.y); context.moveTo(pivot.x, pivot.y - 5); context.lineTo(pivot.x, pivot.y + 5); context.stroke();
+        }
+        context.restore();
+      }
+      function backdrop(context, width, height) { const gradient = context.createLinearGradient(0, 0, 0, height); gradient.addColorStop(0, "#0a1730"); gradient.addColorStop(1, "#111f38"); context.fillStyle = gradient; context.fillRect(0, 0, width, height); context.fillStyle = "rgba(247,210,122,.15)"; context.beginPath(); context.arc(width * .72, height * .20, 75, 0, Math.PI * 2); context.fill(); }
+      async function main() {
+        for (const [label, timeMs] of poses) {
+          const figure = document.createElement("figure"); const canvas = document.createElement("canvas"); canvas.width = 420; canvas.height = 700; const caption = document.createElement("figcaption"); caption.textContent = label; figure.append(canvas, caption); gallery.append(figure);
+          const rig = new SantaV5Rig(); rig.setSceneDuration(8000); rig.setSpeechAmplitude(0.55); const renderer = new LayeredCharacterRenderer(canvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: false }); await renderer.load(); renderer.renderFrame({ timeMs, speechAmplitude: 0.55, isPlaying: true });
+          const context = canvas.getContext("2d"); const character = context.getImageData(0, 0, canvas.width, canvas.height); backdrop(context, canvas.width, canvas.height); context.putImageData(character, 0, 0); drawDiagnostics(context, renderer.getLayerDrawPlan());
+        }
+        document.title = "Santa V5 · poses prontas";
+      }
+      main().catch((error) => { document.body.dataset.error = String(error); document.title = `error: ${error.message}`; console.error(error); });
+    </script>
+  </body>
+</html>

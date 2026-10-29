@@ -65,3 +65,34 @@ adapter remain outside this mission.
 The artwork is original project material generated for Fabuloom from the
 approved identity direction. No third-party art, model weights, personal media
 or private project source is included.
+
+## Mission 012.3 — rig calibration
+
+The V5 source PNGs remain unchanged. Calibration is represented by the pack's
+normalized positions, sizes and pivots, while alpha bounds are recorded as
+diagnostic metadata in `frontend/src/santa-v5-calibration.mjs`. The diagnostic
+checks parent references, normalized values, expected joint regions and large
+transparent margins without loading model files or rewriting artwork.
+
+The local DEV tool is `frontend/santa-v5-calibration.html`. It can inspect the
+master overlay, intrinsic layer boxes and transformed pivots, switch between
+neutral, walking, seated, gesture, cup and controlled-extreme poses, and export
+parameter data. It is a development aid, not a public character editor.
+
+`SantaV5Rig` remains a thin adapter over the V3 scene choreography. V5 now
+limits walking, seated, reach/drink and explain amplitudes to the overlap range
+of the painted parts; V3 and V4 are not changed. The same absolute-time rig is
+used by the Character Stage and by
+`frontend/capture-santa-v5-calibration.html`.
+
+The technical reel is generated with:
+
+```powershell
+& 'E:\Fabuloom\workspace\.venv\Scripts\python.exe' .\examples\santa_v5_calibration_demo.py --overwrite
+```
+
+It writes the 8-second, silent visual calibration reel and report under
+`E:\Fabuloom\workspace\exports\videos\`. The reel is deliberately silent: it
+validates composition and deterministic poses, not Kokoro timing. The current
+calibration remains subject to human visual approval, especially for long-form
+hand/object contact.
