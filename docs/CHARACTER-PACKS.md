@@ -142,6 +142,20 @@ original lightweight SVG technical layers and reuse only the already-approved
 Santa facial artwork. This is an animation-ready demonstrator, not final
 cinematic illustration or a character editor.
 
+### Santa V4 cartoon refinement
+
+Mission 011.1 adds `frontend/src/santa-v4-pack.mjs` and original local SVG
+layers under `frontend/assets/characters/topazio-narrators-v4/santa/`. The
+pack keeps the `fabuloom.character/0.1` descriptor and the V3 hierarchy while
+using a softer cartoon treatment: a larger expressive head, gray side hair,
+discreet glasses, short beard, rounded shoulders, articulated sleeves and
+visible hands, with the navy/black/gold Topazio uniform and chest gem.
+
+Santa V4 is intentionally independent from Santa V3. `SantaV4Rig` and
+`SantaV4SceneRenderer` reuse the same deterministic scene and capture code;
+only the pack and stage title change. The concept reference generated during
+the art pass is a design reference, not a runtime layer or a published model.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.

@@ -237,7 +237,9 @@ export class SantaV3SceneRenderer {
     this.characterCanvas.width = options.characterWidth || 680;
     this.characterCanvas.height = options.characterHeight || 1550;
     this.characterDrawHeight = options.characterDrawHeight || 1300;
-    this.characterRenderer = new LayeredCharacterRenderer(this.characterCanvas, rig, SANTA_V3_PACK, {
+    this.pack = options.pack || SANTA_V3_PACK;
+    this.title = options.title || "SANTA V3  ·  TOPAZIOVERSE";
+    this.characterRenderer = new LayeredCharacterRenderer(this.characterCanvas, rig, this.pack, {
       assetRoot: options.assetRoot || globalThis.document?.baseURI || "http://127.0.0.1/",
       renderBackground: false,
     });
@@ -257,7 +259,7 @@ export class SantaV3SceneRenderer {
     ctx.drawImage(this.characterCanvas, scene.characterX, scene.characterY, this.characterCanvas.width, this.characterDrawHeight);
     drawCup(ctx, props.x, props.y, props.angle);
     ctx.fillStyle = "rgba(5,9,19,.70)"; ctx.fillRect(54, 62, 972, 94);
-    ctx.fillStyle = "#f7d27a"; ctx.font = "700 38px Segoe UI, sans-serif"; ctx.textAlign = "center"; ctx.fillText("SANTA V3  ·  TOPAZIOVERSE", width / 2, 122);
+    ctx.fillStyle = "#f7d27a"; ctx.font = "700 38px Segoe UI, sans-serif"; ctx.textAlign = "center"; ctx.fillText(this.title, width / 2, 122);
     if (scene.action === "explain") { ctx.fillStyle = "#f7e2a0"; ctx.font = "600 28px Segoe UI, sans-serif"; ctx.fillText("histórias que ganham vida", width / 2, height - 78); }
     return this.canvas;
   }
