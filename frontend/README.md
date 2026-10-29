@@ -21,11 +21,12 @@ anatomical hierarchy, expressions, blinking, head motion, brow motion, arm
 gestures, mouth openness, breathing, and subtle hair sway are handled by
 `src/layered-character.ts`.
 
-The primary demonstrators are now the simple official narrator trio: Dora
+The primary demonstrators are now the animation-ready V2 narrator trio: Dora
 (`pf_dora`), Santa (`pm_santa`), and Alex (`pm_alex`). Their shared original
-uniform language and portrait-based layers are independent of Kokoro at
-runtime; the voice IDs are metadata used to keep the visual identities aligned
-with the narration voices. Ari and Lia remain available as technical
+uniform language uses independent torso, neck, head, hair, facial, arm, hand
+and accessory layers. The voice IDs are metadata used to keep visual
+identities aligned with narration voices. The earlier portrait-based V1 packs
+remain available as compatibility references; Ari and Lia remain technical
 references.
 
 The local narration catalog in `src/topazio-narrations.mjs` maps each official
@@ -58,3 +59,13 @@ node --experimental-strip-types .\frontend\tests\test_timeline.mjs
 
 The original vector brand assets are in `frontend/assets/`. No bundler or
 global dependency is required for the local preview.
+
+## Animation-ready capture boundary
+
+`src/layered-character.ts` exposes `frameSchedule`,
+`LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. They use
+the same rig and Canvas renderer as the Stage, update the pose at deterministic
+timestamps, and stream PNG frames through a callback without accumulating the
+whole sequence in memory. A future local FFmpeg bridge can consume those
+frames and mux the measured narration. The current first-video exporter is
+kept unchanged until that bridge receives its own integration validation.

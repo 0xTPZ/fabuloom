@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500" role="img" aria-label="Cabeça da Dora V2">
+  <ellipse cx="78" cy="260" rx="42" ry="68" fill="#d49a78" stroke="#7a463f" stroke-width="10"/>
+  <ellipse cx="522" cy="260" rx="42" ry="68" fill="#d49a78" stroke="#7a463f" stroke-width="10"/>
+  <path d="M300 34q151 0 189 139l-17 166q-31 124-172 139-141-15-172-139l-17-166Q149 34 300 34Z" fill="#d49a78" stroke="#7a463f" stroke-width="12"/>
+  <path d="M183 366q117 83 234 0-27 106-117 108-90-2-117-108Z" fill="#e7b08d" opacity=".7"/>
+  <path d="M260 330q40 24 80 0" fill="none" stroke="#8c554b" stroke-width="8" stroke-linecap="round"/>
+</svg>

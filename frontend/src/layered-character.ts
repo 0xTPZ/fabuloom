@@ -20,6 +20,15 @@ function rotate(angle) { const cos = Math.cos(angle); const sin = Math.sin(angle
 function scale(x, y) { return { a: x, b: 0, c: 0, d: y, e: 0, f: 0 }; }
 function clamp(value, min = 0, max = 1) { return Math.max(min, Math.min(max, Number(value) || 0)); }
 
+export function* frameSchedule(durationMs, fps = 30) {
+  if (!Number.isFinite(durationMs) || durationMs < 0) throw new TypeError("durationMs must be finite and non-negative");
+  if (!Number.isInteger(fps) || fps <= 0 || fps > 120) throw new TypeError("fps must be an integer in [1,120]");
+  const frameCount = Math.ceil(durationMs / 1000 * fps);
+  for (let index = 0; index < frameCount; index += 1) {
+    yield { index, timeMs: Math.round(index * 1000 / fps) };
+  }
+}
+
 function sourceSizeFor(layer, assetSizes) {
   return assetSizes.get(layer.asset) || layer.source_size || [1024, 1024];
 }
@@ -196,6 +205,17 @@ export class LayeredCharacterRenderer {
     this.rig.setExpression(expressionId);
   }
 
+  /**
+   * Render one deterministic frame through the same rig used by Character Stage.
+   * This is the boundary consumed by a future local frame encoder.
+   */
+  renderFrame({ timeMs = 0, speechAmplitude = 0, isPlaying = true } = {}) {
+    this.rig.setSpeechAmplitude(speechAmplitude);
+    this.rig.update(timeMs, isPlaying);
+    this.render();
+    return this.canvas;
+  }
+
   resolvedAsset(layer) {
     const expression = this.pack.expressions.find((candidate) => candidate.id === this.expression);
     return expression?.overrides?.[layer.id] || layer.asset;
@@ -221,4 +241,35 @@ export class LayeredCharacterRenderer {
       ctx.restore();
     }
   }
+}
+
+function canvasBlob(canvas, type = "image/png") {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("canvas frame encoding returned no blob")), type);
+  });
+}
+
+/**
+ * Stream frames without retaining the complete video in browser memory.
+ * `onFrame` can forward each PNG to a local encoder or persist a short preview.
+ */
+export async function captureLayeredFrames(renderer, {
+  durationMs,
+  fps = 30,
+  isPlaying = true,
+  amplitudeAt = () => 0,
+  onFrame,
+  signal,
+} = {}) {
+  if (!(renderer instanceof LayeredCharacterRenderer)) throw new TypeError("renderer must be a LayeredCharacterRenderer");
+  if (typeof onFrame !== "function") throw new TypeError("onFrame callback is required");
+  let count = 0;
+  for (const frame of frameSchedule(durationMs, fps)) {
+    if (signal?.aborted) throw new DOMException("frame capture aborted", "AbortError");
+    renderer.renderFrame({ timeMs: frame.timeMs, speechAmplitude: amplitudeAt(frame.timeMs), isPlaying });
+    const blob = await canvasBlob(renderer.canvas);
+    await onFrame({ ...frame, blob });
+    count += 1;
+  }
+  return { frameCount: count, durationMs, fps };
 }

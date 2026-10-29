@@ -93,6 +93,29 @@ voice, disposes the prior `AudioTimelinePlayer` before switching, and reuses
 existing WAVs instead of synthesizing during selection. Playback controls,
 seek, timeline rendering and RMS analysis remain shared.
 
+### Animation-ready narrator pipeline 010.1
+
+The original Mission 010 export is intentionally diagnosed as a portrait
+composition: its Python path places Dora's full image on the stage and adds
+small audio-reactive overlays. That path proves MP4 delivery but cannot move
+the head, torso, arms, hands, hair and facial parts independently.
+
+Mission 010.1 keeps the existing V1 packs for compatibility and makes the
+`animation-ready/0.1` V2 packs the default official narrator assets. Their
+parent graph is consumed by the same `LayeredCharacterRig` and
+`LayeredCharacterRenderer` used by the interactive Stage. The V2 pack has
+separate anatomical layers and explicit pivots; the torso is the breathing
+root, the head is the rotation target, and facial descendants inherit only the
+head transform.
+
+`frameSchedule`, `renderFrame`, and `captureLayeredFrames` are the first
+export boundary. They render deterministic Canvas frames from the real rig,
+with the same time, RMS amplitude, expression and playing state as the Stage,
+and stream one PNG blob at a time through a callback. A future local bridge can
+forward those frames to FFmpeg and mux the measured WAV without retaining a
+complete video in browser memory. The current portrait exporter remains
+unchanged until that bridge is connected and validated.
+
 ### First video pipeline 010
 
 `examples/first_video_demo.py` is the first deterministic text-to-MP4 path. It

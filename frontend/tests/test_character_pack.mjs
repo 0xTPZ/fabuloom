@@ -32,3 +32,19 @@ test("validates optional normalized layer size", () => {
 });
 test("rejects unsupported animation target", () => { const p=base(); p.bindings.mouth_open="absent"; assert.throws(()=>validateCharacterPack(p)); });
 test("rejects expression overriding absent layer", () => { const p=base(); p.expressions[0].overrides={nope:"assets/a.png"}; assert.throws(()=>validateCharacterPack(p)); });
+test("accepts the additive animation-ready profile and roles", () => {
+  const p = base();
+  p.rig_profile = "animation-ready/0.1";
+  p.layers[0].role = "torso";
+  p.layers[1].role = "head";
+  p.layers[2].role = "mouth";
+  assert.equal(validateCharacterPack(p).rig_profile, "animation-ready/0.1");
+});
+test("rejects unknown animation-ready profile or role", () => {
+  const p = base();
+  p.rig_profile = "animation-ready/9.0";
+  assert.throws(() => validateCharacterPack(p), /rig profile/);
+  const q = base();
+  q.layers[0].role = "wing";
+  assert.throws(() => validateCharacterPack(q), /layer role/);
+});

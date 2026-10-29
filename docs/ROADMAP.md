@@ -36,6 +36,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
 - First video proof — Dora / `pf_dora`, measured segment captions, and RMS
   mouth response implemented; production editor and richer export controls
   remain deferred.
+- Animation-ready narrator packs — V2 Dora, Santa and Alex with independent
+  anatomical layers and shared Stage rig implemented in Mission 010.1.
+- Rig-faithful video export — frame capture boundary implemented; FFmpeg bridge
+  and end-to-end validation remain the next export step.
 
 ## Later
 

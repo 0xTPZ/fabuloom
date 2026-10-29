@@ -43,6 +43,11 @@ and a 1080x1920 H.264/AAC export. This is a reusable proof-of-pipeline, not
 the final editor, compositor, or cinematic animation system. Piper, Animus,
 the full editor, word/phoneme alignment, and production export tooling remain
 future work.
+Mission 010.1 corrects the visual direction for future exports: the official
+Dora, Santa and Alex V2 packs now use an animation-ready 16-node hierarchy with
+independent body, head, face, hair, arm, hand and accessory layers. The Stage
+and a new frame-capture boundary share the same rig; the original portrait
+export remains preserved until the frame-stream-to-FFmpeg bridge is validated.
 
 ## Technology direction
 

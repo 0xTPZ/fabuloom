@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FANTASY_NARRATOR_PACK } from "../src/fantasy-narrator-pack.mjs";
 import { validateCharacterPack } from "../src/character-pack.mjs";
-import { buildLayerDrawPlan, LayeredCharacterRig } from "../src/layered-character.ts";
+import { buildLayerDrawPlan, frameSchedule, LayeredCharacterRig } from "../src/layered-character.ts";
 
 test("fantasy narrator pack validates and resolves layered transforms", () => {
   validateCharacterPack(FANTASY_NARRATOR_PACK);
@@ -75,4 +75,21 @@ test("layered rig produces a blink and subtle secondary motion", () => {
   rig.update(4380, false);
   assert.ok(rig.pose().eye_open < 1);
   assert.notEqual(rig.pose().hair_sway, 0);
+});
+
+test("frame schedule is deterministic and bounded", () => {
+  assert.deepEqual([...frameSchedule(1000, 10)], [
+    { index: 0, timeMs: 0 },
+    { index: 1, timeMs: 100 },
+    { index: 2, timeMs: 200 },
+    { index: 3, timeMs: 300 },
+    { index: 4, timeMs: 400 },
+    { index: 5, timeMs: 500 },
+    { index: 6, timeMs: 600 },
+    { index: 7, timeMs: 700 },
+    { index: 8, timeMs: 800 },
+    { index: 9, timeMs: 900 },
+  ]);
+  assert.throws(() => [...frameSchedule(-1, 30)], /non-negative/);
+  assert.throws(() => [...frameSchedule(1000, 0)], /\[1,120\]/);
 });
