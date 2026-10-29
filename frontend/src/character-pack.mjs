@@ -4,9 +4,11 @@
  * Coordinates and pivots use normalized [0,1] canvas space.
  */
 export const CHARACTER_FORMAT = "fabuloom.character/0.1";
+export const ANIMATION_READY_PROFILE = "animation-ready/0.1";
 const idPattern = /^[a-z][a-z0-9_-]{1,63}$/;
 const safeAsset = /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)(?!.*:)(?!\/\/)[a-zA-Z0-9_./-]+\.(?:png|webp|svg)$/;
 const channels = new Set(["head_rotation","eye_open","mouth_open","breathing","left_arm","right_arm","hair_sway","brow_raise","expression"]);
+const layerRoles = new Set(["torso","neck","head","hair_back","hair_front","eyes","eyelids","brows","mouth","upper_arm","forearm","hand","accessory","portrait","overlay"]);
 function valid(condition, message) { if (!condition) throw new TypeError(message); }
 function identifier(id, label) { valid(typeof id === "string" && idPattern.test(id), `Invalid ${label}`); }
 function unit(value, label) { valid(typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1, `Invalid ${label}: expected [0,1]`); }
@@ -24,6 +26,7 @@ export function validateCharacterPack(pack) {
   valid(Array.isArray(pack.layers) && pack.layers.length > 0 && pack.layers.length <= 128,"Invalid layer count");
   valid(Array.isArray(pack.expressions), "Missing expressions");
   valid(plainObject(pack.bindings), "Missing animation bindings");
+  if (pack.rig_profile !== undefined) valid(pack.rig_profile === ANIMATION_READY_PROFILE, "Unsupported rig profile");
   const ids = new Set();
   for (const layer of pack.layers) {
     valid(plainObject(layer), "Invalid layer");
@@ -31,6 +34,7 @@ export function validateCharacterPack(pack) {
     valid(!ids.has(layer.id), "Duplicate layer id");
     ids.add(layer.id);
     valid(typeof layer.asset === "string" && safeAsset.test(layer.asset) && !layer.asset.includes("//"), "Unsafe sprite path");
+    if (layer.role !== undefined) valid(typeof layer.role === "string" && layerRoles.has(layer.role), "Invalid layer role");
     if (layer.parent !== null) identifier(layer.parent,"layer parent");
     point(layer.anchor,"layer anchor");
     point(layer.position,"layer position");

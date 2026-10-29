@@ -1,6 +1,6 @@
 # Layered Character Packs (V0.1)
 
-Status: contract and optional Canvas renderer refined on Mission 007A.2 / PR #4.
+Status: contract and optional Canvas renderer refined on Mission 010.1 / PR #6.
 
 ## Purpose
 
@@ -23,6 +23,25 @@ point placed there, `size` (when supplied) scales relative to that frame, and
 renderer default. This keeps the data contract independent of Canvas.
 
 The current list of animation channels is `head_rotation`, `eye_open`, `mouth_open`, `breathing`, `left_arm`, `right_arm`, `hair_sway`, `brow_raise`, and `expression`.
+
+### Animation-ready profile
+
+The optional `rig_profile: "animation-ready/0.1"` profile keeps the public
+`fabuloom.character/0.1` format compatible while making the intended anatomy
+explicit. Animation-ready layers carry a `role` and use the following minimum
+set: `torso`, `neck`, `head`, `hair_back`, `hair_front`, `eyes`, `eyelids`,
+`brows`, `mouth`, two `upper_arm` nodes, two `forearm` nodes, two `hand` nodes,
+and an optional `accessory`. Every node has a local pivot (`anchor`), a base
+position, a stable `z` draw order, and a semantic role. The parent graph is the
+rig: head rotation targets `head` and does not rotate `torso`; facial children
+inherit the head transform; breathing targets `torso`; arm motion targets the
+upper-arm chains.
+
+This profile is deliberately additive. Legacy portrait packs remain valid and
+are retained as V1 references. The official V2 packs use local SVG parts under
+`frontend/assets/characters/topazio-narrators-v2/`, share a small uniform
+library, and use character-specific head, hair, brow and mouth artwork. They
+are technical animation assets, not final cinematic art.
 
 The channel target is a layer ID, not a global character transform. For example,
 `head_rotation` targets `head`, so the torso remains fixed while child facial
@@ -90,6 +109,20 @@ references for the richer and geometric rigs.
 
 These assets are a maintainable visual foundation, not final production art.
 The editor and external character-pack import remain outside this mission.
+
+Mission 010.1 adds V2 animation-ready Dora, Santa and Alex packs. The Stage
+now selects the V2 packs by default while `TOPAZIO_NARRATOR_PACKS_V1` remains
+available for compatibility checks. Their local vector layers are designed to
+move independently in the existing Canvas renderer, rather than using a full
+portrait as the transform root.
+
+The export bridge is intentionally separate from the provider and player.
+`frontend/src/layered-character.ts` exposes `frameSchedule`,
+`LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. A future
+local exporter can stream each Canvas PNG frame to FFmpeg while using the same
+rig pose, measured audio clock and RMS amplitude as the Stage. The current
+Mission 010 exporter remains the reference portrait exporter until that frame
+stream is connected to the final MP4 pipeline.
 
 ## Validation and security
 

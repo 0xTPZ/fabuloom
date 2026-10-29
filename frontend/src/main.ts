@@ -64,9 +64,9 @@ let narrationLoadToken = 0;
 const characterMeta = {
   geometric: { name: "Lia", kind: "Rig geométrico · Canvas", presence: "Referência técnica", motion: "Respiração sutil" },
   fantasy: { name: "Ari", kind: "Pack em camadas · 2.5D", presence: "Narrador ilustrado", motion: "Cabeça, braços, cabelo e respiração" },
-  dora: { name: "Dora", kind: "Narradora oficial · Kokoro", presence: "Voz acolhedora · pf_dora", motion: "Cabeça, olhos, boca e respiração" },
-  santa: { name: "Santa", kind: "Narrador oficial · Kokoro", presence: "Voz sábia · pm_santa", motion: "Cabeça, olhos, boca e respiração" },
-  alex: { name: "Alex", kind: "Narrador oficial · Kokoro", presence: "Voz confiante · pm_alex", motion: "Cabeça, olhos, boca e respiração" },
+  dora: { name: "Dora", kind: "Narradora oficial · Rig V2", presence: "Voz acolhedora · pf_dora", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
+  santa: { name: "Santa", kind: "Narrador oficial · Rig V2", presence: "Voz sábia · pm_santa", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
+  alex: { name: "Alex", kind: "Narrador oficial · Rig V2", presence: "Voz confiante · pm_alex", motion: "Cabeça, braços, mãos, olhos, boca e respiração" },
 };
 
 for (const narration of NARRATIONS) {

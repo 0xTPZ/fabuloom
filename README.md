@@ -43,6 +43,13 @@ and a 1080x1920 H.264/AAC export. This is a reusable proof-of-pipeline, not
 the final editor, compositor, or cinematic animation system. Piper, Animus,
 the full editor, word/phoneme alignment, and production export tooling remain
 future work.
+Mission 010.1 corrects the visual direction for future exports: the official
+Dora, Santa and Alex V2 packs now use an animation-ready 16-node hierarchy with
+independent body, head, face, hair, arm, hand and accessory layers. The Stage
+and the video exporter share the same rig. Mission 010.2 validates the bridge
+with Santa V2, real Kokoro `pm_santa` audio, transparent deterministic Canvas
+frames, measured segment captions, and a 1080x1920 H.264/AAC MP4. The original
+portrait export remains preserved as a compatibility reference.
 
 ## Technology direction
 

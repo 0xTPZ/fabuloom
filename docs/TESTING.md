@@ -104,6 +104,49 @@ in the inspector, switching during playback, paused-state and seek behavior,
 safe stop/disposal, and empty error/warning logs. The audio-player unit test
 also verifies that disposal closes the context and clears decoded buffers.
 
+Mission 010.1 adds animation-ready V2 pack coverage. The Character Stage now
+loads Dora, Santa and Alex from 16 real layers each, while the V1 portrait
+packs remain validated as compatibility references. The tests cover the V2
+rig profile, anatomical roles, head-parent isolation, finite draw plans, and
+the deterministic frame schedule:
+
+```powershell
+node --test .\frontend\tests\test_character_pack.mjs .\frontend\tests\test_layered_character.mjs .\frontend\tests\test_topazio_narrators.mjs
+```
+
+The browser capture API is `captureLayeredFrames` in
+`frontend/src/layered-character.ts`. It streams one transparent Canvas PNG
+blob per frame to a caller-owned callback using deterministic absolute times.
+Browser validation should select each V2 narrator, exercise head motion,
+blink, RMS mouth, breathing, arm/hand hierarchy and expressions, then confirm
+no console errors or warnings. The original portrait exporter remains covered
+by the Mission 010 render/probe checks.
+
+## Character Engine video demonstration
+
+The Mission 010.2 exporter uses a local Kokoro runtime and writes the Santa V2
+demonstration only under `E:\Fabuloom\workspace\exports`:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+$env:HF_DATASETS_OFFLINE = "1"
+python .\examples\character_engine_video_demo.py `
+  --export-dir "E:\Fabuloom\workspace\exports" `
+  --background "E:\Fabuloom\workspace\exports\videos\fabuloom-first-video-background.png" `
+  --overwrite
+```
+
+The command produces `fabuloom-character-engine-santa.mp4`, measured audio,
+SRT and per-segment caption sources, a transparent frame sequence, and a
+probe report. The capture server is enabled only when `FABULOOM_CAPTURE_DIR`
+is set by the script, binds to `127.0.0.1`, rejects paths outside the
+workspace and accepts only PNG/JSON payloads. The exporter checks frame
+count/order, WAV/video duration, H.264/AAC output, full FFmpeg decode and
+black-frame diagnostics. Human review is still required for final visual
+approval.
+
 ## First video demonstration
 
 The Mission 010 demo uses an already available local Kokoro runtime and does

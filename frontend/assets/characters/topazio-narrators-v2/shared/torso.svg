@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 960" role="img" aria-label="Tronco do uniforme Topazioverse">
+  <path d="M98 958 116 405q15-125 120-158h168q105 33 120 158l18 553Z" fill="#14294c" stroke="#07172e" stroke-width="14"/>
+  <path d="M177 958 198 455l122-93 122 93 21 503Z" fill="#1d3d6d"/>
+  <path d="M244 350 320 430l76-80 48 83-70 92h-48l-70-92Z" fill="#d9e8f4" stroke="#b7cfe4" stroke-width="8"/>
+  <path d="M201 410 273 367l47 63-59 89-76-60Z" fill="#102447" stroke="#d6a94b" stroke-width="9"/>
+  <path d="m439 410-72-43-47 63 59 89 76-60Z" fill="#102447" stroke="#d6a94b" stroke-width="9"/>
+  <path d="M211 459 175 935M429 459l36 476" fill="none" stroke="#e5b957" stroke-width="12"/>
+  <path d="M182 952h276" stroke="#e5b957" stroke-width="12"/>
+  <path d="m320 465 35 35-35 35-35-35Z" fill="#69b9dc" stroke="#f0c86b" stroke-width="9"/>
+  <path d="M320 542v106" stroke="#d6a94b" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="320" cy="686" r="13" fill="#e5b957"/><circle cx="320" cy="744" r="13" fill="#e5b957"/>
+  <path d="M130 425q-50 115-48 235M510 425q50 115 48 235" fill="none" stroke="#d6a94b" stroke-width="12" stroke-linecap="round"/>
+</svg>
