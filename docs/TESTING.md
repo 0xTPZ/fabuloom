@@ -290,3 +290,17 @@ and the measured rendered hand error at a full wave pose. The regenerated
 technical MP4 is checked with FFprobe as 150 frames at 30 FPS, 1080x1920,
 H.264, silent and 5.000 seconds. The five-pose board and previous-versus-IK
 comparison remain workspace-only review artifacts.
+
+Mission 012.7 adds the provider-independent target and presenter tests:
+
+```powershell
+node --test .\\frontend\\tests\\test_presentation_targets.mjs .\\frontend\\tests\\test_santa_v5_point_at.mjs .\\frontend\\tests\\test_santa_v5_art.mjs
+```
+
+They cover normalized and scene-object target resolution, invalid targets,
+configurable POINT_AT phases/hold, safe out-of-reach planning, right/left arm
+selection, actual left-hand pivot reach, expression asset preservation, and
+out-of-order deterministic seeks. The capture is
+`fabuloom-santa-v5-point-at.mp4`; its accompanying report records the target
+sequence, frame count and the fact that the video is silent by design. The
+pose board is a workspace-only visual review artifact.

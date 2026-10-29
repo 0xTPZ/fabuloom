@@ -158,3 +158,21 @@ The technical capture is regenerated with:
 Review artifacts are `santa-v5-wave-poses-ik.png` and
 `santa-v5-wave-previous-vs-ik.png` under the workspace exports directory.
 They are local generated media and are not committed.
+
+## Mission 012.7 — presenter targeting
+
+Santa V5 now includes the provider-independent `POINT_AT` gesture. The
+gesture uses the calibrated right or left two-bone chain, a runtime target
+planner, measured wrist clearance, and a deterministic index-finger direction.
+Targets may be normalized stage coordinates, pixel coordinates, or registered
+scene-object centers. The left chain is calibrated against the actual rendered
+left-arm pivots and includes torso-root compensation, so rotating the torso
+does not leave the hand chain detached from its parent.
+
+The DEV page now supports preset target selection, left/right arm selection,
+hold duration, seek, pointer dragging and solver diagnostics. The technical
+capture `examples/santa_v5_point_at_demo.py` writes a silent 1080x1920 H.264
+reel plus a report under the workspace exports directory. The current result
+is intentionally a technical rig demonstration: it uses rigid 2.5D layers,
+not mesh deformation, physics, phonetic alignment or a final cinematic art
+pass. The original hand assets and Santa V3/V4 packs remain preserved.

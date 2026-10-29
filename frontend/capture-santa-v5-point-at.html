@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Santa V5 POINT_AT capture</title>
+    <style>html,body{margin:0;background:#101a2c;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="1080" height="1920"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { frameSchedule, LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { FABULOOM_KEYFRAME_FORMAT } from "./src/animation-keyframes.mjs";
+      import { createPresentationTarget } from "./src/presentation-targets.mjs";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { validateCharacterPack } from "./src/character-pack.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session"); const fps = Number(params.get("fps") || 30); const durationMs = 8500; const segmentMs = 4000; const gapMs = 500;
+      const status = document.querySelector("#status");
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+      const drawBackground = (ctx, width, height) => { const gradient = ctx.createLinearGradient(0, 0, 0, height); gradient.addColorStop(0, "#182b49"); gradient.addColorStop(1, "#080f1d"); ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height); ctx.fillStyle = "rgba(247,210,122,.12)"; ctx.beginPath(); ctx.arc(width * .50, height * .25, 310, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "rgba(247,210,122,.18)"; ctx.fillRect(0, height * .86, width, 5); };
+      const drawBook = (ctx, x, y, scale = 1) => { ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.rotate(-0.05); ctx.fillStyle = "#d6a84d"; ctx.strokeStyle = "#fff2cf"; ctx.lineWidth = 5; ctx.beginPath(); ctx.roundRect(-110, -72, 220, 144, 16); ctx.fill(); ctx.stroke(); ctx.strokeStyle = "#8a5b20"; ctx.lineWidth = 3; for (let i = -2; i <= 2; i += 1) { ctx.beginPath(); ctx.moveTo(-78, i * 20); ctx.lineTo(-12, i * 20 + 5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(12, i * 20 + 5); ctx.lineTo(78, i * 20); ctx.stroke(); } ctx.restore(); };
+      const drawSymbol = (ctx, x, y, scale = 1) => { ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.fillStyle = "#1b5ca8"; ctx.strokeStyle = "#f7d27a"; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(0, 0, 82, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#f7d27a"; ctx.beginPath(); ctx.moveTo(0, -58); ctx.lineTo(18, -12); ctx.lineTo(68, 0); ctx.lineTo(18, 12); ctx.lineTo(0, 58); ctx.lineTo(-18, 12); ctx.lineTo(-68, 0); ctx.lineTo(-18, -12); ctx.closePath(); ctx.fill(); ctx.restore(); };
+      const drawTargets = (ctx, width, height) => { drawBook(ctx, width * .88, height * .30, 1.05); drawSymbol(ctx, width * .30, height * .34, 1.0); ctx.fillStyle = "#f7d27a"; ctx.font = "600 30px Segoe UI"; ctx.fillText("LIVRO", width * .88 - 74, height * .30 + 125); ctx.fillText("SÍMBOLO", width * .30 - 84, height * .34 + 126); };
+      const blobFromFrame = (canvas) => new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("frame encoding returned no blob")), "image/png"));
+      const sendFrame = async ({ index, timeMs, blob }) => { const response = await fetch(`/capture/${encodeURIComponent(session)}/${String(index).padStart(6, "0")}.png`, { method: "POST", headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`); };
+      const rightTarget = createPresentationTarget({ id: "book-right", position: { x: .90, y: .15 }, label: "Livro · direita" });
+      const leftTarget = createPresentationTarget({ id: "symbol-left", position: { x: .44, y: .15 }, label: "Símbolo · esquerda" });
+
+      async function main() {
+        if (!session) fail("session is required");
+        if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps");
+        validateCharacterPack(SANTA_V5_PACK);
+        const outputCanvas = document.querySelector("#capture-canvas");
+        const characterCanvas = document.createElement("canvas"); characterCanvas.width = outputCanvas.width; characterCanvas.height = outputCanvas.height;
+        const rig = new SantaV5Rig(); rig.setSceneDuration(durationMs); rig.setPointAtTiming({ durationMs: segmentMs, holdMs: 1300, attentionMs: 300, anticipationMs: 250, elevationMs: 700, returnMs: 1450 }); rig.setAnimation("POINT_AT");
+        const renderer = new LayeredCharacterRenderer(characterCanvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: false });
+        await renderer.load(); renderer.setExpression("point");
+        const frameCount = [...frameSchedule(durationMs, fps)].length;
+        for (const frame of frameSchedule(durationMs, fps)) {
+          const segmentStart = frame.timeMs < segmentMs ? 0 : segmentMs + gapMs;
+          const pointing = frame.timeMs < segmentMs ? rightTarget : frame.timeMs < segmentStart + segmentMs ? leftTarget : null;
+          const localTime = pointing ? frame.timeMs - (pointing === rightTarget ? 0 : segmentStart) : 0;
+          if (pointing) rig.setPresentationTarget(pointing, { arm: pointing === rightTarget ? "right" : "left", wristClearancePx: 86, elbowPreference: pointing === rightTarget ? { x: 1, y: .55 } : { x: -1, y: .55 } });
+          rig.setAnimation("POINT_AT"); renderer.renderFrame({ timeMs: localTime, speechAmplitude: 0, isPlaying: false });
+          const ctx = outputCanvas.getContext("2d"); drawBackground(ctx, outputCanvas.width, outputCanvas.height); drawTargets(ctx, outputCanvas.width, outputCanvas.height); ctx.drawImage(characterCanvas, 0, 0); await sendFrame({ index: frame.index, timeMs: frame.timeMs, blob: await blobFromFrame(outputCanvas) });
+        }
+        const completion = { character: SANTA_V5_PACK.id, animation_id: "POINT_AT", animation_format: FABULOOM_KEYFRAME_FORMAT, duration_ms: durationMs, canvas: { width: outputCanvas.width, height: outputCanvas.height }, fps, frame_count: frameCount, timing_source: "absolute_point_at_clip_time", targets: [rightTarget.id, leftTarget.id], audio: "none", purpose: "point_at_presenter_targeting_demo" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });
+        if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`);
+        status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>

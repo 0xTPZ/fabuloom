@@ -81,6 +81,7 @@ export const SANTA_V5_ANATOMICAL_LANDMARKS = Object.freeze([
 export const SANTA_V5_RIGHT_ARM_IK_CALIBRATION = Object.freeze({
   frameWidth: 1080,
   frameHeight: 1920,
+  rootPivot: Object.freeze({ x: 540, y: 883.2 }),
   shoulder: Object.freeze({ x: 782.352, y: 399.36 }),
   elbow: Object.freeze({ x: 772.65792, y: 666.8544 }),
   wrist: Object.freeze({ x: 767.2777056, y: 841.8551808 }),
@@ -106,6 +107,35 @@ export const SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY = Object.freeze({
   forearmScale: Object.freeze({ x: 0.74, y: 0.46 }),
   upperOffset: Object.freeze({ x: -40.96, y: 691.2 }),
   forearmOffset: Object.freeze({ x: -30.72, y: 983.04 }),
+});
+
+/** Left-arm companion calibration used when POINT_AT selects a left target. */
+export const SANTA_V5_LEFT_ARM_IK_CALIBRATION = Object.freeze({
+  frameWidth: 1080,
+  frameHeight: 1920,
+  rootPivot: Object.freeze({ x: 540, y: 883.2 }),
+  // These landmarks are the actual rendered pivots of the left arm chain at
+  // 1080x1920. The upper-arm pivot is used as the IK root because it is the
+  // parent transform that the Canvas renderer can control independently from
+  // the torso's estimated anatomical shoulder landmark.
+  shoulder: Object.freeze({ x: 262.008, y: 385.536 }),
+  elbow: Object.freeze({ x: 269.72644998755766, y: 676.9587293289997 }),
+  wrist: Object.freeze({ x: 275.6388335446021, y: 863.0105767197603 }),
+  handTarget: Object.freeze({ x: 275.6388335446021, y: 863.0105767197603 }),
+  upperLength: 291.5249245601031,
+  forearmLength: 186.14576599224725,
+  baseShoulderAngle: 1.5443171088107452,
+  baseElbowAngle: -0.005288241659316517,
+  elbowPreference: Object.freeze({ x: -1, y: 0.55 }),
+  restTarget: Object.freeze({ x: 273.91969974646844, y: 852.0425575286847 }),
+});
+
+export const SANTA_V5_LEFT_ARM_RENDER_GEOMETRY = Object.freeze({
+  rootScale: Object.freeze({ x: 0.6258121158911326, y: 1.0010137581462708 }),
+  upperScale: Object.freeze({ x: 0.37818359375, y: 0.3866080729166667 }),
+  forearmScale: Object.freeze({ x: 0.74, y: 0.46 }),
+  upperOffset: Object.freeze({ x: 32.61245125791849, y: 753.0303083436683 }),
+  forearmOffset: Object.freeze({ x: 33.75858457841485, y: 1045.117668749357 }),
 });
 
 const finiteUnit = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;

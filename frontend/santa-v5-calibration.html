@@ -44,17 +44,27 @@
           </div>
           <div><button id="neutral">Neutro</button><button id="arm-raised" class="secondary">Braço levantado</button><button id="elbow" class="secondary">Cotovelo</button><button id="gesture" class="secondary">Explicação</button><button id="step-left" class="secondary">Passo E</button><button id="step-right" class="secondary">Passo D</button><button id="sit" class="secondary">Sentado</button><button id="drink" class="secondary">Xícara</button><button id="extreme" class="secondary">Extremo</button></div>
           <div><button id="wave" >WAVE_HELLO</button><button id="wave-play" class="secondary">Reproduzir</button><button id="wave-pause" class="secondary">Pausar</button><button id="wave-reset" class="secondary">Início</button></div>
+          <div><button id="point">POINT_AT</button><button id="point-play" class="secondary">Reproduzir</button><button id="point-pause" class="secondary">Pausar</button><button id="point-reset" class="secondary">Início</button></div>
           <label><span>Tempo WAVE</span><input id="wave-time" type="range" min="0" max="4600" step="1" value="0" /><input id="wave-time-value" type="number" min="0" max="4600" step="1" value="0" /></label>
+          <label><span>Tempo POINT</span><input id="point-time" type="range" min="0" max="8000" step="1" value="0" /><input id="point-time-value" type="number" min="0" max="8000" step="1" value="0" /></label>
+          <label><span>Sustentação</span><input id="point-hold" type="range" min="800" max="6000" step="100" value="4100" /><input id="point-hold-value" type="number" min="800" max="6000" step="100" value="4100" /></label>
           <pre id="wave-keyframes" class="keyframes">carregando keyframes…</pre>
           <div><button id="export">Exportar parâmetros</button><button id="reset" class="secondary">Recarregar pack</button></div>
         </div>
         <div class="panel">
-          <strong>IK do braço direito · WAVE_HELLO</strong>
+          <strong>IK do braço direito · WAVE_HELLO / POINT_AT</strong>
           <label><span>Alvo X</span><input id="ik-target-x" type="range" min="0" max="1" step="0.001" /><input id="ik-target-x-value" type="number" min="0" max="1" step="0.001" /></label>
           <label><span>Alvo Y</span><input id="ik-target-y" type="range" min="0" max="1" step="0.001" /><input id="ik-target-y-value" type="number" min="0" max="1" step="0.001" /></label>
           <label><span>Cotovelo</span><select id="ik-elbow-preference"><option value="outward">afastado do tronco</option><option value="down">para baixo</option><option value="inward">para dentro</option></select><span></span></label>
           <label><span>Controle manual</span><input id="ik-manual" type="checkbox" /><span>arraste o alvo no palco</span></label>
           <pre id="ik-diagnostics">IK aguardando WAVE_HELLO…</pre>
+        </div>
+        <div class="panel">
+          <strong>Alvo de apresentação</strong>
+          <label><span>Alvo</span><select id="point-target"><option value="book-right">Livro · direita</option><option value="symbol-left">Símbolo · esquerda</option></select><span></span></label>
+          <label><span>Posição</span><span id="point-target-position">—</span><span></span></label>
+          <div><button id="point-right" class="secondary">Alvo à direita</button><button id="point-left" class="secondary">Alvo à esquerda</button></div>
+          <pre id="point-diagnostics">POINT_AT aguardando alvo…</pre>
         </div>
         <div class="panel">
           <strong>Transformação da camada</strong>
@@ -73,8 +83,9 @@
     <script type="module">
       import { buildLayerDrawPlan, LayeredCharacterRenderer } from "./src/layered-character.ts";
       import { landmarkConnectionSegments, resolveLandmarks, transformPoint } from "./src/character-landmarks.mjs";
-      import { diagnoseSantaV5Calibration, SANTA_V5_ANATOMICAL_LANDMARKS, SANTA_V5_RIGHT_ARM_IK_CALIBRATION } from "./src/santa-v5-calibration.mjs";
-      import { SantaV5Rig, SANTA_V5_WAVE_HELLO_CLIP } from "./src/santa-v5-engine.ts";
+      import { createPresentationTarget } from "./src/presentation-targets.mjs";
+      import { diagnoseSantaV5Calibration, SANTA_V5_ANATOMICAL_LANDMARKS, SANTA_V5_RIGHT_ARM_IK_CALIBRATION, SANTA_V5_LEFT_ARM_IK_CALIBRATION } from "./src/santa-v5-calibration.mjs";
+      import { SantaV5Rig, SANTA_V5_POINT_AT_CLIP, SANTA_V5_WAVE_HELLO_CLIP } from "./src/santa-v5-engine.ts";
       import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
 
       const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -114,11 +125,27 @@
       const waveTimeValue = document.querySelector("#wave-time-value");
       const waveKeyframes = document.querySelector("#wave-keyframes");
       const ikDiagnostics = document.querySelector("#ik-diagnostics");
+      const pointDiagnostics = document.querySelector("#point-diagnostics");
+      const pointTargetPosition = document.querySelector("#point-target-position");
       const ikManual = document.querySelector("#ik-manual");
       const ikTargetX = document.querySelector("#ik-target-x");
       const ikTargetY = document.querySelector("#ik-target-y");
       const ikPreference = document.querySelector("#ik-elbow-preference");
       const ikPreferenceVectors = { outward: { x: 1, y: 0.55 }, down: { x: 0.15, y: 1 }, inward: { x: -1, y: 0.55 } };
+      const presentationTargets = {
+        "book-right": createPresentationTarget({ id: "book-right", position: { x: 0.90, y: 0.15 }, label: "Livro · direita" }),
+        "symbol-left": createPresentationTarget({ id: "symbol-left", position: { x: 0.44, y: 0.15 }, label: "Símbolo · esquerda" }),
+      };
+      let selectedPresentationTarget = "book-right";
+      let pointPlaying = false;
+      let pointFrame = 0;
+      let pointStartedAt = 0;
+      let pointTimeMs = 0;
+      const pointTime = document.querySelector("#point-time");
+      const pointTimeValue = document.querySelector("#point-time-value");
+      const pointHold = document.querySelector("#point-hold");
+      const pointHoldValue = document.querySelector("#point-hold-value");
+      const pointTarget = document.querySelector("#point-target");
       const ikField = (axis) => [document.querySelector(`#ik-target-${axis}`), document.querySelector(`#ik-target-${axis}-value`)];
       const setIKField = (axis, value) => { for (const input of ikField(axis)) input.value = Number(value).toFixed(3); };
       const readIKTarget = () => ({ x: clamp(ikTargetX.value, 0, 1), y: clamp(ikTargetY.value, 0, 1) });
@@ -129,6 +156,11 @@
       const setWaveTime = (value) => { timeMs = clamp(value, 0, SANTA_V5_WAVE_HELLO_CLIP.durationMs); waveTime.value = String(Math.round(timeMs)); waveTimeValue.value = String(Math.round(timeMs)); };
       const stopWaveLoop = () => { wavePlaying = false; cancelAnimationFrame(waveFrame); };
       const playWaveLoop = (now) => { if (!wavePlaying) return; if (!waveStartedAt) waveStartedAt = now - timeMs; setWaveTime(now - waveStartedAt); render(); if (timeMs < SANTA_V5_WAVE_HELLO_CLIP.durationMs) waveFrame = requestAnimationFrame(playWaveLoop); else stopWaveLoop(); };
+      const setPointTiming = () => { const hold = clamp(pointHold.value, 800, 6000); const durationMs = 600 + 500 + 1400 + hold + 1400; rig.setPointAtTiming({ durationMs, holdMs: hold }); pointTime.max = String(rig.pointAtClipDefinition().durationMs); pointTimeValue.max = String(rig.pointAtClipDefinition().durationMs); pointHold.value = String(Math.round(hold)); pointHoldValue.value = String(Math.round(hold)); };
+      const setPointTime = (value) => { pointTimeMs = clamp(value, 0, rig.pointAtClipDefinition().durationMs); pointTime.value = String(Math.round(pointTimeMs)); pointTimeValue.value = String(Math.round(pointTimeMs)); };
+      const stopPointLoop = () => { pointPlaying = false; cancelAnimationFrame(pointFrame); };
+      const applyPresentationTarget = (id = selectedPresentationTarget) => { selectedPresentationTarget = id; pointTarget.value = id; const target = presentationTargets[id]; rig.setPresentationTarget(target, { elbowPreference: ikPreferenceVectors[id === "symbol-left" ? "inward" : "outward"] }); const resolved = rig.presentationTargetInfo(); if (resolved) { setIKField("x", resolved.wristTarget.x / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameWidth); setIKField("y", resolved.wristTarget.y / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameHeight); } pointTargetPosition.textContent = `${target.label}: (${target.position.x.toFixed(3)}, ${target.position.y.toFixed(3)})`; render(); };
+      const playPointLoop = (now) => { if (!pointPlaying) return; if (!pointStartedAt) pointStartedAt = now - pointTimeMs; setPointTime(now - pointStartedAt); rig.setAnimation("POINT_AT"); render(); if (pointTimeMs < rig.pointAtClipDefinition().durationMs) pointFrame = requestAnimationFrame(playPointLoop); else stopPointLoop(); };
       const applyControl = (name, target, index, min, max) => {
         const value = clamp(readValue(name), min, max); const layer = workingPack.layers.find((item) => item.id === selectedId); layer[target][index] = value; setPair(name, value); render();
       };
@@ -148,11 +180,20 @@
       document.querySelector("#wave-reset").addEventListener("click", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); waveStartedAt = 0; setWaveTime(0); render(); });
       waveTime.addEventListener("input", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); setWaveTime(waveTime.value); render(); });
       waveTimeValue.addEventListener("input", () => { stopWaveLoop(); rig.setAnimation("WAVE_HELLO"); setWaveTime(waveTimeValue.value); render(); });
+      document.querySelector("#point").addEventListener("click", () => { stopWaveLoop(); stopPointLoop(); setPointTiming(); applyPresentationTarget(); pointStartedAt = 0; setPointTime(0); rig.setAnimation("POINT_AT"); updateControls(); render(); });
+      document.querySelector("#point-play").addEventListener("click", () => { stopWaveLoop(); setPointTiming(); if (rig.animationId() !== "POINT_AT" || pointTimeMs >= rig.pointAtClipDefinition().durationMs) setPointTime(0); applyPresentationTarget(); rig.setAnimation("POINT_AT"); pointPlaying = true; pointStartedAt = 0; pointFrame = requestAnimationFrame(playPointLoop); });
+      document.querySelector("#point-pause").addEventListener("click", () => { stopPointLoop(); render(); });
+      document.querySelector("#point-reset").addEventListener("click", () => { stopPointLoop(); setPointTiming(); applyPresentationTarget(); rig.setAnimation("POINT_AT"); pointStartedAt = 0; setPointTime(0); render(); });
+      for (const input of [pointTime, pointTimeValue]) input.addEventListener("input", () => { stopPointLoop(); setPointTiming(); rig.setAnimation("POINT_AT"); setPointTime(input.value); render(); });
+      for (const input of [pointHold, pointHoldValue]) input.addEventListener("input", () => { setPointTiming(); if (rig.animationId() === "POINT_AT") { rig.setAnimation("POINT_AT"); setPointTime(pointTimeMs); render(); } });
+      pointTarget.addEventListener("change", () => applyPresentationTarget(pointTarget.value));
+      document.querySelector("#point-right").addEventListener("click", () => applyPresentationTarget("book-right"));
+      document.querySelector("#point-left").addEventListener("click", () => applyPresentationTarget("symbol-left"));
       for (const axis of ["x", "y"]) for (const input of ikField(axis)) input.addEventListener("input", applyIKTarget);
       ikPreference.addEventListener("change", () => { elbowPreference = ikPreference.value; if (ikManual.checked) applyIKTarget(); else render(); });
       ikManual.addEventListener("change", () => { if (ikManual.checked) applyIKTarget(); else { rig.clearRightHandTarget(); render(); } });
-      const setIKFromPointer = (event) => { const rect = canvas.getBoundingClientRect(); const x = clamp((event.clientX - rect.left) / rect.width, 0, 1); const y = clamp((event.clientY - rect.top) / rect.height, 0, 1); setIKField("x", x); setIKField("y", y); applyIKTarget(); };
-      canvas.addEventListener("pointerdown", (event) => { const ik = rig.rightHandIK(); if (!ik || rig.animationId() !== "WAVE_HELLO") return; const rect = canvas.getBoundingClientRect(); const x = ik.normalizedTarget.x * rect.width; const y = ik.normalizedTarget.y * rect.height; if (Math.hypot(event.clientX - rect.left - x, event.clientY - rect.top - y) > 32) return; draggingIKTarget = true; canvas.setPointerCapture(event.pointerId); setIKFromPointer(event); });
+      const setIKFromPointer = (event) => { const rect = canvas.getBoundingClientRect(); const x = clamp((event.clientX - rect.left) / rect.width, 0, 1); const y = clamp((event.clientY - rect.top) / rect.height, 0, 1); setIKField("x", x); setIKField("y", y); if (rig.animationId() === "POINT_AT") { const manual = createPresentationTarget({ id: "manual-target", position: { x, y }, coordinateSpace: "normalized-stage", label: "Alvo manual" }); rig.setPresentationTarget(manual, { elbowPreference: x < 0.5 ? ikPreferenceVectors.inward : ikPreferenceVectors.outward }); pointTargetPosition.textContent = `Alvo manual: (${x.toFixed(3)}, ${y.toFixed(3)})`; pointDiagnostics.textContent = "alvo manual arrastado no palco"; render(); } else applyIKTarget(); };
+      canvas.addEventListener("pointerdown", (event) => { const ik = rig.rightHandIK(); if (!ik || !["WAVE_HELLO", "POINT_AT"].includes(rig.animationId())) return; const rect = canvas.getBoundingClientRect(); const x = ik.normalizedTarget.x * rect.width; const y = ik.normalizedTarget.y * rect.height; if (Math.hypot(event.clientX - rect.left - x, event.clientY - rect.top - y) > 32) return; draggingIKTarget = true; canvas.setPointerCapture(event.pointerId); setIKFromPointer(event); });
       canvas.addEventListener("pointermove", (event) => { if (draggingIKTarget) setIKFromPointer(event); });
       const releaseIK = (event) => { draggingIKTarget = false; if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId); };
       canvas.addEventListener("pointerup", releaseIK); canvas.addEventListener("pointercancel", releaseIK);
@@ -180,22 +221,37 @@
       }
       function drawIKOverlay(plans) {
         const ik = rig.rightHandIK();
-        if (!ik || rig.animationId() !== "WAVE_HELLO") { ikDiagnostics.textContent = "IK aguardando WAVE_HELLO…"; return; }
-        const shoulder = layerPivot(plans, "right_upper_arm"); const elbow = layerPivot(plans, "right_forearm"); const wrist = layerPivot(plans, "right_hand");
-        const sx = canvas.width / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameWidth; const sy = canvas.height / SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameHeight;
-        const target = { x: ik.requestedTarget.x * sx, y: ik.requestedTarget.y * sy };
+        if (!ik || !["WAVE_HELLO", "POINT_AT"].includes(rig.animationId())) { ikDiagnostics.textContent = "IK aguardando WAVE_HELLO / POINT_AT…"; pointDiagnostics.textContent = "POINT_AT aguardando alvo…"; return; }
+        const info = rig.presentationTargetInfo();
+        const left = ik.arm === "left" || info?.arm === "left";
+        const side = left ? "left" : "right";
+        const calibration = left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION : SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+        const shoulder = layerPivot(plans, `${side}_upper_arm`); const elbow = layerPivot(plans, `${side}_forearm`); const wrist = layerPivot(plans, `${side}_hand`);
+        const sx = canvas.width / calibration.frameWidth; const sy = canvas.height / calibration.frameHeight;
+        const targetSource = rig.animationId() === "POINT_AT" && info ? info.point : ik.requestedTarget;
+        const target = { x: targetSource.x * sx, y: targetSource.y * sy };
         ctx.save(); ctx.lineWidth = 6; ctx.strokeStyle = "rgba(247,210,122,.94)"; ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(elbow.x, elbow.y); ctx.lineTo(wrist.x, wrist.y); ctx.stroke();
         ctx.strokeStyle = "rgba(88,220,255,.80)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(shoulder.x, shoulder.y, ik.maximumDistance * ((sx + sy) / 2), 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(shoulder.x, shoulder.y, ik.minimumDistance * ((sx + sy) / 2), 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = "#ff8a8a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(target.x - 14, target.y); ctx.lineTo(target.x + 14, target.y); ctx.moveTo(target.x, target.y - 14); ctx.lineTo(target.x, target.y + 14); ctx.stroke(); ctx.beginPath(); ctx.arc(target.x, target.y, 12, 0, Math.PI * 2); ctx.stroke();
+        if (rig.animationId() === "POINT_AT" && info) { ctx.strokeStyle = "#f7d27a"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(wrist.x, wrist.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.fillStyle = "#f7d27a"; ctx.font = "600 16px Segoe UI"; ctx.fillText(info.label, target.x + 16, target.y - 10); }
         ctx.fillStyle = "#f7d27a"; ctx.font = "600 16px Segoe UI"; ctx.fillText("alvo", target.x + 16, target.y - 10); ctx.restore();
         const renderedError = Math.hypot(wrist.x - target.x, wrist.y - target.y);
         ikDiagnostics.textContent = [
-          `alvo: (${ik.normalizedTarget.x.toFixed(3)}, ${ik.normalizedTarget.y.toFixed(3)}) · peso ${(ik.weight * 100).toFixed(0)}%`,
+          `braço: ${side} · alvo: (${ik.normalizedTarget.x.toFixed(3)}, ${ik.normalizedTarget.y.toFixed(3)}) · peso ${(ik.weight * 100).toFixed(0)}%`,
           `ombro: ${(ik.shoulderAngle * 180 / Math.PI).toFixed(1)}° · cotovelo: ${(ik.elbowAngle * 180 / Math.PI).toFixed(1)}°`,
           `erro do solver: ${ik.error.toFixed(2)} px · erro no render: ${renderedError.toFixed(2)} px`,
           `alcance: ${ik.minimumDistance.toFixed(1)}–${ik.maximumDistance.toFixed(1)} px · ${ik.reachable ? "alvo alcançável" : "alvo limitado"}`,
           `preferência: ${elbowPreference} · origem: forward model do rig em 1080×1920`,
         ].join("\n");
+        if (rig.animationId() === "POINT_AT" && info) {
+          const pointerDelta = Math.atan2(target.y - wrist.y, target.x - wrist.x) - (ik.pointerDirection || 0);
+          pointDiagnostics.textContent = [
+            `alvo: ${info.label} · posição (${info.normalized.x.toFixed(3)}, ${info.normalized.y.toFixed(3)})`,
+            `pulso: (${info.normalizedWrist.x.toFixed(3)}, ${info.normalizedWrist.y.toFixed(3)}) · folga ${ik.wristClearancePx.toFixed(0)} px`,
+            `direção do indicador: ${(ik.pointerDirection * 180 / Math.PI).toFixed(1)}° · erro visual ${Math.abs(pointerDelta * 180 / Math.PI).toFixed(1)}°`,
+            `alcance: ${info.reachable ? "alcançável" : "aproximado com limite"} · sustentação ${Math.round(rig.pointAtClipDefinition().durationMs - pointTimeMs)} ms`,
+          ].join("\n");
+        }
         syncIKFields(ik);
       }
       function drawOverlay(plans) {
@@ -207,9 +263,9 @@
           if (showPivots || active) { const pivot = point(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); ctx.save(); ctx.strokeStyle = active ? "#ff8a8a" : "rgba(255,159,159,.55)"; ctx.lineWidth = active ? 3 : 1; ctx.beginPath(); ctx.moveTo(pivot.x - 8, pivot.y); ctx.lineTo(pivot.x + 8, pivot.y); ctx.moveTo(pivot.x, pivot.y - 8); ctx.lineTo(pivot.x, pivot.y + 8); ctx.stroke(); ctx.restore(); }
         }
       }
-      function render() { rig.setSceneDuration(20450); rig.setSpeechAmplitude(clamp(readValue("amplitude"), 0, 1)); if (rig.animationId() !== "WAVE_HELLO") rig.clearAnimation(); const expression = rig.animationId() === "WAVE_HELLO" ? "wave" : "neutral"; if (renderer.expression !== expression) renderer.setExpression(expression); rig.update(timeMs, wavePlaying || timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const landmarkReport = drawLandmarks(plans); drawIKOverlay(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nlandmarks: ${landmarkReport.count}\nanimação: ${rig.animationId() || "cena base"}\ntempo: ${Math.round(timeMs)} ms${wavePlaying ? " · reproduzindo" : ""}\ndelta máximo pivô/landmark: ${landmarkReport.maxPivotDelta.toFixed(1)} px\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\ncruzes: pivôs transformados\nlinha/círculos ciano: landmarks anatômicos (amarelo = estimativa baixa)`; }
+      function render() { rig.setSceneDuration(20450); rig.setSpeechAmplitude(clamp(readValue("amplitude"), 0, 1)); if (!["WAVE_HELLO", "POINT_AT"].includes(rig.animationId())) rig.clearAnimation(); const animationId = rig.animationId(); const info = rig.presentationTargetInfo?.(); const expression = animationId === "WAVE_HELLO" ? "wave" : animationId === "POINT_AT" ? (info?.arm === "left" ? "point-left" : "point") : "neutral"; if (renderer.expression !== expression) renderer.setExpression(expression); const activeTime = animationId === "POINT_AT" ? pointTimeMs : timeMs; rig.update(activeTime, wavePlaying || pointPlaying || activeTime !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const landmarkReport = drawLandmarks(plans); drawIKOverlay(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nlandmarks: ${landmarkReport.count}\nanimação: ${rig.animationId() || "cena base"}\ntempo: ${Math.round(activeTime)} ms${wavePlaying || pointPlaying ? " · reproduzindo" : ""}\ndelta máximo pivô/landmark: ${landmarkReport.maxPivotDelta.toFixed(1)} px\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\ncruzes: pivôs transformados\nlinha/círculos ciano: landmarks anatômicos (amarelo = estimativa baixa)`; }
       master.onload = render;
-      await renderer.load(); layerSelect.value = selectedId; updateControls(); render();
+      await renderer.load(); layerSelect.value = selectedId; updateControls(); setPointTiming(); applyPresentationTarget(); rig.clearAnimation(); render();
     </script>
   </body>
 </html>

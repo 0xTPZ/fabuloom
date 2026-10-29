@@ -177,6 +177,16 @@ The pack is a first production rig pass, not a claim of finished cinematic art.
 Generated PNGs are original Fabuloom assets made for this pass; model weights,
 private media and concept references remain outside the public repository.
 
+### Presenter pointing expression
+
+Mission 012.7 adds the optional `point` and `point-left` expressions to the
+Santa V5 pack. They preserve the neutral and wave hands and swap only the
+selected hand asset for an index-pointing original. The expression is selected
+by `SantaV5SceneRenderer` from the resolved `PresentationTarget`; it is not a
+second animation system. A pack that does not provide a pointing-hand asset
+can still consume the provider-independent clip, but should report that its
+visual hand cannot communicate the final finger direction.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.

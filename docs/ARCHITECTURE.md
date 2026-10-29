@@ -231,6 +231,29 @@ the target and elbow preference for diagnostics, including a pointer-drag
 override; these controls are development-only and are not a general character
 editor.
 
+### Presenter targeting and POINT_AT 012.7
+
+`frontend/src/presentation-targets.mjs` defines the provider- and character-
+independent `fabuloom.presentation-target/0.1` boundary. A target can be a
+normalized stage point, a stage-pixel point, or the center of a registered
+scene object. Resolution is deterministic and never executes target content.
+
+`frontend/src/presenter-targeting.mjs` owns the reusable `POINT_AT` clip and
+the planning step that keeps the wrist short of the target by a measured
+clearance. The target's actual direction is retained for the pointing finger;
+out-of-reach targets are clamped safely and reported as such instead of being
+silently treated as precise contact. `SantaV5Rig` selects the calibrated right
+or left arm, runs the same two-bone IK and affine forward refinement, and
+applies subtle head/torso follow. The painted `point` and `point-left`
+expressions are only asset overrides; the animation remains provider-neutral.
+
+The clip is sampled from absolute time, so seek, reverse-order capture and
+frame-by-frame export are deterministic. `santa-v5-calibration.html` exposes
+target presets, left/right selection, pointer dragging, timing/hold controls,
+reach diagnostics, and the resolved pointing direction. Stage and capture
+must continue to use this same rig path; FFmpeg receives only the resulting
+frames and does not reimplement the gesture.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

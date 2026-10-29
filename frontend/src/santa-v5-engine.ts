@@ -12,11 +12,15 @@ import {
   validateAnimationClip,
 } from "./animation-keyframes.mjs";
 import { angleDelta, solveTwoBoneIK } from "./two-bone-ik.mjs";
+import { createPresentationTarget, validatePresentationTarget } from "./presentation-targets.mjs";
+import { createPointAtClip, planPointAtTarget, pointerRotationForIK } from "./presenter-targeting.mjs";
 import {
   SANTA_V5_RIGHT_ARM_IK_CALIBRATION,
   SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY,
+  SANTA_V5_LEFT_ARM_IK_CALIBRATION,
+  SANTA_V5_LEFT_ARM_RENDER_GEOMETRY,
 } from "./santa-v5-calibration.mjs";
-import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
+import { SANTA_V5_PACK, SANTA_V5_POINTING_HAND, SANTA_V5_POINTING_HAND_LEFT } from "./santa-v5-pack.mjs";
 
 export const SANTA_V5_ANIMATION_FORMAT = SANTA_V3_ANIMATION_FORMAT;
 
@@ -30,35 +34,34 @@ const scaleVector = (vector, scale) => ({ x: vector.x * scale.x, y: vector.y * s
 const addVectors = (left, right) => ({ x: left.x + right.x, y: left.y + right.y });
 const distanceBetween = (left, right) => Math.hypot(right.x - left.x, right.y - left.y);
 
-/**
- * Forward kinematics for the calibrated, non-uniformly scaled right arm.
- * `upperRotation` and `forearmRotation` are the actual pose channels, not
- * world angles. Keeping this small forward model beside the IK adapter lets
- * us refine the analytic solution against the same transforms used by the
- * layered renderer.
- */
-function renderedRightArmAt(upperRotation, forearmRotation) {
-  const geometry = SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY;
-  const calibration = SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+/** Forward model for either calibrated painted arm. */
+function renderedArmAt(calibration, geometry, upperRotation, forearmRotation, rootRotation = 0) {
   const upper = rotateVector(scaleVector(geometry.upperOffset, geometry.upperScale), upperRotation);
   const forearmLocal = rotateVector(scaleVector(geometry.forearmOffset, geometry.forearmScale), forearmRotation);
   const forearm = rotateVector(scaleVector(forearmLocal, geometry.upperScale), upperRotation);
-  const elbow = addVectors(calibration.shoulder, scaleVector(upper, geometry.rootScale));
-  const wrist = addVectors(calibration.shoulder, scaleVector(addVectors(upper, forearm), geometry.rootScale));
+  const localElbow = addVectors(calibration.shoulder, scaleVector(upper, geometry.rootScale));
+  const localWrist = addVectors(calibration.shoulder, scaleVector(addVectors(upper, forearm), geometry.rootScale));
+  if (!rootRotation) return { elbow: localElbow, wrist: localWrist };
+  const rotateAroundRoot = (point) => {
+    const relative = { x: point.x - calibration.rootPivot.x, y: point.y - calibration.rootPivot.y };
+    const rotated = rotateVector(relative, rootRotation);
+    return { x: calibration.rootPivot.x + rotated.x, y: calibration.rootPivot.y + rotated.y };
+  };
+  const elbow = rotateAroundRoot(localElbow);
+  const wrist = rotateAroundRoot(localWrist);
   return { elbow, wrist };
 }
 
-function refineRenderedRightArm(analytic, target) {
-  const calibration = SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+function refineRenderedArm(analytic, target, calibration, geometry, rootRotation = 0) {
   let upperRotation = angleDelta(calibration.baseShoulderAngle, analytic.shoulderAngle);
   let forearmRotation = angleDelta(calibration.baseElbowAngle, analytic.elbowAngle);
   const epsilon = 1e-4;
   for (let iteration = 0; iteration < 16; iteration += 1) {
-    const current = renderedRightArmAt(upperRotation, forearmRotation).wrist;
+    const current = renderedArmAt(calibration, geometry, upperRotation, forearmRotation, rootRotation).wrist;
     const error = { x: target.x - current.x, y: target.y - current.y };
     if (Math.hypot(error.x, error.y) < 0.01) break;
-    const nextUpper = renderedRightArmAt(upperRotation + epsilon, forearmRotation).wrist;
-    const nextForearm = renderedRightArmAt(upperRotation, forearmRotation + epsilon).wrist;
+    const nextUpper = renderedArmAt(calibration, geometry, upperRotation + epsilon, forearmRotation, rootRotation).wrist;
+    const nextForearm = renderedArmAt(calibration, geometry, upperRotation, forearmRotation + epsilon, rootRotation).wrist;
     const upperJacobian = { x: (nextUpper.x - current.x) / epsilon, y: (nextUpper.y - current.y) / epsilon };
     const forearmJacobian = { x: (nextForearm.x - current.x) / epsilon, y: (nextForearm.y - current.y) / epsilon };
     const determinant = upperJacobian.x * forearmJacobian.y - forearmJacobian.x * upperJacobian.y;
@@ -69,9 +72,14 @@ function refineRenderedRightArm(analytic, target) {
     upperRotation += upperStep / stepScale;
     forearmRotation += forearmStep / stepScale;
   }
-  const rendered = renderedRightArmAt(upperRotation, forearmRotation);
+  const rendered = renderedArmAt(calibration, geometry, upperRotation, forearmRotation, rootRotation);
   return { upperRotation, forearmRotation, ...rendered, error: distanceBetween(rendered.wrist, target) };
 }
+
+function renderedRightArmAt(upperRotation, forearmRotation) { return renderedArmAt(SANTA_V5_RIGHT_ARM_IK_CALIBRATION, SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY, upperRotation, forearmRotation); }
+function renderedLeftArmAt(upperRotation, forearmRotation) { return renderedArmAt(SANTA_V5_LEFT_ARM_IK_CALIBRATION, SANTA_V5_LEFT_ARM_RENDER_GEOMETRY, upperRotation, forearmRotation); }
+function refineRenderedRightArm(analytic, target) { return refineRenderedArm(analytic, target, SANTA_V5_RIGHT_ARM_IK_CALIBRATION, SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY); }
+function refineRenderedLeftArm(analytic, target) { return refineRenderedArm(analytic, target, SANTA_V5_LEFT_ARM_IK_CALIBRATION, SANTA_V5_LEFT_ARM_RENDER_GEOMETRY); }
 
 function limitPoseChannel(pose, channel, min, max) {
   pose[channel] = Math.max(min, Math.min(max, Number(pose[channel]) || 0));
@@ -100,11 +108,24 @@ export const SANTA_V5_WAVE_HELLO_CLIP = validateAnimationClip({
   ],
 });
 
-const SANTA_V5_ANIMATION_CLIPS = Object.freeze({ WAVE_HELLO: SANTA_V5_WAVE_HELLO_CLIP });
+export const SANTA_V5_POINT_AT_CLIP = createPointAtClip({ durationMs: 8000, holdMs: 4100 });
+
+export const SANTA_V5_DEFAULT_POINT_TARGET = createPresentationTarget({
+  id: "default-point-target",
+  position: { x: 0.90, y: 0.15 },
+  coordinateSpace: "normalized-stage",
+  label: "alvo padrão",
+});
+
+const SANTA_V5_ANIMATION_CLIPS = Object.freeze({
+  WAVE_HELLO: SANTA_V5_WAVE_HELLO_CLIP,
+  POINT_AT: SANTA_V5_POINT_AT_CLIP,
+});
 
 export const SANTA_V5_ANIMATION_LIBRARY = Object.freeze({
   ...SANTA_V3_ANIMATION_LIBRARY,
   WAVE_HELLO: { durationMs: SANTA_V5_WAVE_HELLO_CLIP.durationMs, sample: (timeMs) => sampleAnimationClip(SANTA_V5_WAVE_HELLO_CLIP, timeMs) },
+  POINT_AT: { durationMs: SANTA_V5_POINT_AT_CLIP.durationMs, sample: (timeMs) => sampleAnimationClip(SANTA_V5_POINT_AT_CLIP, timeMs) },
 });
 
 /**
@@ -119,6 +140,9 @@ export class SantaV5Rig extends SantaV3Rig {
     this.animationStartMs = 0;
     this.rightHandTarget = null;
     this.lastIKResult = null;
+    this.presentationTarget = null;
+    this.pointAtPlan = null;
+    this.pointAtClip = SANTA_V5_POINT_AT_CLIP;
   }
 
   setAnimation(animationId, startTimeMs = 0) {
@@ -144,6 +168,60 @@ export class SantaV5Rig extends SantaV3Rig {
 
   animationId() { return this.activeAnimationId; }
 
+  pointAtClipDefinition() { return this.pointAtClip; }
+
+  setPointAtTiming(options = {}) {
+    this.pointAtClip = createPointAtClip(options);
+    if (this.activeAnimationId === "POINT_AT") this.animationStartMs = 0;
+    return this;
+  }
+
+  /** Configure the provider-independent target used by POINT_AT. */
+  setPresentationTarget(target, options = {}) {
+    const validated = validatePresentationTarget(target);
+    const arm = options.arm || (validated.coordinateSpace === "normalized-stage" ? (validated.position.x < 0.5 ? "left" : "right") : "right");
+    const left = arm === "left";
+    this.presentationTarget = validated;
+    this.pointAtPlan = planPointAtTarget(validated, {
+      calibration: left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION : SANTA_V5_RIGHT_ARM_IK_CALIBRATION,
+      pointerLocalAngle: options.pointerLocalAngle ?? (left ? SANTA_V5_POINTING_HAND_LEFT.localAngle : SANTA_V5_POINTING_HAND.localAngle),
+      wristClearancePx: options.wristClearancePx ?? 86,
+      objects: options.objects,
+      width: options.width ?? (left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION.frameWidth : SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameWidth),
+      height: options.height ?? (left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION.frameHeight : SANTA_V5_RIGHT_ARM_IK_CALIBRATION.frameHeight),
+      elbowPreference: options.elbowPreference,
+      arm,
+    });
+    this.lastIKResult = null;
+    return this;
+  }
+
+  clearPresentationTarget() {
+    this.presentationTarget = null;
+    this.pointAtPlan = null;
+    this.lastIKResult = null;
+    return this;
+  }
+
+  presentationTargetInfo() {
+    if (!this.pointAtPlan) return null;
+    return {
+      id: this.pointAtPlan.target.target.id,
+      label: this.pointAtPlan.target.label,
+      point: { ...this.pointAtPlan.target.point },
+      normalized: { ...this.pointAtPlan.target.normalized },
+      wristTarget: { ...this.pointAtPlan.wristTarget },
+      normalizedWrist: { ...this.pointAtPlan.normalizedWrist },
+      pointerDirection: this.pointAtPlan.pointerDirection,
+      headRotation: this.pointAtPlan.headRotation,
+      torsoRotation: this.pointAtPlan.torsoRotation,
+      reachable: this.pointAtPlan.reachable,
+      clamped: this.pointAtPlan.clamped,
+      coordinateSpace: this.pointAtPlan.target.coordinateSpace,
+      arm: this.pointAtPlan.arm,
+    };
+  }
+
   /**
    * Set an optional normalized [0,1] hand target for the active IK clip.
    * Coordinates are stage-relative; the solver itself works in the calibrated
@@ -161,11 +239,15 @@ export class SantaV5Rig extends SantaV3Rig {
   clearRightHandTarget() { this.rightHandTarget = null; return this; }
   rightHandIK() { return this.lastIKResult ? { ...this.lastIKResult } : null; }
 
-  solveRightHandIK(sample) {
-    const calibration = SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+  solveArmIK(side, sample) {
+    const left = side === "left";
+    const calibration = left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION : SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+    const geometry = left ? SANTA_V5_LEFT_ARM_RENDER_GEOMETRY : SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY;
+    const x = sample[`${side}_hand_target_x`];
+    const y = sample[`${side}_hand_target_y`];
     const target = {
-      x: clamp(sample.right_hand_target_x, 0, 1) * calibration.frameWidth,
-      y: clamp(sample.right_hand_target_y, 0, 1) * calibration.frameHeight,
+      x: clamp(x, 0, 1) * calibration.frameWidth,
+      y: clamp(y, 0, 1) * calibration.frameHeight,
     };
     const analytic = solveTwoBoneIK({
       shoulder: calibration.shoulder,
@@ -175,16 +257,22 @@ export class SantaV5Rig extends SantaV3Rig {
       elbowPreference: sample.elbowPreference || calibration.elbowPreference,
       limits: { shoulder: [-2.35, 2.15], elbow: [-3.12, 3.12] },
     });
-    const refined = refineRenderedRightArm(analytic, target);
-    return { ...analytic, shoulderRotation: refined.upperRotation, elbowRotation: refined.forearmRotation, renderedElbow: refined.elbow, renderedWrist: refined.wrist, renderedError: refined.error };
+    const refined = refineRenderedArm(analytic, target, calibration, geometry, Number(sample.rootRotation) || 0);
+    return { ...analytic, arm: side, shoulderRotation: refined.upperRotation, elbowRotation: refined.forearmRotation, renderedElbow: refined.elbow, renderedWrist: refined.wrist, renderedError: refined.error };
   }
+
+  solveRightHandIK(sample) { return this.solveArmIK("right", sample); }
+  solveLeftHandIK(sample) { return this.solveArmIK("left", sample); }
+  activeArmIK() { return this.lastIKResult ? { ...this.lastIKResult } : null; }
 
   poseAt(timeMs, isPlaying) {
     const pose = super.poseAt(timeMs, isPlaying);
     const safeTime = Math.max(0, Number(timeMs) || 0);
     const seconds = Math.max(0, Number(timeMs) || 0) / 1000;
     const scene = santaV3SceneAt(timeMs, this.sceneDurationMs);
-    const activeClip = this.activeAnimationId ? SANTA_V5_ANIMATION_CLIPS[this.activeAnimationId] : null;
+    const activeClip = this.activeAnimationId === "POINT_AT"
+      ? this.pointAtClip
+      : this.activeAnimationId ? SANTA_V5_ANIMATION_CLIPS[this.activeAnimationId] : null;
     const clipTime = Math.max(0, safeTime - this.animationStartMs);
     pose.mouth_open = isPlaying
       ? clamp(this.speechAmplitude * 0.86 + Math.max(0, Math.sin(seconds * Math.PI * 8.4)) * 0.04)
@@ -199,7 +287,7 @@ export class SantaV5Rig extends SantaV3Rig {
     // This keeps WAVE_HELLO composable without letting the long scene
     // choreography introduce an unrelated walk/sit transition.
     if (activeClip) {
-      if (activeClip.id === "WAVE_HELLO") pose.breathing = 0.5;
+      if (activeClip.id === "WAVE_HELLO" || activeClip.id === "POINT_AT") pose.breathing = 0.5;
       pose.torso_y = 0;
       pose.torso_rotation = 0;
       pose.pelvis_y = 0;
@@ -252,6 +340,71 @@ export class SantaV5Rig extends SantaV3Rig {
           ),
         });
       }
+      if (activeClip.id === "POINT_AT") {
+        const plan = this.pointAtPlan || planPointAtTarget(SANTA_V5_DEFAULT_POINT_TARGET, { calibration: SANTA_V5_RIGHT_ARM_IK_CALIBRATION, pointerLocalAngle: SANTA_V5_POINTING_HAND.localAngle });
+        const left = plan.arm === "left";
+        const side = left ? "left" : "right";
+        const calibration = left ? SANTA_V5_LEFT_ARM_IK_CALIBRATION : SANTA_V5_RIGHT_ARM_IK_CALIBRATION;
+        const geometry = left ? SANTA_V5_LEFT_ARM_RENDER_GEOMETRY : SANTA_V5_RIGHT_ARM_RENDER_GEOMETRY;
+        const weight = clamp(delta.point_at_weight);
+        const headWeight = clamp(delta.point_head_weight);
+        const torsoWeight = clamp(delta.point_torso_weight);
+        const rootRotation = plan.torsoRotation * torsoWeight;
+        const ik = left
+          ? this.solveLeftHandIK({
+            left_hand_target_x: plan.normalizedWrist.x,
+            left_hand_target_y: plan.normalizedWrist.y,
+            elbowPreference: plan.elbowPreference,
+            rootRotation,
+          })
+          : this.solveRightHandIK({
+            right_hand_target_x: plan.normalizedWrist.x,
+            right_hand_target_y: plan.normalizedWrist.y,
+            elbowPreference: plan.elbowPreference,
+            rootRotation,
+          });
+        const pointerRotation = pointerRotationForIK(ik, plan, calibration);
+        pose[`${side}_hand_target_x`] = plan.normalizedWrist.x;
+        pose[`${side}_hand_target_y`] = plan.normalizedWrist.y;
+        pose[`${side}_arm_ik_weight`] = weight;
+        pose[`${side}_arm_rotation`] = ik.shoulderRotation * weight;
+        pose[`${side}_forearm_rotation`] = ik.elbowRotation * weight;
+        pose[`${side}_hand_rotation`] = (pointerRotation + (Number(delta.point_hand_rotation) || 0)) * weight;
+        pose.head_rotation += plan.headRotation * headWeight;
+        pose.torso_rotation += rootRotation;
+        const applied = renderedArmAt(calibration, geometry, ik.shoulderRotation * weight, ik.elbowRotation * weight, rootRotation);
+        this.lastIKResult = Object.freeze({
+          ...ik,
+          arm: side,
+          weight,
+          normalizedTarget: { ...plan.normalizedWrist },
+          presentationTarget: { ...plan.target.point },
+          presentationTargetId: plan.target.target.id,
+          presentationTargetLabel: plan.target.label,
+          pointerDirection: plan.pointerDirection,
+          pointerRotation,
+          targetReachable: plan.reachable,
+          targetClamped: plan.clamped,
+          targetOutOfReach: plan.targetOutOfReach,
+          wristClearancePx: plan.wristClearancePx,
+          appliedRenderedWrist: applied.wrist,
+          appliedRenderedError: distanceBetween(applied.wrist, ik.requestedTarget),
+        });
+        /*
+         * POINT_AT owns the selected arm only. The other arm remains at its
+         * neutral channel values so changing targets never leaves a stale
+         * right-arm pose behind when attention moves to the left side.
+         */
+        if (left) {
+          pose.right_hand_target_x = 0;
+          pose.right_hand_target_y = 0;
+          pose.right_arm_ik_weight = 0;
+        } else {
+          pose.left_hand_target_x = 0;
+          pose.left_hand_target_y = 0;
+          pose.left_arm_ik_weight = 0;
+        }
+      }
     }
 
     // V5 uses the V3 choreography, but its painted parts have narrower
@@ -295,18 +448,24 @@ export class SantaV5Rig extends SantaV3Rig {
       limitPoseChannel(pose, "left_forearm_rotation", -0.38, 0.38);
       limitPoseChannel(pose, "right_forearm_rotation", -0.38, 0.38);
     }
-    if (activeClip?.id === "WAVE_HELLO") {
-      limitPoseChannel(pose, "right_arm_rotation", -2.35, 2.15);
-      limitPoseChannel(pose, "right_forearm_rotation", -3.12, 3.12);
-      limitPoseChannel(pose, "right_hand_rotation", -0.34, 0.34);
+    if (activeClip?.id === "WAVE_HELLO" || activeClip?.id === "POINT_AT") {
+      const pointLeft = activeClip.id === "POINT_AT" && this.pointAtPlan?.arm === "left";
+      const side = pointLeft ? "left" : "right";
+      limitPoseChannel(pose, `${side}_arm_rotation`, -2.35, 2.15);
+      limitPoseChannel(pose, `${side}_forearm_rotation`, -3.12, 3.12);
+      limitPoseChannel(pose, `${side}_hand_rotation`, -0.34, 0.34);
       limitPoseChannel(pose, "head_rotation", -0.10, 0.10);
       limitPoseChannel(pose, "torso_rotation", -0.06, 0.06);
     }
-    pose.left_hand_rotation += pose.left_forearm_rotation * 0.14;
-    if (activeClip?.id !== "WAVE_HELLO") pose.right_hand_rotation += pose.right_forearm_rotation * 0.14;
+    if (activeClip?.id !== "POINT_AT") pose.left_hand_rotation += pose.left_forearm_rotation * 0.14;
+    if (activeClip?.id !== "WAVE_HELLO" && activeClip?.id !== "POINT_AT") pose.right_hand_rotation += pose.right_forearm_rotation * 0.14;
     pose.left_foot_rotation += pose.left_shin_rotation * -0.18;
     pose.right_foot_rotation += pose.right_shin_rotation * -0.18;
     if (activeClip?.id === "WAVE_HELLO") limitPoseChannel(pose, "right_hand_rotation", -0.34, 0.34);
+    if (activeClip?.id === "POINT_AT") {
+      const side = this.pointAtPlan?.arm === "left" ? "left" : "right";
+      limitPoseChannel(pose, `${side}_hand_rotation`, -Math.PI, Math.PI);
+    }
     return pose;
   }
 }
@@ -321,7 +480,12 @@ export class SantaV5SceneRenderer extends SantaV3SceneRenderer {
   }
 
   renderFrame(options = {}) {
-    const expression = this.rig.animationId?.() === "WAVE_HELLO" ? "wave" : "neutral";
+    const animationId = this.rig.animationId?.();
+    const expression = animationId === "WAVE_HELLO"
+      ? "wave"
+      : animationId === "POINT_AT"
+        ? (this.rig.presentationTargetInfo?.()?.arm === "left" ? "point-left" : "point")
+        : "neutral";
     if (this.characterRenderer.expression !== expression) this.characterRenderer.setExpression(expression);
     return super.renderFrame(options);
   }

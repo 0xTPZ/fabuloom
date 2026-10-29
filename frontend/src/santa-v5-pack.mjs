@@ -49,6 +49,8 @@ export const SANTA_V5_PACK = {
     { id: "neutral", overrides: {} },
     { id: "smile", overrides: { mouth: asset("mouth-open.png") } },
     { id: "wave", overrides: { right_hand: asset("hand-right-wave.png") } },
+    { id: "point", overrides: { right_hand: asset("hand-right-point.png") } },
+    { id: "point-left", overrides: { left_hand: asset("hand-left-point.png") } },
   ],
   bindings: {
     head_rotation: "head",
@@ -78,3 +80,18 @@ export const SANTA_V5_PACK = {
     right_foot_x: "right_foot",
   },
 };
+
+/** Local direction of the index finger in the point-hand asset. */
+export const SANTA_V5_POINTING_HAND = Object.freeze({
+  asset: asset("hand-right-point.png"),
+  wrist: Object.freeze({ x: 0.5, y: 0.1 }),
+  indexTip: Object.freeze({ x: 0.5, y: 0.9 }),
+  localAngle: Math.PI / 2,
+});
+
+export const SANTA_V5_POINTING_HAND_LEFT = Object.freeze({
+  asset: asset("hand-left-point.png"),
+  wrist: Object.freeze({ x: 0.5, y: 0.1 }),
+  indexTip: Object.freeze({ x: 0.5, y: 0.9 }),
+  localAngle: Math.PI / 2,
+});

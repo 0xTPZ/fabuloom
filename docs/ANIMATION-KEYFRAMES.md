@@ -40,3 +40,23 @@ and the 5-second technical capture use the same `SantaV5Rig` and
 `LayeredCharacterRenderer`; the wave expression swaps only the right-hand
 asset for the palm-facing `hand-right-wave.png` variant and preserves the
 original `hand-right.png` asset.
+
+## Provider-independent POINT_AT
+
+`createPointAtClip()` adds a target-independent `POINT_AT` clip with explicit
+attention, anticipation, elevation, hold and return phases. Runtime timing can
+be overridden with positive integer milliseconds; the exact hold is validated
+against the clip duration. The clip only emits normalized pose weights and a
+small hand rotation channel, never a character or provider-specific target.
+
+`createPresentationTarget()` and `planPointAtTarget()` resolve normalized
+stage points, pixel points, or registered scene objects. The planner returns a
+safe wrist position, target direction, elbow preference, reach/clamping flags,
+and head/torso follow values. A target outside the calibrated chain is
+reported as approximate and clamped to the valid wrist range. Word, phoneme
+and viseme timings are unrelated to this gesture and are not invented.
+
+Santa V5 currently has calibrated left and right chains. The selected arm is
+chosen explicitly by the presenter adapter (or inferred from the normalized
+target side), and the renderer switches between the preserved neutral/wave
+assets and the original `hand-right-point.png` / `hand-left-point.png` assets.

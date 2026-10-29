@@ -13,6 +13,7 @@ const sizes = new Map([
   ["assets/characters/topazio-narrators-v5/santa/forearm-right.png", [1024, 1536]],
   ["assets/characters/topazio-narrators-v5/santa/hand-right.png", [1151, 1366]],
   ["assets/characters/topazio-narrators-v5/santa/hand-right-wave.png", [1151, 1366]],
+  ["assets/characters/topazio-narrators-v5/santa/hand-right-point.png", [1151, 1366]],
 ]);
 
 test("WAVE_HELLO is a reusable validated keyframe clip", () => {
