@@ -39,8 +39,9 @@
             <label><input id="overlay" type="checkbox" checked /> arte original</label>
             <label><input id="bounds" type="checkbox" checked /> limites</label>
             <label><input id="pivots" type="checkbox" checked /> pivôs</label>
+            <label><input id="landmarks" type="checkbox" checked /> landmarks</label>
           </div>
-          <div><button id="neutral">Neutro</button><button id="walk" class="secondary">Caminhada</button><button id="sit" class="secondary">Sentado</button><button id="gesture" class="secondary">Braço</button><button id="drink" class="secondary">Xícara</button><button id="extreme" class="secondary">Extremo</button></div>
+          <div><button id="neutral">Neutro</button><button id="arm-raised" class="secondary">Braço levantado</button><button id="elbow" class="secondary">Cotovelo</button><button id="gesture" class="secondary">Explicação</button><button id="step-left" class="secondary">Passo E</button><button id="step-right" class="secondary">Passo D</button><button id="sit" class="secondary">Sentado</button><button id="drink" class="secondary">Xícara</button><button id="extreme" class="secondary">Extremo</button></div>
           <div><button id="export">Exportar parâmetros</button><button id="reset" class="secondary">Recarregar pack</button></div>
         </div>
         <div class="panel">
@@ -52,13 +53,15 @@
           <label><span>Pivô X</span><input id="anchor-x" type="range" min="0" max="1" step="0.001" /><input id="anchor-x-value" type="number" min="0" max="1" step="0.001" /></label>
           <label><span>Pivô Y</span><input id="anchor-y" type="range" min="0" max="1" step="0.001" /><input id="anchor-y-value" type="number" min="0" max="1" step="0.001" /></label>
           <label><span>Ângulo</span><input id="rotation" type="range" min="-3.14" max="3.14" step="0.001" value="0" /><input id="rotation-value" type="number" min="-3.14" max="3.14" step="0.001" value="0" /></label>
+          <label><span>Amplitude</span><input id="amplitude" type="range" min="0" max="1" step="0.01" value="0.55" /><input id="amplitude-value" type="number" min="0" max="1" step="0.01" value="0.55" /></label>
         </div>
         <div class="panel"><strong>Diagnóstico</strong><pre id="diagnostics">carregando…</pre></div>
       </section>
     </main>
     <script type="module">
       import { buildLayerDrawPlan, LayeredCharacterRenderer } from "./src/layered-character.ts";
-      import { diagnoseSantaV5Calibration } from "./src/santa-v5-calibration.mjs";
+      import { landmarkConnectionSegments, resolveLandmarks, transformPoint } from "./src/character-landmarks.mjs";
+      import { diagnoseSantaV5Calibration, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
       import { SantaV5Rig } from "./src/santa-v5-engine.ts";
       import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
 
@@ -71,7 +74,7 @@
       const master = new Image(); master.src = new URL("assets/characters/topazio-narrators-v5/santa/master-front.png", location.href).href;
       const layerSelect = document.querySelector("#layer");
       const diagnostics = document.querySelector("#diagnostics");
-      const poseTimes = { neutral: 0, walk: 1800, sit: 5000, gesture: 15000, drink: 9600, extreme: 8000 };
+      const poseTimes = { neutral: 0, "arm-raised": 7200, elbow: 9000, gesture: 17000, "step-left": 650, "step-right": 1250, sit: 5000, drink: 9600, extreme: 8000 };
       let timeMs = 0;
       let selectedId = "torso";
 
@@ -101,13 +104,26 @@
       document.querySelector("#rotation").addEventListener("input", () => { const channel = document.querySelector("#rotation").dataset.channel; if (!channel) return; const value = Number(document.querySelector("#rotation").value); rig.currentPose = { ...rig.pose(), [channel]: value }; setPair("rotation", value); render(); });
       document.querySelector("#rotation-value").addEventListener("input", () => { document.querySelector("#rotation").value = document.querySelector("#rotation-value").value; document.querySelector("#rotation").dispatchEvent(new Event("input")); });
       layerSelect.addEventListener("change", () => { selectedId = layerSelect.value; updateControls(); render(); });
-      for (const id of ["overlay", "bounds", "pivots"]) document.querySelector(`#${id}`).addEventListener("change", render);
+      for (const id of ["overlay", "bounds", "pivots", "landmarks"]) document.querySelector(`#${id}`).addEventListener("change", render);
       for (const [id, value] of Object.entries(poseTimes)) document.querySelector(`#${id}`).addEventListener("click", () => { timeMs = value; updateControls(); render(); });
       document.querySelector("#reset").addEventListener("click", () => location.reload());
-      document.querySelector("#export").addEventListener("click", () => { const payload = { format: workingPack.format, character_id: workingPack.id, source: "santa-v5-calibration.html", layers: workingPack.layers.map(({ id, parent, position, size, anchor }) => ({ id, parent, position, size, anchor })) }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "santa-v5-calibrated-parameters.json"; link.click(); URL.revokeObjectURL(url); });
+      for (const input of pair("amplitude")) input.addEventListener("input", () => { setPair("amplitude", clamp(readValue("amplitude"), 0, 1)); render(); });
+      document.querySelector("#export").addEventListener("click", () => { const payload = { format: workingPack.format, character_id: workingPack.id, source: "santa-v5-calibration.html", landmarks: SANTA_V5_ANATOMICAL_LANDMARKS, layers: workingPack.layers.map(({ id, parent, position, size, anchor }) => ({ id, parent, position, size, anchor })) }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "santa-v5-calibrated-parameters.json"; link.click(); URL.revokeObjectURL(url); });
 
       function point(matrix, x, y) { return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }; }
       function polygon(plan) { return [[0, 0], [plan.intrinsic[0], 0], [plan.intrinsic[0], plan.intrinsic[1]], [0, plan.intrinsic[1]]].map(([x, y]) => point(plan.matrix, x, y)); }
+      function drawLandmarks(plans) {
+        if (!document.querySelector("#landmarks").checked) return { count: 0, maxPivotDelta: 0 };
+        const resolved = resolveLandmarks(SANTA_V5_ANATOMICAL_LANDMARKS, plans);
+        ctx.save(); ctx.lineWidth = 3; ctx.strokeStyle = "rgba(88,220,255,.86)";
+        for (const segment of landmarkConnectionSegments(SANTA_V5_ANATOMICAL_LANDMARKS, plans)) { ctx.beginPath(); ctx.moveTo(segment.a.x, segment.a.y); ctx.lineTo(segment.b.x, segment.b.y); ctx.stroke(); }
+        for (const landmark of resolved) { ctx.fillStyle = landmark.confidence === "low" ? "#f7d27a" : "#58dcff"; ctx.beginPath(); ctx.arc(landmark.stage.x, landmark.stage.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#eef5ff"; ctx.font = "16px Segoe UI"; ctx.fillText(landmark.id, landmark.stage.x + 10, landmark.stage.y - 8); }
+        ctx.restore();
+        const pivotLayer = { leftShoulder: "left_upper_arm", rightShoulder: "right_upper_arm", leftElbow: "left_forearm", rightElbow: "right_forearm", leftWrist: "left_hand", rightWrist: "right_hand", leftKnee: "left_shin", rightKnee: "right_shin", leftAnkle: "left_foot", rightAnkle: "right_foot" };
+        let maxPivotDelta = 0;
+        for (const landmark of resolved) { const layerId = pivotLayer[landmark.id]; const plan = plans.find((entry) => entry.layer.id === layerId); if (!plan) continue; const pivot = transformPoint(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); maxPivotDelta = Math.max(maxPivotDelta, Math.hypot(pivot.x - landmark.stage.x, pivot.y - landmark.stage.y)); }
+        return { count: resolved.length, maxPivotDelta };
+      }
       function drawOverlay(plans) {
         if (document.querySelector("#overlay").checked && master.complete) { ctx.save(); ctx.globalAlpha = 0.28; ctx.drawImage(master, 0, 0, canvas.width, canvas.height); ctx.restore(); }
         const showBounds = document.querySelector("#bounds").checked; const showPivots = document.querySelector("#pivots").checked;
@@ -117,7 +133,7 @@
           if (showPivots || active) { const pivot = point(plan.matrix, plan.layer.anchor[0] * plan.intrinsic[0], plan.layer.anchor[1] * plan.intrinsic[1]); ctx.save(); ctx.strokeStyle = active ? "#ff8a8a" : "rgba(255,159,159,.55)"; ctx.lineWidth = active ? 3 : 1; ctx.beginPath(); ctx.moveTo(pivot.x - 8, pivot.y); ctx.lineTo(pivot.x + 8, pivot.y); ctx.moveTo(pivot.x, pivot.y - 8); ctx.lineTo(pivot.x, pivot.y + 8); ctx.stroke(); ctx.restore(); }
         }
       }
-      function render() { rig.setSceneDuration(20450); rig.update(timeMs, timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\nmarcas: pivôs transformados`; }
+      function render() { rig.setSceneDuration(20450); rig.setSpeechAmplitude(clamp(readValue("amplitude"), 0, 1)); rig.update(timeMs, timeMs !== 0); renderer.render(); const plans = renderer.getLayerDrawPlan(); drawOverlay(plans); const landmarkReport = drawLandmarks(plans); const report = diagnoseSantaV5Calibration(workingPack, new Map([...renderer.images.entries()].map(([asset, record]) => [asset, record.size]))); diagnostics.className = report.ok ? "good" : "bad"; diagnostics.textContent = `estado: ${report.ok ? "válido" : "erro"}\ncamada: ${selectedId}\nlandmarks: ${landmarkReport.count}\ndelta máximo pivô/landmark: ${landmarkReport.maxPivotDelta.toFixed(1)} px\nerros: ${report.errors.length ? report.errors.join("; ") : "nenhum"}\navisos: ${report.warnings.length ? report.warnings.join("; ") : "nenhum"}\n\nretângulos: limites das caixas intrínsecas\ncruzes: pivôs transformados\nlinha/círculos ciano: landmarks anatômicos (amarelo = estimativa baixa)`; }
       master.onload = render;
       await renderer.load(); layerSelect.value = selectedId; updateControls(); render();
     </script>

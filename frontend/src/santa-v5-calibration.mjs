@@ -51,6 +51,26 @@ export const SANTA_V5_EXPECTED_PIVOTS = Object.freeze({
   right_foot: [0.5, 0.16],
 });
 
+/**
+ * Anatomical landmarks are normalized in the local intrinsic image of their
+ * associated layer. Medium/low confidence marks joints hidden by the uniform
+ * or inferred from adjacent pieces; they are not claimed as measurements.
+ */
+export const SANTA_V5_ANATOMICAL_LANDMARKS = Object.freeze([
+  { id: "neck", layer: "neck", local: [0.5, 0.56], confidence: "medium", note: "centro estimado da gola visível" },
+  { id: "leftShoulder", layer: "torso", local: [0.16, 0.15], confidence: "medium", note: "junção sob a ombreira esquerda; parcialmente oculta" },
+  { id: "rightShoulder", layer: "torso", local: [0.84, 0.15], confidence: "medium", note: "junção sob a ombreira direita; parcialmente oculta" },
+  { id: "leftElbow", layer: "left_upper_arm", local: [0.54, 0.53], confidence: "low", note: "inferido pela dobra da manga e pela posição do antebraço" },
+  { id: "rightElbow", layer: "right_upper_arm", local: [0.46, 0.53], confidence: "low", note: "inferido pela dobra da manga e pela posição do antebraço" },
+  { id: "leftWrist", layer: "left_forearm", local: [0.53, 0.72], confidence: "medium", note: "transição visível entre punho e mão" },
+  { id: "rightWrist", layer: "right_forearm", local: [0.47, 0.72], confidence: "medium", note: "transição visível entre punho e mão" },
+  { id: "hip", layer: "pelvis", local: [0.5, 0.42], confidence: "medium", note: "centro estimado do cós sob o casaco" },
+  { id: "leftKnee", layer: "left_thigh", local: [0.5, 0.58], confidence: "low", note: "inferido pela continuidade entre coxa e canela" },
+  { id: "rightKnee", layer: "right_thigh", local: [0.5, 0.58], confidence: "low", note: "inferido pela continuidade entre coxa e canela" },
+  { id: "leftAnkle", layer: "left_shin", local: [0.5, 0.72], confidence: "medium", note: "ponto de encontro estimado com o cano da bota" },
+  { id: "rightAnkle", layer: "right_shin", local: [0.5, 0.72], confidence: "medium", note: "ponto de encontro estimado com o cano da bota" },
+]);
+
 const finiteUnit = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
 /**

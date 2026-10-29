@@ -49,7 +49,7 @@
         validateCharacterPack(SANTA_V5_PACK);
         const outputCanvas = document.querySelector("#capture-canvas");
         const characterCanvas = document.createElement("canvas"); characterCanvas.width = outputCanvas.width; characterCanvas.height = outputCanvas.height;
-        const rig = new SantaV5Rig(); rig.setSceneDuration(durationMs); rig.setSpeechAmplitude(0.42);
+        const rig = new SantaV5Rig(); rig.setSceneDuration(20450); rig.setSpeechAmplitude(0.42);
         const renderer = new LayeredCharacterRenderer(characterCanvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: false });
         await renderer.load();
         const result = await captureLayeredFrames(renderer, {

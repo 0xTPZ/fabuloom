@@ -253,3 +253,9 @@ the measured alpha metadata, action-specific amplitude limits, deterministic
 draw plans and independent head/hand transforms. The visual tools are local
 DEV pages; their screenshots and the silent 8-second reel are generated under
 the workspace export directory and are not committed.
+
+Mission 012.4 extends those checks with local-to-stage landmark conversion,
+landmark/pivot proximity for shoulders, elbows, wrists, knees and ankles,
+finite hierarchical transforms, bounded gait channels and continuity checks at
+walk/seated phase boundaries. Visual review remains mandatory because the long
+coat can conceal some seated knee motion even when the transforms are valid.

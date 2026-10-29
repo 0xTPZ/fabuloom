@@ -30,23 +30,40 @@ export class SantaV5Rig extends SantaV3Rig {
     pose.mouth_open = isPlaying
       ? clamp(this.speechAmplitude * 0.86 + Math.max(0, Math.sin(seconds * Math.PI * 8.4)) * 0.04)
       : 0;
+    pose.pelvis_x = 0;
+    pose.pelvis_rotation = 0;
+    pose.left_foot_x = 0;
+    pose.right_foot_x = 0;
 
     // V5 uses the V3 choreography, but its painted parts have narrower
     // overlap zones. Keep the approved motions while constraining extremes so
     // sleeves, elbows, knees and hands remain visually connected.
     if (scene.action === "walk") {
-      pose.left_thigh_rotation *= 0.82;
-      pose.right_thigh_rotation *= 0.82;
-      pose.left_shin_rotation *= 0.74;
-      pose.right_shin_rotation *= 0.74;
+      const gait = Math.sin(seconds * Math.PI * 2 * 0.95);
+      pose.left_thigh_rotation = gait * 0.11;
+      pose.right_thigh_rotation = -gait * 0.11;
+      pose.left_shin_rotation = Math.max(0, -gait) * 0.08;
+      pose.right_shin_rotation = Math.max(0, gait) * 0.08;
+      pose.pelvis_x = gait * 0.012;
+      pose.pelvis_y -= Math.abs(gait) * 0.012;
+      pose.pelvis_rotation = gait * 0.018;
+      pose.left_foot_x = gait * 0.006;
+      pose.right_foot_x = -gait * 0.006;
       pose.left_arm_rotation *= 0.84;
       pose.right_arm_rotation *= 0.84;
     }
     if (scene.seated) {
-      pose.left_thigh_rotation *= 0.78;
-      pose.right_thigh_rotation *= 0.78;
-      pose.left_shin_rotation *= 0.78;
-      pose.right_shin_rotation *= 0.78;
+      const seated = scene.seated;
+      pose.torso_y = seated * 0.045;
+      pose.torso_rotation += seated * 0.028;
+      pose.pelvis_y = seated * 0.060;
+      pose.pelvis_rotation = -seated * 0.024;
+      pose.left_thigh_rotation = seated * 0.36;
+      pose.right_thigh_rotation = -seated * 0.36;
+      pose.left_shin_rotation = -seated * 0.43;
+      pose.right_shin_rotation = seated * 0.43;
+      pose.left_foot_x = -seated * 0.010;
+      pose.right_foot_x = seated * 0.010;
     }
     if (scene.action === "reach" || scene.action === "drink") {
       limitPoseChannel(pose, "right_arm_rotation", -0.75, 1.02);

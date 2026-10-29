@@ -202,6 +202,12 @@ consume `LayeredCharacterRenderer`. Diagnostic overlays are development-only
 and are not part of exported character frames. FFmpeg receives deterministic
 PNG frames only after the browser rig has resolved parent transforms.
 
+Landmark calibration is intentionally downstream of pack validation and
+upstream of visual QA. It consumes resolved layer plans but never changes a
+source image or invents hidden-joint precision. V5 gait and seated corrections
+are deterministic pose-channel adjustments; no physics system or second
+renderer was introduced.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

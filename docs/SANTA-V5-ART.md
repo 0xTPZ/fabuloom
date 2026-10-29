@@ -96,3 +96,22 @@ It writes the 8-second, silent visual calibration reel and report under
 validates composition and deterministic poses, not Kokoro timing. The current
 calibration remains subject to human visual approval, especially for long-form
 hand/object contact.
+
+## Mission 012.4 — anatomical rig calibration
+
+The approved V5 assets were kept intact. `frontend/src/character-landmarks.mjs`
+defines reusable local-intrinsic landmarks for the neck, shoulders, elbows,
+wrists, hip, knees and ankles, and converts them through the resolved draw plan
+to stage coordinates. Hidden joints are explicitly marked as low/medium
+confidence estimates rather than exact measurements.
+
+The DEV calibration page now draws landmark connections, compares them with
+current transformed pivots, exposes movement amplitude and includes dedicated
+arm, elbow, step and seated pose buttons. The eight-pose gallery is a visual
+diagnostic, not a character editor.
+
+The V5 pack now mounts upper-arm sleeves at the estimated shoulder landmarks.
+The V5 adapter adds a bounded gait with modest pelvis/foot offsets and a
+progressive seated pose; these are lightweight corrections at the pack/rig
+boundary. The full-body coat still limits how clearly a seated knee fold can be
+read, so seated motion remains a known visual limitation.

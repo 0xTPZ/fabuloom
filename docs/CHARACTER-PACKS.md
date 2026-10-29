@@ -205,3 +205,13 @@ The calibration tool exposes the same hierarchy consumed by
 transformed pivots. A V5 adapter constrains only action amplitudes that exceed
 the painted overlap zones. This preserves the V3/V4 formats and keeps the
 runtime provider-independent.
+
+### Anatomical landmarks
+
+`frontend/src/character-landmarks.mjs` is a small reusable diagnostic layer,
+not a new character format. A landmark stores a layer ID, normalized local
+coordinates, confidence and an explanatory note. The renderer's resolved
+matrix converts it into stage coordinates; this avoids treating the center of
+an image box as an anatomical joint. Additional V5 channels (`pelvis_x`,
+`pelvis_rotation` and foot offsets) remain additive to `fabuloom.character/0.1`
+and are validated like the existing animation bindings.
