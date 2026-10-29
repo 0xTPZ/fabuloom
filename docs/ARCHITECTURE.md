@@ -145,6 +145,23 @@ implementation exists in FFmpeg. The rig's `poseAt()` is clock-pure, making
 the same pose reproducible after seek or an out-of-order capture request.
 Word, phoneme and viseme timing remain unavailable and are not synthesized.
 
+### Santa V3 continuous scene 011
+
+`SantaV3Rig` and `SantaV3SceneRenderer` extend the same deterministic capture
+boundary for a full-body character. The rig owns absolute-time pose channels
+for the torso, pelvis, head, arms, forearms, hands, legs, blink, brow, mouth
+and breathing. A small scene director maps the measured narration duration to
+one uninterrupted sequence: walk, sit, reach, drink, return the cup, read and
+explain. Chair, table, book and cup are scene primitives; the cup position is
+derived from the same scene state as the hand gesture, so FFmpeg only encodes
+already-rendered frames and audio.
+
+The browser capture uses an offscreen transparent character canvas composited
+onto the scene canvas. This prevents an opaque character background from
+leaking into the exported video and keeps Stage/export pose behavior aligned.
+The renderer remains independent of Kokoro and can receive another measured
+audio envelope or a future phoneme/viseme signal without changing the pack.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:

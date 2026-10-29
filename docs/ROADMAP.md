@@ -42,6 +42,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   measured RMS mouth motion, per-segment captions and FFmpeg composition
   validated with Santa V2 in Mission 010.2. Multi-scene composition and
   richer camera direction remain future work.
+- Santa V3 character scene — full-body joint layers, deterministic continuous
+  prop interaction, measured `pm_santa` narration and real-engine MP4 export
+  implemented in Mission 011. General scene authoring and final art remain
+  future work.
 
 ## Later
 

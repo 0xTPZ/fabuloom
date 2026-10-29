@@ -7,8 +7,8 @@ export const CHARACTER_FORMAT = "fabuloom.character/0.1";
 export const ANIMATION_READY_PROFILE = "animation-ready/0.1";
 const idPattern = /^[a-z][a-z0-9_-]{1,63}$/;
 const safeAsset = /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)(?!.*:)(?!\/\/)[a-zA-Z0-9_./-]+\.(?:png|webp|svg)$/;
-const channels = new Set(["head_rotation","eye_open","mouth_open","breathing","left_arm","right_arm","hair_sway","brow_raise","expression"]);
-const layerRoles = new Set(["torso","neck","head","hair_back","hair_front","eyes","eyelids","brows","mouth","upper_arm","forearm","hand","accessory","portrait","overlay"]);
+const channels = new Set(["head_rotation","eye_open","mouth_open","breathing","left_arm","right_arm","hair_sway","brow_raise","expression","torso_rotation","torso_y","pelvis_y","left_arm_rotation","right_arm_rotation","left_forearm_rotation","right_forearm_rotation","left_hand_rotation","right_hand_rotation","left_thigh_rotation","right_thigh_rotation","left_shin_rotation","right_shin_rotation","left_foot_rotation","right_foot_rotation"]);
+const layerRoles = new Set(["torso","pelvis","neck","head","hair_back","hair_front","eyes","eyelids","brows","mouth","upper_arm","forearm","hand","upper_leg","lower_leg","foot","accessory","portrait","overlay"]);
 function valid(condition, message) { if (!condition) throw new TypeError(message); }
 function identifier(id, label) { valid(typeof id === "string" && idPattern.test(id), `Invalid ${label}`); }
 function unit(value, label) { valid(typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1, `Invalid ${label}: expected [0,1]`); }
