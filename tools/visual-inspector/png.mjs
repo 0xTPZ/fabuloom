@@ -158,3 +158,40 @@ export function comparePngBuffers(referenceInput, currentInput, options = {}) {
     overlayPng: encodePng({ width: current.width, height: current.height, rgba: overlay }),
   };
 }
+
+function setPixel(rgba, width, height, x, y, color) {
+  if (x < 0 || y < 0 || x >= width || y >= height) return;
+  const index = (y * width + x) * 4;
+  rgba[index] = color[0];
+  rgba[index + 1] = color[1];
+  rgba[index + 2] = color[2];
+  rgba[index + 3] = color[3];
+}
+
+function drawLine(rgba, width, height, x1, y1, x2, y2, color, lineWidth = 3) {
+  const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1);
+  const radius = Math.max(0, Math.floor(lineWidth / 2));
+  for (let step = 0; step <= steps; step += 1) {
+    const x = Math.round(x1 + (x2 - x1) * step / steps);
+    const y = Math.round(y1 + (y2 - y1) * step / steps);
+    for (let oy = -radius; oy <= radius; oy += 1) for (let ox = -radius; ox <= radius; ox += 1) setPixel(rgba, width, height, x + ox, y + oy, color);
+  }
+}
+
+/** Add compact, deterministic evidence boxes without requiring a canvas library. */
+export function annotatePng(input, { regions = [], color = [255, 80, 60, 255], lineWidth = 4 } = {}) {
+  const image = decodePng(input);
+  for (const region of regions) {
+    const bounds = region?.bounds || region;
+    if (!bounds || !Number.isFinite(bounds.left) || !Number.isFinite(bounds.top)) continue;
+    const left = Math.round(bounds.left);
+    const top = Math.round(bounds.top);
+    const right = Math.round(bounds.right);
+    const bottom = Math.round(bounds.bottom);
+    drawLine(image.rgba, image.width, image.height, left, top, right, top, color, lineWidth);
+    drawLine(image.rgba, image.width, image.height, right, top, right, bottom, color, lineWidth);
+    drawLine(image.rgba, image.width, image.height, right, bottom, left, bottom, color, lineWidth);
+    drawLine(image.rgba, image.width, image.height, left, bottom, left, top, color, lineWidth);
+  }
+  return encodePng(image);
+}

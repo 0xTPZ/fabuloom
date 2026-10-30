@@ -37,6 +37,47 @@ export function transformRect(matrix, rect) {
   return { left: minX, top: minY, right: maxX, bottom: maxY, width: maxX - minX, height: maxY - minY };
 }
 
+export function boundsArea(bounds) {
+  return bounds && finite(bounds.width) && finite(bounds.height) ? Math.max(0, bounds.width) * Math.max(0, bounds.height) : 0;
+}
+
+export function intersectBounds(first, second) {
+  if (!first || !second) return null;
+  const left = Math.max(first.left, second.left);
+  const top = Math.max(first.top, second.top);
+  const right = Math.min(first.right, second.right);
+  const bottom = Math.min(first.bottom, second.bottom);
+  if (right <= left || bottom <= top) return null;
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+export function unionBounds(...boundsList) {
+  const bounds = boundsList.flat().filter(Boolean);
+  if (!bounds.length) return null;
+  const left = Math.min(...bounds.map((value) => value.left));
+  const top = Math.min(...bounds.map((value) => value.top));
+  const right = Math.max(...bounds.map((value) => value.right));
+  const bottom = Math.max(...bounds.map((value) => value.bottom));
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+export function boundsForLayers(frame, layerIds = []) {
+  const wanted = new Set(layerIds);
+  return unionBounds((frame.layers || [])
+    .filter((layer) => wanted.has(layer.id))
+    .map((layer) => layer.transformedAlphaBounds));
+}
+
+export function pointBounds(...points) {
+  const valid = points.flat().filter((point) => point && finite(point.x) && finite(point.y));
+  if (!valid.length) return null;
+  const left = Math.min(...valid.map((point) => point.x));
+  const top = Math.min(...valid.map((point) => point.y));
+  const right = Math.max(...valid.map((point) => point.x));
+  const bottom = Math.max(...valid.map((point) => point.y));
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
 export function defaultInspectionConfig() {
   return {
     jointChecks: [
@@ -58,12 +99,26 @@ export function defaultInspectionConfig() {
       { id: "hands-symmetry", left: "left_hand", right: "right_hand", metric: "width", minRatio: 0.55, label: "simetria de mãos" },
       { id: "feet-symmetry", left: "left_foot", right: "right_foot", metric: "width", minRatio: 0.55, label: "simetria de pés" },
     ],
+    visibleOverlapChecks: [
+      { id: "left-shoulder-visible-join", first: "torso", second: "left_upper_arm", minOverlapRatio: 0.20, label: "junção visível do ombro esquerdo" },
+      { id: "right-shoulder-visible-join", first: "torso", second: "right_upper_arm", minOverlapRatio: 0.20, label: "junção visível do ombro direito" },
+      { id: "left-elbow-visible-join", first: "left_upper_arm", second: "left_forearm", minOverlapRatio: 0.25, label: "junção visível do cotovelo esquerdo" },
+      { id: "right-elbow-visible-join", first: "right_upper_arm", second: "right_forearm", minOverlapRatio: 0.25, label: "junção visível do cotovelo direito" },
+      { id: "left-wrist-visible-join", first: "left_forearm", second: "left_hand", minOverlapRatio: 0.20, label: "junção visível do punho esquerdo" },
+      { id: "right-wrist-visible-join", first: "right_forearm", second: "right_hand", minOverlapRatio: 0.20, label: "junção visível do punho direito" },
+      { id: "left-ankle-visible-join", first: "left_shin", second: "left_foot", minOverlapRatio: 0.15, label: "junção visível do tornozelo esquerdo" },
+      { id: "right-ankle-visible-join", first: "right_shin", second: "right_foot", minOverlapRatio: 0.15, label: "junção visível do tornozelo direito" },
+    ],
+    crossingChecks: [
+      { id: "left-forearm-torso-crossing", layer: "left_forearm", torsoLayer: "torso", side: "left", centerMarginPx: 22, label: "antebraço esquerdo atravessando o torso" },
+      { id: "right-forearm-torso-crossing", layer: "right_forearm", torsoLayer: "torso", side: "right", centerMarginPx: 22, label: "antebraço direito atravessando o torso" },
+    ],
     maxLandmarkSpeedPxPerSecond: 1800,
   };
 }
 
-function issue({ code, severity, confidence, message, evidence = {}, relatedLayers = [] }) {
-  return { code, severity, confidence, message, evidence, relatedLayers };
+function issue({ code, severity, confidence, message, evidence = {}, relatedLayers = [], region = null }) {
+  return { code, severity, confidence, message, evidence, relatedLayers, region };
 }
 
 function layerCenter(layer) {
@@ -150,6 +205,8 @@ export function diagnoseFrame(frame, config = {}) {
     jointChecks: config.jointChecks || defaults.jointChecks,
     proportionChecks: config.proportionChecks || defaults.proportionChecks,
     symmetryChecks: config.symmetryChecks || defaults.symmetryChecks,
+    visibleOverlapChecks: config.visibleOverlapChecks || defaults.visibleOverlapChecks,
+    crossingChecks: config.crossingChecks || defaults.crossingChecks,
   };
   const issues = [];
   const layerMap = new Map((frame.layers || []).map((layer) => [layer.id, layer]));
@@ -179,6 +236,7 @@ export function diagnoseFrame(frame, config = {}) {
         message: `Camadas faciais reutilizam o mesmo asset: ${previous.id} e ${layer.id}.`,
         evidence: { asset: layer.asset, layers: [previous.id, layer.id] },
         relatedLayers: [previous.id, layer.id],
+        region: { kind: "layers", layers: [previous.id, layer.id] },
       }));
     } else facialAssets.set(layer.asset, layer);
   }
@@ -191,6 +249,7 @@ export function diagnoseFrame(frame, config = {}) {
       message: "A cabeça usa head.png junto com overlays faciais; o asset pode já conter elementos duplicados.",
       evidence: { headAsset: head.asset, overlays: facial.filter((layer) => FACE_OVERLAY_IDS.has(layer.id)).map((layer) => layer.id) },
       relatedLayers: ["head", ...facial.filter((layer) => FACE_OVERLAY_IDS.has(layer.id)).map((layer) => layer.id)],
+      region: { kind: "layers", layers: ["head", ...facial.filter((layer) => FACE_OVERLAY_IDS.has(layer.id)).map((layer) => layer.id)] },
     }));
   }
 
@@ -198,9 +257,9 @@ export function diagnoseFrame(frame, config = {}) {
   const eyelids = layerMap.get("eyelids");
   if (eyelids && finite(eyeOpen)) {
     if (eyeOpen > 0.95 && eyelids.opacity > 0.05) {
-      add(issue({ code: "blink-open-state", severity: "error", confidence: "high", message: "A camada de pálpebras aparece no estado de olhos abertos.", evidence: { eyeOpen, eyelidOpacity: eyelids.opacity }, relatedLayers: ["eyelids"] }));
+      add(issue({ code: "blink-open-state", severity: "error", confidence: "high", message: "A camada de pálpebras aparece no estado de olhos abertos.", evidence: { eyeOpen, eyelidOpacity: eyelids.opacity }, relatedLayers: ["eyelids"], region: { kind: "layers", layers: ["eyelids"] } }));
     } else if (eyeOpen < 0.05 && eyelids.opacity < 0.9) {
-      add(issue({ code: "blink-closed-state", severity: "warning", confidence: "medium", message: "A piscada declarada não torna a camada de pálpebras suficientemente visível.", evidence: { eyeOpen, eyelidOpacity: eyelids.opacity }, relatedLayers: ["eyelids"] }));
+      add(issue({ code: "blink-closed-state", severity: "warning", confidence: "medium", message: "A piscada declarada não torna a camada de pálpebras suficientemente visível.", evidence: { eyeOpen, eyelidOpacity: eyelids.opacity }, relatedLayers: ["eyelids"], region: { kind: "layers", layers: ["eyelids"] } }));
     }
   }
 
@@ -213,8 +272,60 @@ export function diagnoseFrame(frame, config = {}) {
       const inside = center && center.x >= bounds.left - marginX && center.x <= bounds.right + marginX
         && center.y >= bounds.top - marginY && center.y <= bounds.bottom + marginY;
       if (!inside) {
-        add(issue({ code: "facial-region-outlier", severity: "warning", confidence: "medium", message: `A camada facial ${layer.id} está fora da região esperada da cabeça.`, evidence: { layer: layer.id, center, headBounds: bounds }, relatedLayers: ["head", layer.id] }));
+        add(issue({ code: "facial-region-outlier", severity: "warning", confidence: "medium", message: `A camada facial ${layer.id} está fora da região esperada da cabeça.`, evidence: { layer: layer.id, center, headBounds: bounds }, relatedLayers: ["head", layer.id], region: { kind: "layers", layers: ["head", layer.id] } }));
       }
+    }
+  }
+
+  for (const check of options.visibleOverlapChecks) {
+    const first = layerMap.get(check.first);
+    const second = layerMap.get(check.second);
+    const firstBounds = first?.transformedAlphaBounds;
+    const secondBounds = second?.transformedAlphaBounds;
+    if (!firstBounds || !secondBounds) {
+      add(issue({ code: "insufficient-visible-overlap-evidence", severity: "hypothesis", confidence: "low", message: `Evidência alfa insuficiente para ${check.label || check.id}.`, evidence: { first: check.first, second: check.second }, relatedLayers: [check.first, check.second], region: { kind: "layers", layers: [check.first, check.second] } }));
+      continue;
+    }
+    const intersection = intersectBounds(firstBounds, secondBounds);
+    const intersectionArea = boundsArea(intersection);
+    const minimumArea = Math.min(boundsArea(firstBounds), boundsArea(secondBounds));
+    const overlapRatio = minimumArea > 0 ? intersectionArea / minimumArea : 0;
+    if (overlapRatio < Number(check.minOverlapRatio ?? 0)) {
+      add(issue({
+        code: "visible-joint-gap",
+        severity: "error",
+        confidence: "medium",
+        message: `${check.label || check.id} tem sobreposição alfa transformada de ${overlapRatio.toFixed(3)}; esperado pelo menos ${Number(check.minOverlapRatio ?? 0).toFixed(3)}.`,
+        evidence: { first: check.first, second: check.second, firstBounds, secondBounds, intersection, intersectionArea, overlapRatio, minOverlapRatio: check.minOverlapRatio },
+        relatedLayers: [check.first, check.second],
+        region: { kind: "bounds", bounds: unionBounds(firstBounds, secondBounds) },
+      }));
+    }
+  }
+
+  for (const check of options.crossingChecks) {
+    const layer = layerMap.get(check.layer);
+    const torso = layerMap.get(check.torsoLayer);
+    const layerCenterPoint = layerCenter(layer);
+    const torsoCenterPoint = layerCenter(torso);
+    if (!layerCenterPoint || !torsoCenterPoint) {
+      add(issue({ code: "insufficient-crossing-evidence", severity: "hypothesis", confidence: "low", message: `Evidência de silhueta insuficiente para ${check.label || check.id}.`, evidence: { layer: check.layer, torsoLayer: check.torsoLayer }, relatedLayers: [check.layer, check.torsoLayer] }));
+      continue;
+    }
+    const margin = Number(check.centerMarginPx ?? 0) * scale;
+    const crossed = check.side === "left"
+      ? layerCenterPoint.x > torsoCenterPoint.x - margin
+      : layerCenterPoint.x < torsoCenterPoint.x + margin;
+    if (crossed) {
+      add(issue({
+        code: "anatomical-crossing",
+        severity: "error",
+        confidence: "medium",
+        message: `${check.label || check.id} deslocou o centro visível para o lado incorreto do torso.`,
+        evidence: { layer: check.layer, torsoLayer: check.torsoLayer, layerCenter: layerCenterPoint, torsoCenter: torsoCenterPoint, side: check.side, marginPx: margin },
+        relatedLayers: [check.layer, check.torsoLayer],
+        region: { kind: "bounds", bounds: unionBounds(layer.transformedAlphaBounds, torso.transformedAlphaBounds) },
+      }));
     }
   }
 
@@ -222,13 +333,13 @@ export function diagnoseFrame(frame, config = {}) {
     const landmark = landmarkMap.get(check.landmark);
     const layer = layerMap.get(check.pivotLayer);
     if (!landmark?.stage || !layer?.pivot) {
-      add(issue({ code: "insufficient-joint-evidence", severity: "hypothesis", confidence: "low", message: `Evidência insuficiente para ${check.label || check.id}.`, evidence: { landmark: check.landmark, pivotLayer: check.pivotLayer }, relatedLayers: [check.pivotLayer] }));
+      add(issue({ code: "insufficient-joint-evidence", severity: "hypothesis", confidence: "low", message: `Evidência insuficiente para ${check.label || check.id}.`, evidence: { landmark: check.landmark, pivotLayer: check.pivotLayer }, relatedLayers: [check.pivotLayer], region: { kind: "layers", layers: [check.pivotLayer] } }));
       continue;
     }
     const distance = Math.hypot(landmark.stage.x - layer.pivot.x, landmark.stage.y - layer.pivot.y);
     const threshold = check.maxDistancePx * scale;
     if (distance > threshold) {
-      add(issue({ code: "joint-gap", severity: "error", confidence: "high", message: `${check.label || check.id} está separado por ${distance.toFixed(1)} px.`, evidence: { distancePx: distance, thresholdPx: threshold, landmark: landmark.stage, pivot: layer.pivot }, relatedLayers: [check.pivotLayer] }));
+      add(issue({ code: "joint-gap", severity: "error", confidence: "high", message: `${check.label || check.id} está separado por ${distance.toFixed(1)} px.`, evidence: { distancePx: distance, thresholdPx: threshold, landmark: landmark.stage, pivot: layer.pivot }, relatedLayers: [check.pivotLayer], region: { kind: "bounds", bounds: pointBounds(landmark.stage, layer.pivot) } }));
     }
   }
 
@@ -237,9 +348,9 @@ export function diagnoseFrame(frame, config = {}) {
     const denominator = layerMap.get(check.denominator);
     const ratio = ratioFor(numerator, denominator, check.metric || "width");
     if (ratio === null) {
-      add(issue({ code: "insufficient-proportion-evidence", severity: "hypothesis", confidence: "low", message: `Evidência insuficiente para ${check.label || check.id}.`, evidence: { numerator: check.numerator, denominator: check.denominator } }));
+      add(issue({ code: "insufficient-proportion-evidence", severity: "hypothesis", confidence: "low", message: `Evidência insuficiente para ${check.label || check.id}.`, evidence: { numerator: check.numerator, denominator: check.denominator }, relatedLayers: [check.numerator, check.denominator], region: { kind: "layers", layers: [check.numerator, check.denominator] } }));
     } else if (ratio < check.min || ratio > check.max) {
-      add(issue({ code: "proportion-outlier", severity: "warning", confidence: "medium", message: `${check.label || check.id} resultou em razão ${ratio.toFixed(3)} fora do intervalo configurado.`, evidence: { ratio, min: check.min, max: check.max }, relatedLayers: [check.numerator, check.denominator] }));
+      add(issue({ code: "proportion-outlier", severity: "warning", confidence: "medium", message: `${check.label || check.id} resultou em razão ${ratio.toFixed(3)} fora do intervalo configurado.`, evidence: { ratio, min: check.min, max: check.max }, relatedLayers: [check.numerator, check.denominator], region: { kind: "layers", layers: [check.numerator, check.denominator] } }));
     }
   }
 
@@ -251,7 +362,7 @@ export function diagnoseFrame(frame, config = {}) {
     if (!finite(leftValue) || !finite(rightValue) || Math.max(leftValue, rightValue) <= 0) continue;
     const ratio = Math.min(leftValue, rightValue) / Math.max(leftValue, rightValue);
     if (ratio < check.minRatio) {
-      add(issue({ code: "side-asymmetry", severity: "warning", confidence: "medium", message: `${check.label || check.id} tem razão esquerda/direita ${ratio.toFixed(3)} abaixo do limite configurado.`, evidence: { ratio, minRatio: check.minRatio, left: leftValue, right: rightValue }, relatedLayers: [check.left, check.right] }));
+      add(issue({ code: "side-asymmetry", severity: "warning", confidence: "medium", message: `${check.label || check.id} tem razão esquerda/direita ${ratio.toFixed(3)} abaixo do limite configurado.`, evidence: { ratio, minRatio: check.minRatio, left: leftValue, right: rightValue }, relatedLayers: [check.left, check.right], region: { kind: "layers", layers: [check.left, check.right] } }));
     }
   }
 
@@ -280,7 +391,7 @@ export function diagnoseMotion(frames, config = {}) {
       const distance = Math.hypot(landmark.stage.x - old.x, landmark.stage.y - old.y);
       const speed = distance / dt;
       if (speed > maxSpeed) {
-        issues.push(issue({ code: "motion-discontinuity", severity: "error", confidence: "high", message: `O landmark ${landmark.id} saltou a ${speed.toFixed(1)} px/s.`, evidence: { fromMs: previous.timeMs, toMs: current.timeMs, distancePx: distance, speedPxPerSecond: speed, maxSpeedPxPerSecond: maxSpeed } }));
+        issues.push(issue({ code: "motion-discontinuity", severity: "error", confidence: "high", message: `O landmark ${landmark.id} saltou a ${speed.toFixed(1)} px/s.`, evidence: { landmarkId: landmark.id, fromMs: previous.timeMs, toMs: current.timeMs, distancePx: distance, speedPxPerSecond: speed, maxSpeedPxPerSecond: maxSpeed, from: old, to: landmark.stage }, region: { kind: "bounds", bounds: pointBounds(old, landmark.stage) } }));
       }
     }
   }

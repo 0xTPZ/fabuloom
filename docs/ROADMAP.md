@@ -59,6 +59,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   evidence, landmark/joint/motion diagnostics, tolerant PNG comparisons and a
   read-only DEV page implemented in Mission 013. Automatic art correction,
   external vision models and final artistic approval remain future work.
+- Visual Inspector V1.1 — controlled known-defect fixtures, alpha-footprint
+  join checks, side-aware crossing checks, IDLE/WAVE/POINT temporal coverage,
+  evidence overlays and separate technical/artistic references implemented in
+  Mission 013.1. Full per-pixel joint masks, external vision execution and
+  human artistic approval remain future work.
 
 ## Later
 

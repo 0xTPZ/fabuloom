@@ -15,7 +15,8 @@ import {
   summarizeInspection,
   transformRect,
 } from "../src/visual-inspector-core.mjs";
-import { comparePngBuffers, decodePng, encodePng } from "../../tools/visual-inspector/png.mjs";
+import { annotatePng, comparePngBuffers, decodePng, encodePng } from "../../tools/visual-inspector/png.mjs";
+import { createKnownDefectFixtures, correctFaceDuplicateFixture, resolveFixtureRegion } from "../../tools/visual-inspector/fixtures.mjs";
 
 const sizes = new Map([
   ["assets/characters/topazio-narrators-v5/santa/hair-back.png", [1246, 1263]],
@@ -85,6 +86,11 @@ test("known-good Santa neutral frame has no verified errors", () => {
   assert.equal(diagnostics.issues.filter((finding) => finding.severity === "error").length, 0, JSON.stringify(diagnostics.issues));
 });
 
+test("known-good Santa frame passes the alpha-overlap and silhouette checks", () => {
+  const diagnostics = diagnoseFrame(santaFrame(), defaultInspectionConfig());
+  assert.equal(diagnostics.issues.some((finding) => ["visible-joint-gap", "anatomical-crossing"].includes(finding.code)), false, JSON.stringify(diagnostics.issues));
+});
+
 test("inspection frames are deterministic for the same absolute time", () => {
   assert.deepEqual(santaFrame({ timeMs: 1680, isPlaying: true }), santaFrame({ timeMs: 1680, isPlaying: true }));
 });
@@ -129,6 +135,28 @@ test("detects motion discontinuity and avoids claiming it with one frame", () =>
   assert.ok(diagnoseMotion([first]).issues.some((finding) => finding.code === "insufficient-motion-evidence" && finding.severity === "hypothesis"));
 });
 
+test("the controlled defect bank detects each introduced defect at the expected region", () => {
+  const goodFrame = santaFrame();
+  const fixtures = createKnownDefectFixtures(goodFrame);
+  assert.equal(fixtures.length, 9);
+  for (const fixture of fixtures) {
+    const diagnostics = fixture.frames ? diagnoseMotion(fixture.frames) : diagnoseFrame(fixture.frame);
+    const issues = diagnostics.issues;
+    const matched = fixture.expectedCodes.filter((code) => issues.some((finding) => finding.code === code));
+    assert.deepEqual(matched, fixture.expectedCodes, `${fixture.id}: ${JSON.stringify(issues)}`);
+    assert.ok(resolveFixtureRegion(fixture, fixture.frame), `${fixture.id}: missing evidence region`);
+  }
+});
+
+test("the preserved painted-face defect has a controlled correction path", () => {
+  const goodFrame = santaFrame();
+  const fixture = createKnownDefectFixtures(goodFrame).find((candidate) => candidate.id === "face-painted-duplicate");
+  assert.ok(diagnoseFrame(fixture.frame).issues.some((finding) => finding.code === "possible-painted-face-duplication"));
+  const corrected = correctFaceDuplicateFixture(fixture, goodFrame);
+  assert.equal(diagnoseFrame(corrected).issues.some((finding) => finding.code === "possible-painted-face-duplication"), false);
+  assert.equal(diagnoseFrame(corrected).issues.filter((finding) => finding.severity === "error").length, 0);
+});
+
 test("PNG comparison tolerates small antialiasing differences and emits evidence", () => {
   const base = Buffer.from([
     20, 30, 40, 255, 20, 30, 40, 255,
@@ -150,6 +178,8 @@ test("PNG comparison tolerates small antialiasing differences and emits evidence
   assert.equal(decodePng(result.overlayPng).height, 2);
   const mismatch = comparePngBuffers(reference, encodePng({ width: 1, height: 1, rgba: Buffer.from([0, 0, 0, 255]) }));
   assert.equal(mismatch.compatible, false);
+  const annotated = decodePng(annotatePng(reference, { regions: [{ left: 0, top: 0, right: 2, bottom: 2 }], color: [255, 0, 0, 255], lineWidth: 1 }));
+  assert.deepEqual([...annotated.rgba.subarray(0, 4)], [255, 0, 0, 255]);
 });
 
 test("summarizes verified errors separately from review hypotheses", () => {

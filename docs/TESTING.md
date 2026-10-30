@@ -228,6 +228,21 @@ unless an approved PNG is supplied with `--reference`; it is not artistic
 ground truth. Review the generated Markdown, JSON, masks, overlays and the
 DEV page before accepting a visual change.
 
+Mission 013.1 adds nine controlled known-defect fixtures and checks both
+positive detection and the known-good false-positive count. The full report
+also samples IDLE, WAVE_HELLO and POINT_AT sequences and emits highlighted
+fixture evidence plus `visual-inspection-evidence.json`:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.1-final"
+```
+
+The external `--reference PNG` input is recorded as an artistic reference and
+is never substituted for the technical neutral baseline. The current CLI uses
+measured alpha bounds and tolerant PNG differences; pixel-perfect or AI-based
+artistic judgment remains outside the automated acceptance criterion.
+
 ## Santa V4 cartoon refinement
 
 Mission 011.1 adds the dependency-free Santa V4 contract and transform tests:

@@ -358,3 +358,13 @@ the built-in comparator avoids adding OpenCV or Pixelmatch as runtime
 dependencies. A DEV page exposes the same renderer, overlays and report
 history but cannot modify source assets. Automatic correction is intentionally
 outside the Inspector boundary and human visual review remains required.
+
+Mission 013.1 adds a controlled defect bank and alpha-footprint checks. The
+bank mutates only copied frame JSON and records expected code, severity,
+location and evidence image. Transformed alpha-bound intersections provide a
+conservative pixel-informed signal for visible joint gaps; side-aware torso
+checks catch an arm crossing without applying a universal human-anatomy rule.
+Temporal coverage samples IDLE, WAVE_HELLO and POINT_AT with at least three
+frames each. Technical same-run baselines and optional artistic references are
+stored separately, and the evidence manifest leaves an explicit extension
+point for optional Codex vision analysis without pretending that a model ran.

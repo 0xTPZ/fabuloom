@@ -87,3 +87,5 @@ shows landmarks and evidence-based diagnostics, supports approved PNG
 references, exports the current frame JSON and keeps a local session history.
 The automated loopback capture and report CLI is documented in
 `docs/VISUAL-INSPECTOR.md` and does not modify assets or source files.
+V1.1 also reports controlled defect fixtures, separates technical and artistic
+references, and states when temporal or human review has not been executed.

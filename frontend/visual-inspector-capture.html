@@ -11,6 +11,7 @@
     <pre id="status">initializing</pre>
     <script type="module">
       import { SantaV5Rig, SantaV5SceneRenderer } from "./src/santa-v5-engine.ts";
+      import { santaV3SceneAt } from "./src/santa-v3-engine.ts";
       import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
       import { SANTA_V5_ALPHA_BOUNDS, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
       import { resolveLandmarks } from "./src/character-landmarks.mjs";
@@ -107,6 +108,15 @@
           view: close === "face" ? "face-close" : "full",
         });
         frame.captureCanvas = { width: canvas.width, height: canvas.height };
+        const scene = santaV3SceneAt(timeMs, mode === "wave" ? 4600 : mode === "point" ? 8000 : 20450);
+        frame.sceneComposition = {
+          characterX: scene.characterX,
+          characterY: scene.characterY,
+          characterWidth: renderer.characterCanvas.width,
+          characterCanvasHeight: renderer.characterCanvas.height,
+          characterDrawHeight: renderer.characterDrawHeight,
+          scaleY: renderer.characterDrawHeight / renderer.characterCanvas.height,
+        };
         frame.assetSizes = assetSizes;
         frame.presentationTarget = rig.presentationTargetInfo?.() || null;
         frame.armIK = rig.activeArmIK?.() || null;

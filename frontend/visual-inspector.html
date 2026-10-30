@@ -57,13 +57,14 @@
       </section>
       <aside class="panel" aria-label="Diagnóstico">
         <p id="state">Carregando assets locais…</p>
+        <div id="coverage" class="muted">Cobertura: preparando frame, landmarks e comparação. Análise temporal e referência artística ainda não executadas nesta tela.</div>
         <div class="stat-grid"><div class="stat"><strong id="errors">—</strong>erros</div><div class="stat"><strong id="warnings">—</strong>avisos</div><div class="stat"><strong id="hypotheses">—</strong>hipóteses</div></div>
         <h2>Problemas detectados</h2>
         <div id="issues" class="issues"></div>
         <h2>Referência visual</h2>
         <label>Carregar PNG aprovado<input id="reference" type="file" accept="image/png" /></label>
         <div class="compare"><canvas id="reference-preview" width="340" height="570"></canvas><canvas id="overlay-preview" width="340" height="570"></canvas></div>
-        <p class="muted">A sobreposição é uma evidência visual auxiliar. A comparação quantitativa com tolerância de antialiasing é gerada pela CLI.</p>
+        <p class="muted">A sobreposição é uma evidência visual auxiliar. A comparação quantitativa com tolerância de antialiasing é gerada pela CLI. Visão por IA: não executada.</p>
         <h2>Histórico</h2>
         <table class="history"><thead><tr><th>Pose</th><th>Tempo</th><th>Estado</th></tr></thead><tbody id="history"></tbody></table>
       </aside>
@@ -121,7 +122,8 @@
         const counts = { error: 0, warning: 0, hypothesis: 0 };
         for (const finding of diagnosis.issues) counts[finding.severity] += 1;
         $("errors").textContent = counts.error; $("warnings").textContent = counts.warning; $("hypotheses").textContent = counts.hypothesis;
-        $("state").textContent = counts.error ? "Correção necessária" : counts.warning || counts.hypothesis ? "Revisão recomendada" : "Nenhum problema verificável";
+        $("state").textContent = counts.error ? "Correção necessária" : counts.warning || counts.hypothesis ? "Revisão recomendada" : "Sem defeitos detectados nesta captura";
+        $("coverage").textContent = "Verificações executadas: frame, landmarks, pivôs, bounds alfa e estado facial. Não executadas nesta tela: sequência temporal, comparação quantitativa da CLI e referência artística aprovada. Aguardando revisão humana.";
         $("issues").replaceChildren(...(diagnosis.issues.length ? diagnosis.issues : [{ severity: "info", code: "ok", message: "Nenhum problema verificável neste quadro." }]).map((finding) => {
           const element = document.createElement("div"); element.className = `issue ${finding.severity}`; element.innerHTML = `<strong>${finding.severity}</strong> · <code>${finding.code}</code><br>${finding.message}<small>${JSON.stringify(finding.evidence || {})}</small>`; return element;
         }));
