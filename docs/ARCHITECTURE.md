@@ -420,3 +420,13 @@ compact facial close-ups. The stage, QA capture and deterministic video demos
 continue to use the same `LayeredCharacterRenderer`; no FFmpeg-only animation
 was introduced. The V5 runtime is still a rigid layered 2.5D system without
 mesh deformation, physics or phonetic alignment.
+
+### Narrator Mode V1
+
+Narrator Mode is a sibling composition path, not a replacement for Character
+Stage. `NarratorAvatarRenderer` consumes only the Santa V5 neck/head/facial
+layers and renders them through a circular clip. `NarratorSceneRenderer` owns
+the independent 1920×1080 scenario and caption-safe layout. The capture page
+uses measured WAV segments and the same absolute-time pose rules; FFmpeg only
+encodes captured frames and muxes the real audio. Preview and export therefore
+share one renderer boundary while the full-body Stage remains independent.
