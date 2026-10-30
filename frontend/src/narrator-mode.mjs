@@ -16,6 +16,7 @@ export const NARRATOR_SCENE_FORMAT = "fabuloom.narrator-scene/0.1";
 export const NARRATOR_FPS = 30;
 export const NARRATOR_CANVAS = Object.freeze({ width: 1920, height: 1080 });
 export const NARRATOR_AVATAR_DEFAULT = Object.freeze({ x: 74, y: 676, size: 330, borderWidth: 8 });
+export const NARRATOR_FACE_CROP = Object.freeze({ x: 260, y: 0, width: 560, height: 560 });
 
 const FACE_LAYER_IDS = new Set([
   "neck", "hair_back", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth",
@@ -89,6 +90,27 @@ export function facialPoseAt(timeMs, speechAmplitude = 0, isPlaying = true) {
   });
 }
 
+export function mouthStateAt(amplitude = 0, isPlaying = true) {
+  const value = isPlaying ? clamp(amplitude) : 0;
+  if (value < 0.12) return "closed";
+  if (value < 0.34) return "slight";
+  if (value < 0.68) return "moderate";
+  return "open";
+}
+
+/**
+ * Narrator Mode's facial clock is intentionally explicit. It delegates the
+ * generic channels to the shared rig, then overlays the named facial pose
+ * used by this mode. This keeps the pose returned to callers and the pose
+ * consumed by the Canvas draw plan on the same deterministic path.
+ */
+export class NarratorFacialRig extends LayeredCharacterRig {
+  poseAt(timeMs, isPlaying) {
+    const sharedPose = super.poseAt(timeMs, isPlaying);
+    return { ...sharedPose, ...facialPoseAt(timeMs, this.speechAmplitude, isPlaying) };
+  }
+}
+
 export function avatarCircleBounds(width, height, options = {}) {
   assertPositiveInteger(width, "width");
   assertPositiveInteger(height, "height");
@@ -101,8 +123,9 @@ export function avatarCircleBounds(width, height, options = {}) {
   return Object.freeze(bounds);
 }
 
-export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK) {
+export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
+  const composition = options.composition || "corrected";
   const layers = sourcePack.layers
     .filter((layer) => FACE_LAYER_IDS.has(layer.id))
     .map((layer) => {
@@ -110,6 +133,15 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK) {
       if (copy.id === "neck") { copy.parent = null; copy.position = [0.5, 0.34]; }
       else if (copy.id === "hair_back") { copy.parent = "head"; copy.position = [0.5, 0.32]; copy.size = [0.98, 0.82]; }
       else if (copy.id !== "head") copy.parent = "head";
+      if (composition === "corrected" && copy.id === "beard") copy.opacity = 0;
+      if (composition === "corrected" && copy.id === "mouth") {
+        // The approved V5 mouth PNGs are complete lower-face plates (they
+        // contain the moustache and beard as well as the lips). Use one plate
+        // at the beard scale instead of stacking two copies of the beard.
+        copy.position = [0.5, 0.77];
+        copy.size = [0.66, 0.42];
+        copy.mouth_motion = "subtle";
+      }
       return copy;
     })
     .sort((left, right) => FACE_ORDER.indexOf(left.id) - FACE_ORDER.indexOf(right.id))
@@ -121,7 +153,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK) {
     name: "Santa V5 · avatar facial do Narrator Mode",
     voice_id: sourcePack.voice_id,
     language: sourcePack.language,
-    art_status: "production-face-crop-v1",
+    art_status: composition === "corrected" ? "production-face-crop-v1.1-experimental-composition" : "production-face-crop-v1",
     layers,
     expressions: sourcePack.expressions.map((expression) => ({
       id: expression.id,
@@ -147,13 +179,29 @@ export class NarratorAvatarRenderer {
     this.sourceCanvas.width = 1080;
     this.sourceCanvas.height = 1920;
     this.pack = options.pack || createNarratorAvatarPack();
-    this.rig = options.rig || new LayeredCharacterRig();
-    this.renderer = new LayeredCharacterRenderer(this.sourceCanvas, this.rig, this.pack, { assetRoot: options.assetRoot || document.baseURI, renderBackground: false });
-    this.crop = Object.freeze(options.crop || { x: 240, y: 24, width: 600, height: 620 });
+    this.rig = options.rig || new NarratorFacialRig();
+    const mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
+    this.renderer = new LayeredCharacterRenderer(this.sourceCanvas, this.rig, this.pack, {
+      assetRoot: options.assetRoot || document.baseURI,
+      renderBackground: false,
+      assetResolver: (layer, pose, expressionAsset) => {
+        if (layer.id !== "mouth" || !mouthOpenAsset) return expressionAsset;
+        return mouthStateAt(pose.mouth_open, true) === "closed" || mouthStateAt(pose.mouth_open, true) === "slight"
+          ? expressionAsset
+          : mouthOpenAsset;
+      },
+    });
+    this.crop = Object.freeze(options.crop || NARRATOR_FACE_CROP);
+    this.visibleLayers = null;
     this.loaded = false;
   }
 
   async load() { await this.renderer.load(); this.loaded = true; return this; }
+
+  setLayerVisibility(visibility) {
+    this.visibleLayers = visibility;
+    this.renderer.setLayerVisibility(visibility);
+  }
 
   renderTo(context, options = {}) {
     if (!this.loaded) throw new Error("narrator avatar assets are not loaded");

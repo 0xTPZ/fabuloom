@@ -107,4 +107,13 @@ Kokoro `pm_santa` audio, segment captions and deterministic 1920x1080 H.264/AAC
 export. The mode reuses facial layers and RMS timing without loading the
 full-body Stage or inventing phonetic timestamps. See `docs/NARRATOR-MODE.md`.
 
+Mission 017.1 corrects the Narrator Mode facial composition without changing
+the approved Santa V5 assets. Inspection showed that the existing mouth PNGs
+already included beard and moustache, so the corrected experimental pack uses a
+single lower-face plate, explicit RMS mouth states, a shared `NarratorFacialRig`
+draw path, and a tighter circular crop. It adds the browser close-up lab at
+`frontend/narrator-face-lab.html`, a reusable no-synthesis correction exporter,
+and real before/after visual evidence. Artistic approval remains human and the
+official pack remains preserved.
+
 Core contract details and invariants are documented in `docs/CONTRACTS.md`. Test instructions are in `docs/TESTING.md`.

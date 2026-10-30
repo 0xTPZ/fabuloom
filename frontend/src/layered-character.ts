@@ -93,7 +93,14 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
       const eyeOpen = clamp(pose.eye_open);
       animatedOpacity *= 1 - eyeOpen;
     }
-    if (pack.bindings.mouth_open === layer.id) animatedY = 0.58 + clamp(pose.mouth_open) * 0.95;
+    if (pack.bindings.mouth_open === layer.id) {
+      // Facial packs may use a combined lower-face plate (beard + lips). In
+      // that case switching the plate is safer than stretching the beard.
+      // Legacy packs keep the original expressive Y scale by default.
+      animatedY = layer.mouth_motion === "subtle"
+        ? 0.96 + clamp(pose.mouth_open) * 0.08
+        : 0.58 + clamp(pose.mouth_open) * 0.95;
+    }
     if (pack.bindings.breathing === layer.id) {
       local = multiply(local, translate(0, (pose.breathing - 0.5) * frameHeight * 0.012));
     }
@@ -212,6 +219,8 @@ export class LayeredCharacterRenderer {
     this.images = new Map();
     this.loaded = false;
     this.expression = "neutral";
+    this.assetResolver = options.assetResolver || null;
+    this.layerVisibility = options.layerVisibility || null;
   }
 
   async load() {
@@ -245,6 +254,16 @@ export class LayeredCharacterRenderer {
     this.rig.setExpression(expressionId);
   }
 
+  setAssetResolver(resolver) {
+    if (resolver !== null && typeof resolver !== "function") throw new TypeError("asset resolver must be a function or null");
+    this.assetResolver = resolver;
+  }
+
+  setLayerVisibility(visibility) {
+    if (visibility !== null && typeof visibility !== "function") throw new TypeError("layer visibility must be a function or null");
+    this.layerVisibility = visibility;
+  }
+
   /**
    * Render one deterministic frame through the same rig used by Character Stage.
    * This is the boundary consumed by a future local frame encoder.
@@ -269,7 +288,8 @@ export class LayeredCharacterRenderer {
 
   resolvedAsset(layer) {
     const expression = this.pack.expressions.find((candidate) => candidate.id === this.expression);
-    return expression?.overrides?.[layer.id] || layer.asset;
+    const expressionAsset = expression?.overrides?.[layer.id] || layer.asset;
+    return this.assetResolver?.(layer, this.rig.pose(), expressionAsset) || expressionAsset;
   }
 
   render() {
@@ -284,6 +304,7 @@ export class LayeredCharacterRenderer {
     if (!this.loaded) return;
     const plans = this.getLayerDrawPlan();
     for (const plan of plans) {
+      if (this.layerVisibility && !this.layerVisibility(plan.layer, this.rig.pose())) continue;
       const asset = this.resolvedAsset(plan.layer);
       const record = this.images.get(asset);
       if (!record?.image) continue;
