@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · Anatomy First</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #050d1d; color: #eef5ff; }
+      header { padding: 20px 26px; background: #07142a; border-bottom: 1px solid #d6a84d66; }
+      h1 { margin: 0 0 4px; color: #f7d27a; font-size: 24px; }
+      p { margin: 0; color: #b8c9df; }
+      main { max-width: 1460px; margin: 18px auto; padding: 0 18px 28px; }
+      h2 { margin: 22px 0 10px; color: #f7d27a; font-size: 18px; }
+      .board { display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 10px; }
+      figure { margin: 0; padding: 8px; background: #0d2342; border: 1px solid #d6a84d55; border-radius: 9px; }
+      canvas { display: block; width: 100%; height: auto; background: #081a33; border-radius: 6px; }
+      figcaption { min-height: 3.4em; padding: 7px 2px 1px; color: #f7d27a; font-weight: 650; }
+      small { display: block; color: #b8c9df; font-weight: 400; }
+      .parts { display: grid; grid-template-columns: repeat(8, minmax(110px, 1fr)); gap: 10px; }
+      .parts img { width: 100%; aspect-ratio: 1 / 1.25; object-fit: contain; background: #ffffff; border-radius: 6px; }
+      @media (max-width: 1000px) { .board { grid-template-columns: repeat(3, minmax(150px, 1fr)); } .parts { grid-template-columns: repeat(4, minmax(110px, 1fr)); } }
+      @media (max-width: 620px) { .board { grid-template-columns: repeat(2, minmax(140px, 1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · Anatomy-First Rig Rebuild</h1><p>Comparação real pelo LayeredCharacterRenderer. A variante experimental não altera o pack oficial.</p></header>
+    <main>
+      <h2>Abordagens em poses equivalentes</h2>
+      <section id="poses" class="board"></section>
+      <h2>Peças separadas — origem e variante experimental</h2>
+      <section id="parts" class="parts"></section>
+    </main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { SANTA_V5_ANATOMY_EXPERIMENTAL_PACK } from "./src/santa-v5-anatomy-experimental-pack.mjs";
+
+      const root = "assets/characters/topazio-narrators-v5/";
+      const poseSamples = [
+        ["Oficial · repouso", "official", "neutral", 0],
+        ["Experimental · repouso", "experimental", "neutral", 0],
+        ["Oficial · WAVE_HELLO", "official", "wave", 1680],
+        ["Experimental · WAVE_HELLO", "experimental", "wave", 1680],
+        ["Oficial · POINT_AT", "official", "point", 5200],
+        ["Experimental · POINT_AT", "experimental", "point", 5200],
+      ];
+
+      function configure(rig, expression, timeMs) {
+        if (expression === "wave") rig.setAnimation("WAVE_HELLO", 0);
+        if (expression === "point") {
+          rig.setPresentationTarget({ format: "fabuloom.presentation-target/0.1", id: "anatomy-gallery-target", coordinateSpace: "normalized-stage", position: { x: 0.88, y: 0.18 }, label: "direita" }, { arm: "right", width: 540, height: 960 });
+          rig.setAnimation("POINT_AT", 0);
+        }
+      }
+
+      async function drawPose(label, variant, expression, timeMs) {
+        const canvas = document.createElement("canvas"); canvas.width = 540; canvas.height = 960;
+        const figure = document.createElement("figure"); const caption = document.createElement("figcaption");
+        caption.innerHTML = `${label}<small>tempo ${timeMs} ms</small>`; figure.append(canvas, caption); document.querySelector("#poses").append(figure);
+        const rig = new SantaV5Rig(); configure(rig, expression, timeMs);
+        const pack = variant === "official" ? SANTA_V5_PACK : SANTA_V5_ANATOMY_EXPERIMENTAL_PACK;
+        const renderer = new LayeredCharacterRenderer(canvas, rig, pack, { assetRoot: new URL("./", location.href).href, renderBackground: true });
+        await renderer.load(); renderer.setExpression(expression === "wave" ? "wave" : expression === "point" ? "point" : "neutral");
+        renderer.renderFrame({ timeMs, speechAmplitude: expression === "neutral" ? 0 : 0.18, isPlaying: expression !== "neutral" });
+      }
+
+      const partSamples = [
+        ["original · upper arm", `${root}santa/upper-arm-left.png`],
+        ["experimental · upper arm", `${root}experimental-anatomy/upper-arm-left-anatomy.png`],
+        ["original · forearm", `${root}santa/forearm-left.png`],
+        ["experimental · forearm", `${root}experimental-anatomy/forearm-left-anatomy.png`],
+        ["experimental · cuff", `${root}experimental-anatomy/cuff-left-anatomy.png`],
+        ["original · hand", `${root}santa/hand-left.png`],
+        ["original · foot", `${root}santa/foot-left.png`],
+        ["original · torso", `${root}santa/torso.png`],
+      ];
+      for (const [label, src] of partSamples) { const figure = document.createElement("figure"); const image = document.createElement("img"); image.src = src; image.alt = label; const caption = document.createElement("figcaption"); caption.textContent = label; figure.append(image, caption); document.querySelector("#parts").append(figure); }
+      for (const sample of poseSamples) await drawPose(...sample);
+      document.title = "completed";
+    </script>
+  </body>
+</html>

@@ -432,3 +432,28 @@ Both videos were verified with FFprobe as H.264/yuv420p at 1080×1920; WAVE is
 5.000 s and POINT_AT is 8.500 s. The demos are silent visual engine proofs;
 they do not claim phonetic alignment. Generated frames, videos and boards stay
 under `E:\Fabuloom\workspace\exports` and are not committed.
+
+## Mission 015 — anatomy-first evidence
+
+The experimental pack and derived PNG bands are validated without network,
+models or GPU dependencies:
+
+```powershell
+node --experimental-strip-types --test .\frontend\tests\test_santa_v5_anatomy_experimental.mjs
+node .\tools\anatomy-first-rig\generate-experimental-assets.mjs
+node .\tools\anatomy-first-rig\generate-report.mjs
+```
+
+Serve the local comparison pages with `python .\frontend\server.py --port
+8903`, then open `/santa-v5-anatomy-gallery.html`,
+`/santa-v5-arm-comparison.html` and `/santa-v5-boots-comparison.html`.
+The short motion proof is generated with:
+
+```powershell
+python .\examples\santa_v5_anatomy_demo.py --export-dir E:\Fabuloom\workspace\exports --overwrite
+```
+
+The proof uses the same `SantaV5Rig` and `LayeredCharacterRenderer` as the
+Stage. It is an isolated raster reconstruction, not a mesh-deformation test;
+Godot, Inochi2D and Blender were unavailable locally and no installation is
+performed by this workflow.

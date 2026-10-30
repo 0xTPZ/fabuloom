@@ -80,6 +80,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   POINT_AT clipping, added before/after and close-up evidence, and regenerated
   the WAVE_HELLO and bilateral POINT_AT H.264 demos. Artistic approval remains
   human; mesh deformation and a general scene editor remain future work.
+- Anatomy-first rig rebuild — Mission 015 added a reversible Santa V5
+  reconstructed-assets experiment with independent cuff/hand nodes, alpha
+  metrics, boot-scale comparison and same-renderer evidence. Godot/Inochi2D
+  mesh deformation remains explicitly unexecuted until a permitted local tool
+  is available; the approved V5 pack remains unchanged.
 
 ## Later
 

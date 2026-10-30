@@ -42,3 +42,21 @@ the wrist pivots stay attached to their forearm chains, the foot pivots remain
 below their shin joins, and repeated out-of-order samples produce identical
 plans. This is enough for the current rigid-layer requirement; it is not a
 claim of mesh-deformation quality.
+
+### Mission 015 practical availability check
+
+The anatomy-first mission repeated the local availability check before any
+tool invocation. `godot`, `godot4`, `inochi2d`, `inochi-creator` and
+`blender.exe` were not available as local executables. No installer, portable
+runtime or external download was used. Consequently the three-way evidence
+package contains the current rigid pack and a reconstructed-assets variant;
+the mesh-deformation column is explicitly `not-executed`, rather than a
+simulated result.
+
+The runnable comparison is available through
+`frontend/santa-v5-anatomy-gallery.html`,
+`frontend/santa-v5-arm-comparison.html` and
+`frontend/santa-v5-boots-comparison.html`. The short MP4 proof uses the same
+Canvas renderer and deterministic frame capture as the Stage. It demonstrates
+the data-layer alternative only; it does not claim that masked raster bands
+are equivalent to weighted mesh deformation.
