@@ -64,6 +64,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   evidence overlays and separate technical/artistic references implemented in
   Mission 013.1. Full per-pixel joint masks, external vision execution and
   human artistic approval remain future work.
+- Visual Inspector V1.2 — historical PNG/MP4 evidence bank, blind real-image
+  evaluation, pixel masks/components/contour measurements, isolated historical
+  correction replay and provider-neutral multimodal contract implemented in
+  Mission 013.2. Opaque-video segmentation remains heuristic; external model
+  execution and final artistic approval remain future work.
 
 ## Later
 

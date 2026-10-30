@@ -368,3 +368,29 @@ Temporal coverage samples IDLE, WAVE_HELLO and POINT_AT with at least three
 frames each. Technical same-run baselines and optional artistic references are
 stored separately, and the evidence manifest leaves an explicit extension
 point for optional Codex vision analysis without pretending that a model ran.
+
+### Visual Inspector V1.2 — real rendered images
+
+Mission 013.2 adds a second, independent boundary for images produced by
+historical MP4s or isolated Canvas captures. `real-image-inspector.mjs` works
+on decoded RGBA pixels and measures alpha availability, a broad foreground
+mask, connected components, silhouette bounds, edge density and coarse visual
+regions. It can compare those measurements and pixels against a reference, but
+it does not receive a defect label or rig landmark when inspecting a PNG-only
+frame. Opaque video frames are therefore reported as heuristic evidence, not
+as alpha-confirmed joints.
+
+`real-cli.mjs` writes the historical manifest and hashes, then writes
+`blind-results.json` before it accepts the optional post-hoc review file. The
+review file is separate from the analyzer input, so metrics distinguish real
+confirmed defects, artistic version differences, clean samples and
+inconclusive cases. The real-image result is never mixed with the V1.1 JSON
+fixture metrics.
+
+The optional `VisualAnalysisProvider` contract exposes `analyzeImage`,
+`analyzeSequence`, `capabilities` and `providerMetadata`. The default provider
+is explicitly unavailable/offline; no image is sent externally and no model
+answer is synthesized. `visual-inspector-real.html` can inspect a local PNG
+without the active Character Stage. Historical `head.png` replay is allowed
+only through an isolated pack variant; the production V5 pack remains
+unchanged.

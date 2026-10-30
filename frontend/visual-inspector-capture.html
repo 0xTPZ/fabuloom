@@ -26,6 +26,11 @@
       const height = Math.max(160, Number(query.get("height") || 1140));
       const close = query.get("close") || "full";
       const speechAmplitude = Math.max(0, Math.min(1, Number(query.get("speechAmplitude") || 0)));
+      const variant = query.get("variant") || "production-v5";
+      const historicalHeadVariant = variant === "historical-head-original"
+        ? { id: "topazio-narrator-santa-v5-historical-head", layers: SANTA_V5_PACK.layers.map((layer) => layer.id === "head" ? { ...layer, asset: "assets/characters/topazio-narrators-v5/santa/head.png" } : layer) }
+        : null;
+      const workingPack = historicalHeadVariant ? { ...SANTA_V5_PACK, ...historicalHeadVariant, art_status: "historical-preserved-asset" } : SANTA_V5_PACK;
       const status = document.querySelector("#status");
       const resourceErrors = [];
       const consoleErrors = [];
@@ -76,6 +81,7 @@
         configureRig(rig);
         const renderer = new SantaV5SceneRenderer(canvas, rig, {
           assetRoot: new URL("./", location.href).href,
+          pack: workingPack,
           characterWidth: 680,
           characterHeight: 1550,
           characterDrawHeight: 1300,
@@ -87,11 +93,11 @@
         const characterRenderer = renderer.characterRenderer;
         const plans = characterRenderer.getLayerDrawPlan();
         const assetSizes = Object.fromEntries([...characterRenderer.images.entries()].map(([asset, record]) => [asset, record.size]));
-        const resolved = Object.fromEntries(SANTA_V5_PACK.layers.map((layer) => [layer.id, characterRenderer.resolvedAsset(layer)]));
+        const resolved = Object.fromEntries(workingPack.layers.map((layer) => [layer.id, characterRenderer.resolvedAsset(layer)]));
         const landmarks = resolveLandmarks(SANTA_V5_ANATOMICAL_LANDMARKS, plans);
         const frame = buildInspectionFrame({
-          characterId: SANTA_V5_PACK.id,
-          pack: SANTA_V5_PACK,
+          characterId: workingPack.id,
+          pack: workingPack,
           plans,
           resolvedAssets: resolved,
           pose: rig.pose(),
@@ -122,6 +128,7 @@
         frame.armIK = rig.activeArmIK?.() || null;
         frame.loadedAssets = [...characterRenderer.images.keys()];
         frame.captureMode = mode;
+        frame.variant = variant;
         frame.captureUrl = location.href;
         await postJson({ format: "fabuloom.visual-inspection-frame/0.1", frame });
         status.textContent = "completed";

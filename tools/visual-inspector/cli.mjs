@@ -231,7 +231,7 @@ function markdownReport(report) {
 async function main() {
   const args = process.argv.slice(2);
   if (hasArgument(args, "--help")) {
-    console.log("Usage: node tools/visual-inspector/cli.mjs [--output DIR] [--reference PNG] [--port PORT]");
+    console.log("Usage: node tools/visual-inspector/cli.mjs [--output DIR] [--reference PNG] [--port PORT] [--variant production-v5|historical-head-original]");
     return;
   }
   const edge = executablePath();
@@ -239,6 +239,7 @@ async function main() {
   const output = path.resolve(argumentValue(args, "--output", defaultWorkspaceOutput));
   const port = Number(argumentValue(args, "--port", "8786"));
   const referencePath = argumentValue(args, "--reference", null);
+  const variant = argumentValue(args, "--variant", "production-v5");
   const session = `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
   const captureRoot = path.join(output, "captures");
   const comparisonRoot = path.join(output, "comparisons");
@@ -267,6 +268,7 @@ async function main() {
         height: spec.close === "face" ? "520" : "1920",
       });
       if (spec.speechAmplitude) params.set("speechAmplitude", String(spec.speechAmplitude));
+      if (variant !== "production-v5") params.set("variant", variant);
       const url = `http://127.0.0.1:${port}/visual-inspector-capture.html?${params}`;
       const result = await runProcess(edge, ["--headless", "--disable-gpu", "--hide-scrollbars", "--run-all-compositor-stages-before-draw", "--window-size=680,1920", "--virtual-time-budget=7000", `--screenshot=${screenshotFile}`, url], { cwd: studioRoot });
       const payload = await readJsonEventually(path.join(captureRoot, session, `${spec.name}.json`));

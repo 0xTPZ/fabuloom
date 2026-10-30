@@ -1,4 +1,4 @@
-# Visual Inspector V1.1
+# Visual Inspector V1.2
 
 O Visual Inspector é uma ferramenta local de QA para o Character Engine. Ele
 faz uma captura reproduzível, registra o plano de desenho resolvido, analisa
@@ -121,3 +121,43 @@ As comparações neutro versus piscada, boca, WAVE_HELLO e POINT_AT foram
 geradas como evidência visual auxiliar. As nove fixtures foram detectadas com
 100% de detecção, 0 falsos positivos no frame conhecido-good e regiões
 compatíveis. A análise por IA não foi executada.
+
+## Validação em imagens históricas reais
+
+Mission 013.2 adiciona `tools/visual-inspector/real-cli.mjs` e o módulo
+browser-safe `frontend/src/real-image-inspector.mjs`. Essa trilha não usa as
+fixtures JSON da V1.1: ela lê PNGs reais extraídos dos MP4s V3, V4 e V5, mais
+uma captura isolada do asset histórico preservado. Cada entrada registra
+origem, versão, tempo, dimensões, SHA-256 e condições de captura em
+`historical-dataset-manifest.json`.
+
+O fluxo cego é obrigatório. O analisador recebe pixels, uma região ampla de
+composição e, quando disponível, uma referência geral; não recebe o rótulo ou
+a localização exata do defeito. `blind-results.json` é gravado antes do
+arquivo de revisão humana. A avaliação posterior separa defeito confirmado,
+diferença de direção artística entre versões, amostra limpa e evidência
+inconclusiva.
+
+O analisador mede transparência, máscara de foreground, componentes conectados,
+limites de silhueta, densidade de borda, regiões faciais/laterais/pés e
+diferença de pixels. Frames de vídeo são opacos; portanto, a segmentação é
+heurística e não confirma juntas ocultas pela roupa. Os resultados de pixels
+continuam sendo hipóteses até revisão humana e não são misturados à taxa das
+fixtures estruturadas.
+
+O contrato opcional `VisualAnalysisProvider` define `analyzeImage`,
+`analyzeSequence`, `capabilities` e `providerMetadata`. O provider padrão está
+indisponível e offline; a execução registra `not-executed`, não inventa uma
+resposta de IA e não envia imagens para serviços externos.
+
+Para executar:
+
+```powershell
+node .\tools\visual-inspector\real-cli.mjs `
+  --workspace "E:\Fabuloom" `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\real-run" `
+  --review "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\historical-review.json"
+```
+
+Para inspeção manual sem o Character Stage, abra
+`http://127.0.0.1:8765/visual-inspector-real.html` e selecione um PNG local.

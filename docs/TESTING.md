@@ -243,6 +243,37 @@ is never substituted for the technical neutral baseline. The current CLI uses
 measured alpha bounds and tolerant PNG differences; pixel-perfect or AI-based
 artistic judgment remains outside the automated acceptance criterion.
 
+## Visual Inspector V1.2 — imagens históricas reais
+
+The real-image path uses only local PNGs and does not require a model, GPU or
+network service. The historical sample bank is created from preserved V3/V4/V5
+MP4 frames plus an isolated replay of the preserved V5 `head.png` asset. The
+original media is never overwritten:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\historical-head-original" `
+  --variant historical-head-original
+
+node .\tools\visual-inspector\real-cli.mjs `
+  --workspace "E:\Fabuloom" `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\real-run" `
+  --review "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\historical-review.json"
+```
+
+The command writes `historical-dataset-manifest.json` with source paths,
+times, dimensions and SHA-256 hashes. It first writes `blind-results.json`
+without review labels, then optionally computes post-hoc metrics from the
+separate review file. `real-visual-inspection-report.md` records the sample
+size, confirmed defects, artistic differences, inconclusive cases, evidence
+regions and limitations. Results are not comparable to the JSON fixture rate
+unless explicitly reported as separate populations.
+
+For a browser-only check, start the local server and open
+`/visual-inspector-real.html`. Select a local PNG and, optionally, a reference
+PNG. The page does not require an active character and displays pixel evidence,
+confidence and the explicit `IA multimodal: não executada` state.
+
 ## Santa V4 cartoon refinement
 
 Mission 011.1 adds the dependency-free Santa V4 contract and transform tests:

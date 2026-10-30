@@ -89,3 +89,9 @@ The automated loopback capture and report CLI is documented in
 `docs/VISUAL-INSPECTOR.md` and does not modify assets or source files.
 V1.1 also reports controlled defect fixtures, separates technical and artistic
 references, and states when temporal or human review has not been executed.
+V1.2 adds `/visual-inspector-real.html` for local PNG inspection independent
+of the active Stage. The offline pixel analyzer records alpha availability,
+foreground bounds, connected components, broad evidence regions and reference
+differences. Historical evaluation writes blind results before post-hoc human
+review; an unavailable multimodal provider is represented explicitly rather
+than simulated.
