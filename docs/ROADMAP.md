@@ -75,6 +75,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   rollback, historical Santa V5 replay and a DEV review page implemented in
   Mission 013.3. Multimodal analysis remains explicitly unavailable/offline;
   human artistic approval remains required.
+- Santa V5 visual quality recovery — Mission 014 audited the real 1080×1920
+  production captures, corrected named-clip composition drift and left-arm
+  POINT_AT clipping, added before/after and close-up evidence, and regenerated
+  the WAVE_HELLO and bilateral POINT_AT H.264 demos. Artistic approval remains
+  human; mesh deformation and a general scene editor remain future work.
 
 ## Later
 

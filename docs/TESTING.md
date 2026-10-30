@@ -399,3 +399,36 @@ does not require internet, GPU, a vision model or model weights. Use
 `qa-gate.mjs --correction` only for the documented historical replay; the
 official production pack remains untouched and artistic approval stays pending
 human review.
+
+## Mission 014 — Santa V5 visual quality recovery
+
+The Mission 014 audit runs the same gate at production width and includes both
+POINT_AT directions:
+
+```powershell
+node .\tools\visual-inspector\qa-gate.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-qa\mission-014\audit-production-1080-final" `
+  --port 8873 --variant production-v5
+```
+
+The final run passed the technical gate with 60 captures at 1080×1920. Human
+inspection verified the corrected WAVE_HELLO anchor, right and left POINT_AT,
+face states, hands and grounded feet. The report generator creates the
+before/after overlays and close-up evidence:
+
+```powershell
+node .\tools\visual-inspector\mission-014-report.mjs
+```
+
+The deterministic video checks are:
+
+```powershell
+python .\examples\santa_v5_wave_demo.py --export-dir E:\Fabuloom\workspace\exports --overwrite
+python .\examples\santa_v5_point_at_demo.py --export-dir E:\Fabuloom\workspace\exports --overwrite
+ffmpeg -v error -i E:\Fabuloom\workspace\exports\videos\fabuloom-santa-v5-point-at.mp4 -f null -
+```
+
+Both videos were verified with FFprobe as H.264/yuv420p at 1080×1920; WAVE is
+5.000 s and POINT_AT is 8.500 s. The demos are silent visual engine proofs;
+they do not claim phonetic alignment. Generated frames, videos and boards stay
+under `E:\Fabuloom\workspace\exports` and are not committed.

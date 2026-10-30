@@ -11,7 +11,6 @@
     <pre id="status">initializing</pre>
     <script type="module">
       import { SantaV5Rig, SantaV5SceneRenderer } from "./src/santa-v5-engine.ts";
-      import { santaV3SceneAt } from "./src/santa-v3-engine.ts";
       import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
       import { SANTA_V5_ALPHA_BOUNDS, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
       import { resolveLandmarks } from "./src/character-landmarks.mjs";
@@ -51,14 +50,14 @@
       function configureRig(rig) {
         if (mode === "wave") {
           rig.setAnimation("WAVE_HELLO", 0);
-        } else if (mode === "point") {
+        } else if (mode === "point" || mode === "point-left") {
           rig.setPresentationTarget({
             format: "fabuloom.presentation-target/0.1",
             id: "visual-inspector-point-target",
             label: "inspector target",
             coordinateSpace: "normalized-stage",
-            position: { x: 0.88, y: 0.18 },
-          }, { arm: "right", width: 1080, height: 1920 });
+            position: { x: mode === "point-left" ? 0.12 : 0.88, y: 0.18 },
+          }, { arm: mode === "point-left" ? "left" : "right", width: 1080, height: 1920 });
           rig.setAnimation("POINT_AT", 0);
         }
       }
@@ -114,7 +113,7 @@
           view: close === "face" ? "face-close" : "full",
         });
         frame.captureCanvas = { width: canvas.width, height: canvas.height };
-        const scene = santaV3SceneAt(timeMs, mode === "wave" ? 4600 : mode === "point" ? 8000 : 20450);
+        const scene = renderer.sceneAt(timeMs, mode === "wave" ? 4600 : (mode === "point" || mode === "point-left") ? 8000 : 20450);
         frame.sceneComposition = {
           characterX: scene.characterX,
           characterY: scene.characterY,

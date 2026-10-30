@@ -252,12 +252,15 @@ export class SantaV3SceneRenderer {
 
   async load() { await this.characterRenderer.load(); this.loaded = true; return this; }
 
+  /** Composition hook for adapters that keep the character anchored during a named clip. */
+  sceneAt(timeMs, durationMs) { return santaV3SceneAt(timeMs, durationMs); }
+
   renderFrame({ timeMs = 0, durationMs = 1, speechAmplitude = 0, isPlaying = true } = {}) {
     this.rig.setSceneDuration(durationMs);
     this.rig.setSpeechAmplitude(speechAmplitude);
     this.characterRenderer.renderFrame({ timeMs, speechAmplitude, isPlaying });
     const ctx = this.context; const width = this.canvas.width; const height = this.canvas.height;
-    const scene = santaV3SceneAt(timeMs, durationMs);
+    const scene = this.sceneAt(timeMs, durationMs);
     const handPlan = this.characterRenderer.getLayerDrawPlan().find((entry) => entry.layer.id === "right_hand");
     const characterScaleY = this.characterDrawHeight / this.characterCanvas.height;
     const localHand = handPlan

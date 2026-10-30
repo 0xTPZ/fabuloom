@@ -49,6 +49,9 @@ export function buildSantaV5QaPlan({ waveClip, pointClip } = {}) {
   addClipFrames(captures, pointClip, { mode: "point", sequence: "POINT_AT", prefix: "point", label: "POINT_AT" });
   addFrame(captures, { name: "point-approach", mode: "point", sequence: "POINT_AT", timeMs: 1000, reason: "POINT_AT: aproximação do alvo" });
   addFrame(captures, { name: "point-hold", mode: "point", sequence: "POINT_AT", timeMs: 5200, reason: "POINT_AT: contato/hold do alvo" });
+  addClipFrames(captures, pointClip, { mode: "point-left", sequence: "POINT_AT", prefix: "point-left", label: "POINT_AT braço esquerdo" });
+  addFrame(captures, { name: "point-left-approach", mode: "point-left", sequence: "POINT_AT", timeMs: 1000, reason: "POINT_AT braço esquerdo: aproximação do alvo" });
+  addFrame(captures, { name: "point-left-hold", mode: "point-left", sequence: "POINT_AT", timeMs: 5200, reason: "POINT_AT braço esquerdo: contato/hold do alvo" });
   addFrame(captures, { name: "feet-neutral", mode: "neutral", timeMs: 0, reason: "inspeção de contato visual dos pés com o chão" });
   return {
     format: VISUAL_QA_PLAN_FORMAT,

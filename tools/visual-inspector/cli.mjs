@@ -267,7 +267,7 @@ async function main() {
         mode: spec.mode,
         timeMs: String(spec.timeMs),
         close: spec.close,
-        width: spec.close === "face" ? "680" : "680",
+        width: spec.close === "face" ? "680" : "1080",
         height: spec.close === "face" ? "520" : "1920",
       });
       if (spec.speechAmplitude) params.set("speechAmplitude", String(spec.speechAmplitude));
@@ -277,7 +277,7 @@ async function main() {
       let payload = null;
       let lastCaptureError = null;
       for (let attempt = 1; attempt <= 2; attempt += 1) {
-        result = await runProcess(edge, ["--headless", "--disable-gpu", "--hide-scrollbars", "--run-all-compositor-stages-before-draw", "--window-size=680,1920", "--virtual-time-budget=7000", `--screenshot=${screenshotFile}`, url], { cwd: studioRoot });
+        result = await runProcess(edge, ["--headless", "--disable-gpu", "--hide-scrollbars", "--run-all-compositor-stages-before-draw", "--window-size=1080,1920", "--virtual-time-budget=7000", `--screenshot=${screenshotFile}`, url], { cwd: studioRoot });
         try {
           payload = await readJsonEventually(path.join(captureRoot, session, `${spec.name}.json`));
           lastCaptureError = null;
