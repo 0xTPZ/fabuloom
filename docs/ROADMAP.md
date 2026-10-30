@@ -1,5 +1,10 @@
 # Roadmap
 
+- Narrator Mode V1: horizontal facial-presenter export is implemented as an
+  isolated sibling of Character Stage. Future work includes richer scene
+  presets, word-level timing when a provider supplies it, and optional mesh
+  facial deformation after evidence-based evaluation.
+
 ## Foundation — completed
 
 - Establish the isolated project layout.

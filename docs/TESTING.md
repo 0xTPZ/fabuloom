@@ -457,3 +457,23 @@ The proof uses the same `SantaV5Rig` and `LayeredCharacterRenderer` as the
 Stage. It is an isolated raster reconstruction, not a mesh-deformation test;
 Godot, Inochi2D and Blender were unavailable locally and no installation is
 performed by this workflow.
+
+## Mission 017 — Narrator Mode
+
+Pure Narrator Mode contracts are tested without a browser or model:
+
+```powershell
+node --test .\frontend\tests\test_narrator_mode.mjs
+```
+
+The real local export requires the existing Fabuloom virtual environment,
+cached Kokoro assets, Edge and FFmpeg. After export, inspect actual PNG
+samples with:
+
+```powershell
+node .\tools\visual-inspector\narrator-mode-report.mjs
+```
+
+The capture report checks 1920×1080 frames, non-empty opaque samples,
+deterministic differences, the circular facial-only avatar and caption safe
+area. Human review remains required.

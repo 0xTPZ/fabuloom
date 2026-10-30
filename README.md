@@ -101,4 +101,10 @@ Original Fabuloom Studio code is intended to use the MIT License. This choice ap
 
 See `docs/KOKORO-INTEGRATION.md` for the optional provider, capability limits, offline demonstration, and third-party licensing notes. See the contribution, security, architecture, and getting-started documents for project boundaries.
 
+Mission 017 adds Narrator Mode V1: a separate horizontal storyteller scene
+with an original fantasy archive SVG, a circular Santa V5 facial avatar, real
+Kokoro `pm_santa` audio, segment captions and deterministic 1920x1080 H.264/AAC
+export. The mode reuses facial layers and RMS timing without loading the
+full-body Stage or inventing phonetic timestamps. See `docs/NARRATOR-MODE.md`.
+
 Core contract details and invariants are documented in `docs/CONTRACTS.md`. Test instructions are in `docs/TESTING.md`.
