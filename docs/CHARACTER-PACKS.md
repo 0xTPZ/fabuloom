@@ -253,3 +253,26 @@ head-clean → eyes → eyelids → brows → glasses → beard → mouth
 looking permanently blinked. `frontend/tests/test_santa_v5_visual_integrity.mjs`
 also checks deterministic seek sampling, wrist-chain joins and grounded foot
 pivots without decoding model files.
+
+### Mission 015 — anatomy-first experimental pack
+
+`frontend/src/santa-v5-anatomy-experimental-pack.mjs` is a reversible DEV
+variant of the approved Santa V5 pack. It keeps the same `fabuloom.character/0.1`
+format and the same `SantaV5Rig`, but derives masked anatomical bands from the
+approved upper-arm and forearm PNGs, adds independent cuff nodes, enlarges the
+hand draw size, and tests a smaller experimental foot scale. The production
+pack and its source PNGs are not modified.
+
+The experimental parent chain is `torso → upper_arm → forearm`, with cuff and
+hand as independent children of the forearm so the wrist can be tuned without
+introducing a visual gap.
+The masked bands are a diagnostic reconstruction, not final painted art. They
+are rendered by the existing `LayeredCharacterRenderer`, so the comparison is
+against the same transforms and timing used by the Stage. The gallery and arm
+comparison pages are DEV evidence only; the experimental pack is not selected
+by the default Character Stage.
+
+Mission 015 records the actual alpha bounds of the source and derived PNGs in
+`workspace/exports/visual-qa/mission-015/`. Godot `Skeleton2D`, `Polygon2D`,
+Inochi2D and Blender were checked for local executables; none was available,
+so no mesh-deformation proof was executed and no tool was installed.

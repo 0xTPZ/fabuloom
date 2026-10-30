@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Santa V5 anatomy experimental capture</title>
+    <style>html,body{margin:0;background:#101a2c;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="1080" height="1920"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { captureLayeredFrames, LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { FABULOOM_KEYFRAME_FORMAT } from "./src/animation-keyframes.mjs";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_ANATOMY_EXPERIMENTAL_PACK } from "./src/santa-v5-anatomy-experimental-pack.mjs";
+      import { validateCharacterPack } from "./src/character-pack.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session"); const fps = Number(params.get("fps") || 30); const durationMs = 5000;
+      const status = document.querySelector("#status");
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+      const drawBackdrop = (ctx, width, height) => { ctx.fillStyle = "#15243b"; ctx.fillRect(0, 0, width, height); ctx.fillStyle = "rgba(247,210,122,.10)"; ctx.beginPath(); ctx.arc(width * .74, height * .22, 220, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "rgba(247,210,122,.18)"; ctx.fillRect(0, height * .84, width, 4); };
+      const blobFromFrame = (renderer, outputCanvas) => { const ctx = outputCanvas.getContext("2d"); drawBackdrop(ctx, outputCanvas.width, outputCanvas.height); ctx.drawImage(renderer.canvas, 0, 0); return new Promise((resolve, reject) => outputCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("frame encoding returned no blob")), "image/png")); };
+      const sendFrame = async ({ index, timeMs, blob }) => { const response = await fetch(`/capture/${encodeURIComponent(session)}/${String(index).padStart(6, "0")}.png`, { method: "POST", headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`); };
+
+      async function main() {
+        if (!session) fail("session is required");
+        if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps");
+        validateCharacterPack(SANTA_V5_ANATOMY_EXPERIMENTAL_PACK);
+        const outputCanvas = document.querySelector("#capture-canvas");
+        const characterCanvas = document.createElement("canvas"); characterCanvas.width = outputCanvas.width; characterCanvas.height = outputCanvas.height;
+        const rig = new SantaV5Rig(); rig.setSceneDuration(20450); rig.setAnimation("WAVE_HELLO");
+        const renderer = new LayeredCharacterRenderer(characterCanvas, rig, SANTA_V5_ANATOMY_EXPERIMENTAL_PACK, { assetRoot: new URL("./", location.href).href, renderBackground: false });
+        await renderer.load(); renderer.setExpression("wave");
+        const result = await captureLayeredFrames(renderer, { durationMs, fps, isPlaying: false, amplitudeAt: () => 0, onFrame: async ({ index, timeMs }) => sendFrame({ index, timeMs, blob: await blobFromFrame(renderer, outputCanvas) }) });
+        const completion = { character: SANTA_V5_ANATOMY_EXPERIMENTAL_PACK.id, animation_id: "WAVE_HELLO", animation_format: FABULOOM_KEYFRAME_FORMAT, duration_ms: durationMs, canvas: { width: outputCanvas.width, height: outputCanvas.height }, fps, frame_count: result.frameCount, timing_source: "absolute_keyframe_time", audio: "none", purpose: "mission_015_anatomy_first_rig_demo", mesh_deformation: "not-executed" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });
+        if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`);
+        status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>
