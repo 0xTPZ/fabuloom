@@ -236,3 +236,20 @@ calibrates the right-arm layer pivots to the shoulder, elbow and wrist
 landmarks, then refines the analytic solution against the pack's non-uniform
 render scales. This is a compatible pose/asset extension, not a new character
 format or a second skeleton.
+
+### Visual integrity and facial layering
+
+The V5 production draw plan uses `head-clean.png` as the head base. The
+previous `head.png` remains in the asset folder as a preserved reference, but
+must not be used together with the independent facial overlays because it is a
+complete painted head. The pack's face order is:
+
+```text
+head-clean → eyes → eyelids → brows → glasses → beard → mouth
+```
+
+`eyelids` is a closed-state overlay: `eye_open = 1` makes it transparent and
+`eye_open = 0` makes it fully visible. This prevents the neutral pose from
+looking permanently blinked. `frontend/tests/test_santa_v5_visual_integrity.mjs`
+also checks deterministic seek sampling, wrist-chain joins and grounded foot
+pivots without decoding model files.

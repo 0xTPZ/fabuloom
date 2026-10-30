@@ -36,7 +36,10 @@ export const SANTA_V5_PACK = {
     { id: "left_hand", role: "hand", asset: asset("hand-left.png"), parent: "left_forearm", anchor: [0.5, 0.10], position: [0.54, 0.76], size: [0.68, 0.34], z: 3 },
     { id: "right_hand", role: "hand", asset: asset("hand-right.png"), parent: "right_forearm", anchor: [0.5, 0.10], position: [0.47, 0.72], size: [0.68, 0.34], z: 3 },
     { id: "neck", role: "neck", asset: asset("neck.png"), parent: "torso", anchor: [0.5, 0.55], position: [0.5, 0.20], size: [0.46, 0.34], z: 4 },
-    { id: "head", role: "head", asset: asset("head.png"), parent: "neck", anchor: [0.5, 0.54], position: [0.5, 0.10], size: [0.84, 0.80], z: 6 },
+    // The original head.png is retained as V5 provenance, but it is a fully
+    // painted face.  The production draw plan must use the clean base so the
+    // independent eyes, glasses, beard, brows, and mouth are not painted twice.
+    { id: "head", role: "head", asset: asset("head-clean.png"), parent: "neck", anchor: [0.5, 0.54], position: [0.5, 0.10], size: [0.84, 0.80], z: 6 },
     { id: "hair_front", role: "hair_front", asset: asset("hair-front.png"), parent: "head", anchor: [0.5, 0.5], position: [0.5, 0.38], size: [0.94, 0.78], z: 7 },
     { id: "eyes", role: "eyes", asset: asset("eyes-open.png"), parent: "head", anchor: [0.5, 0.5], position: [0.5, 0.54], size: [0.68, 0.28], z: 8 },
     { id: "eyelids", role: "eyelids", asset: asset("eyelids-closed.png"), parent: "head", anchor: [0.5, 0.5], position: [0.5, 0.54], size: [0.68, 0.28], z: 9 },

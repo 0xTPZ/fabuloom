@@ -24,7 +24,7 @@ const sizes = new Map([
   ["assets/characters/topazio-narrators-v5/santa/hand-left.png", [1024, 1536]],
   ["assets/characters/topazio-narrators-v5/santa/hand-right.png", [1151, 1366]],
   ["assets/characters/topazio-narrators-v5/santa/neck.png", [1536, 1024]],
-  ["assets/characters/topazio-narrators-v5/santa/head.png", [1316, 1195]],
+  ["assets/characters/topazio-narrators-v5/santa/head-clean.png", [1316, 1195]],
   ["assets/characters/topazio-narrators-v5/santa/hair-front.png", [1536, 1024]],
   ["assets/characters/topazio-narrators-v5/santa/eyes-open.png", [1774, 887]],
   ["assets/characters/topazio-narrators-v5/santa/eyelids-closed.png", [1851, 850]],

@@ -176,3 +176,32 @@ reel plus a report under the workspace exports directory. The current result
 is intentionally a technical rig demonstration: it uses rigid 2.5D layers,
 not mesh deformation, physics, phonetic alignment or a final cinematic art
 pass. The original hand assets and Santa V3/V4 packs remain preserved.
+
+## Mission 012.8 — visual integrity audit
+
+The audit of the effective draw plan found two renderer/asset defects rather
+than a need for a new animation engine:
+
+1. `head.png` was a complete painted head that already contained eyes,
+   glasses, brows, moustache, beard and mouth. The pack also drew those same
+   features as independent layers, producing visible doubling and a rigid
+   facial read.
+2. `eyelids-closed.png` was always opaque. The neutral pose therefore looked
+   blinked even when `eye_open` was `1`.
+
+The original `head.png` is preserved as V5 provenance. The production pack now
+uses the original Fabuloom `head-clean.png` base, with hair, eyes, eyelids,
+brows, glasses, beard and mouth remaining separate. The renderer treats the
+eyelid bitmap as a closed-state overlay with opacity `1 - eye_open`; it does
+not distort the eyelid image to simulate a blink. The clean base was prepared
+from the existing Santa identity while preserving the transparent canvas and
+was copied into the project as a versioned asset; it does not contain external
+art or model weights.
+
+The measured neutral plan keeps the calibrated hand pivots at the existing
+left/right wrist chain and places the foot pivots below the matching shin
+joins. The visual audit found no demonstrated need to change the hand or boot
+assets, so their sizes, swaps, pivots and V3/V4/V5 compatibility remain
+unchanged. The new local QA page is `/santa-v5-visual-integrity.html` and
+covers close-face neutral/blink/mouth states, neutral/raised/pointing hands
+and neutral grounded feet.

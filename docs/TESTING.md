@@ -304,3 +304,15 @@ out-of-order deterministic seeks. The capture is
 `fabuloom-santa-v5-point-at.mp4`; its accompanying report records the target
 sequence, frame count and the fact that the video is silent by design. The
 pose board is a workspace-only visual review artifact.
+
+Mission 012.8 adds the visual-integrity regression suite and review page:
+
+```powershell
+node --test .\frontend\tests\test_santa_v5_visual_integrity.mjs .\frontend\tests\test_santa_v5_art.mjs .\frontend\tests\test_santa_v5_calibration.mjs
+```
+
+Open `/santa-v5-visual-integrity.html` on the loopback server to review the
+clean facial base, neutral/blink/mouth states, hand neutral/raised/pointing
+states and grounded feet. The screenshot
+`E:\Fabuloom\workspace\exports\santa-v5-visual-integrity.png` is a local QA
+artifact and is not committed.

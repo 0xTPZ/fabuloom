@@ -72,3 +72,9 @@ loads Santa V2, computes the PCM-16 RMS envelope from the measured WAV, and
 posts frames only to the loopback capture endpoint. FFmpeg composes those
 same frames over the background; the original portrait exporter remains a
 compatibility reference.
+
+The Santa V5 visual-integrity review is available at
+`/santa-v5-visual-integrity.html`. It is a local QA page for the clean facial
+base, eyelid open/closed states, RMS mouth state, neutral/raised/pointing hands
+and grounded feet. The page uses the same pack and draw-plan implementation as
+the Stage; it is not a second renderer.

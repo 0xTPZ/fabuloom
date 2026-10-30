@@ -320,3 +320,21 @@ Santa V5 consumes this boundary for `WAVE_HELLO`. The clip owns only the body
 channels it animates; breathing, blinking and RMS mouth motion remain in the
 base rig. This keeps Character Stage and frame capture on one source of truth
 and avoids a second animation implementation in FFmpeg.
+
+### Visual integrity research and engine boundary
+
+Mission 012.8 audited the rendered Canvas plan before considering a backend
+migration. The current `LayeredCharacterRenderer` is a rigid cut-out renderer:
+each transparent PNG has a local pivot, parent transform and draw order; it
+is deterministic for seek and out-of-order frame capture and is already shared
+by the Stage and the FFmpeg bridge. It does not perform mesh deformation,
+weight painting or phonetic facial alignment.
+
+The research comparison is recorded in
+`docs/ANIMATION-TOOLS-RESEARCH.md`. The conclusion is to keep Canvas as the
+runtime/export boundary for the current V5 packs. Godot is the strongest later
+candidate if mesh deformation and an engine-owned 2D skeleton become necessary;
+Inochi2D is promising for specialist 2D deformation but would require a format
+bridge and a separate runtime; Blender is best treated as an offline authoring
+and render option because its armature/Grease Pencil pipeline is heavier than
+the local Stage. None of these tools was installed or used in this mission.

@@ -23,6 +23,7 @@ export const SANTA_V5_ALPHA_BOUNDS = Object.freeze({
   "hand-right.png": [101, 75, 982, 1244],
   "neck.png": [259, 209, 1280, 848],
   "head.png": [173, 41, 1112, 1152],
+  "head-clean.png": [0, 23, 1302, 1168],
   "hair-front.png": [111, 78, 1425, 922],
   "eyes-open.png": [196, 278, 1579, 627],
   "eyelids-closed.png": [243, 290, 1609, 673],

@@ -85,7 +85,14 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
     if (offsetX || offsetY) local = multiply(local, translate(offsetX, offsetY));
     local = multiply(local, rotate(layerRotation(layer, pack, pose)));
     let animatedY = 1;
-    if (pack.bindings.eye_open === layer.id) animatedY = Math.max(0.08, clamp(pose.eye_open));
+    let animatedOpacity = layer.opacity === undefined ? 1 : clamp(layer.opacity);
+    if (pack.bindings.eye_open === layer.id) {
+      // Eyelids are authored as a closed-state overlay.  They must disappear
+      // in the open state; scaling the bitmap alone leaves closed eyes visible
+      // in every neutral frame and can also distort the eyelid artwork.
+      const eyeOpen = clamp(pose.eye_open);
+      animatedOpacity *= 1 - eyeOpen;
+    }
     if (pack.bindings.mouth_open === layer.id) animatedY = 0.58 + clamp(pose.mouth_open) * 0.95;
     if (pack.bindings.breathing === layer.id) {
       local = multiply(local, translate(0, (pose.breathing - 0.5) * frameHeight * 0.012));
@@ -105,7 +112,7 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
       drawWidth,
       drawHeight,
       intrinsic,
-      opacity: layer.opacity === undefined ? 1 : clamp(layer.opacity),
+      opacity: animatedOpacity,
     };
     plans.set(layer.id, plan);
     return plan;

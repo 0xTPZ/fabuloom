@@ -11,6 +11,9 @@ test("Santa V5 final rig pack validates its fine-grained local assets", () => {
   assert.equal(SANTA_V5_PACK.voice_id, "pm_santa");
   assert.equal(SANTA_V5_PACK.language, "pt-BR");
   assert.equal(SANTA_V5_PACK.art_status, "production-rig-v1");
+  const headLayer = SANTA_V5_PACK.layers.find((layer) => layer.id === "head");
+  assert.equal(headLayer.asset.endsWith("head-clean.png"), true);
+  assert.equal(existsSync(new URL("../assets/characters/topazio-narrators-v5/santa/head-clean.png", import.meta.url)), true);
   assert.ok(SANTA_V5_PACK.expressions.some((expression) => expression.id === "wave" && expression.overrides.right_hand.endsWith("hand-right-wave.png")));
   assert.ok(SANTA_V5_PACK.expressions.some((expression) => expression.id === "point" && expression.overrides.right_hand.endsWith("hand-right-point.png")));
   assert.ok(SANTA_V5_PACK.expressions.some((expression) => expression.id === "point-left" && expression.overrides.left_hand.endsWith("hand-left-point.png")));
@@ -22,6 +25,9 @@ test("Santa V5 final rig pack validates its fine-grained local assets", () => {
     assert.equal(existsSync(path), true, `missing asset ${layer.asset}`);
     assert.equal(readFileSync(path).subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `not a PNG: ${layer.asset}`);
   }
+  const facialLayers = SANTA_V5_PACK.layers.filter((layer) => ["head", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"].includes(layer.id));
+  assert.equal(new Set(facialLayers.map((layer) => layer.asset)).size, facialLayers.length, "facial layers must not reuse the same painted asset");
+  assert.equal(facialLayers.some((layer) => layer.id !== "head" && layer.asset === headLayer.asset), false, "clean head base must not be reused as a facial overlay");
 });
 
 test("Santa V5 wave expression keeps the original hand and adds a valid palm-facing asset", () => {
@@ -87,4 +93,14 @@ test("Santa V5 head and torso remain independently transformable", () => {
   assert.equal(entry(still, "torso").matrix.b, entry(turned, "torso").matrix.b);
   assert.notEqual(entry(still, "head").matrix.b, entry(turned, "head").matrix.b);
   assert.notEqual(entry(still, "right_hand").matrix.e, entry(wristTurned, "right_hand").matrix.e);
+});
+
+test("Santa V5 eyelid overlay is hidden when open and visible only while blinking", () => {
+  const open = buildLayerDrawPlan(SANTA_V5_PACK, 680, 1550, { eye_open: 1 });
+  const closed = buildLayerDrawPlan(SANTA_V5_PACK, 680, 1550, { eye_open: 0 });
+  const partial = buildLayerDrawPlan(SANTA_V5_PACK, 680, 1550, { eye_open: 0.5 });
+  const opacity = (plan) => plan.find((entry) => entry.layer.id === "eyelids").opacity;
+  assert.equal(opacity(open), 0);
+  assert.equal(opacity(closed), 1);
+  assert.equal(opacity(partial), 0.5);
 });
