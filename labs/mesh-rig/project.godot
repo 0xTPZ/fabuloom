@@ -1,0 +1,23 @@
+; Godot 4.7.2 proof-of-concept project for Mission 016.
+; This project is intentionally isolated from the production Character Stage.
+config_version=5
+
+[application]
+config/name="Fabuloom Mesh Rig Lab V1"
+run/main_scene="res://main.tscn"
+
+[display]
+window/size/viewport_width=1600
+window/size/viewport_height=1000
+window/size/window_width_override=1600
+window/size/window_height_override=1000
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.018, 0.022, 0.04, 1)
+
+[gui]
+theme/default_font_multichannel_signed_distance_field=true

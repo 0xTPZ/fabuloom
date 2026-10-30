@@ -85,6 +85,12 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   metrics, boot-scale comparison and same-renderer evidence. Godot/Inochi2D
   mesh deformation remains explicitly unexecuted until a permitted local tool
   is available; the approved V5 pack remains unchanged.
+- Mesh Rig Lab V1 — Mission 016 executed the first isolated weighted-mesh proof
+  with Godot 4.7.2 Compatibility/OpenGL. The lab uses a copied Santa V5 arm
+  texture, a five-bone `Skeleton2D` hierarchy, 96 weighted `Polygon2D` tiles,
+  five pose captures, transparent PNG output and a deterministic six-second
+  frame sequence. The current Canvas renderer remains production; the mesh
+  lab is experimental and requires human visual review before any migration.
 
 ## Later
 
