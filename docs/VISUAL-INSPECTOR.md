@@ -193,3 +193,31 @@ sobrescreve assets oficiais. O pacote `visual-qa-evidence.json` e a interface
 DEV exibem o histórico, os frames selecionados, o gate técnico e a revisão
 artística pendente. Sem um `VisualAnalysisProvider` configurado, o resultado é
 `not-executed`; nenhum modelo ou serviço externo é simulado.
+
+## Visual Quality Recovery — Mission 014
+
+Mission 014 executou o gate sobre o Santa V5 em resolução de produção
+1080×1920, com 60 capturas: repouso, rosto, fala, piscada, mãos, pés,
+`WAVE_HELLO`, `POINT_AT` à direita e `POINT_AT` à esquerda. A revisão humana
+das PNGs reais encontrou uma deriva de composição: clips nomeados herdavam o
+`characterX` do walk-in V3. A causa foi corrigida com `SantaV5SceneRenderer.sceneAt`,
+que ancora apenas os clips V5 sem alterar o rig ou os assets.
+
+Também foi corrigido o enquadramento do alvo esquerdo de `POINT_AT`: a
+composição usa uma âncora de apresentação x=180 quando o braço esquerdo está
+ativo, evitando cortar a manga no limite interno do canvas. A resolução full
+frame da CLI passou de 680 para 1080 pixels; close-ups faciais continuam
+compactos por desenho.
+
+O relatório e a prancha visual ficam somente no workspace:
+
+```text
+E:\Fabuloom\workspace\exports\visual-qa\mission-014\mission-014-visual-quality-report.md
+E:\Fabuloom\workspace\exports\visual-qa\mission-014\santa-v5-visual-quality-board.png
+```
+
+Os vídeos de revisão são gerados pelos exemplos reais do Character Engine:
+`fabuloom-santa-v5-wave-hello.mp4` e `fabuloom-santa-v5-point-at.mp4`, em
+1080×1920 H.264. A inspeção multimodal realizada nesta missão foi a leitura
+local das imagens geradas; nenhum provider de visão externo foi executado.
+O gate técnico passou, mas a aprovação artística continua humana.

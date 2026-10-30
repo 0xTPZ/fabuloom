@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · Visual Quality Recovery</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #050d1d; color: #eef5ff; }
+      header { padding: 22px 28px; border-bottom: 1px solid #d6a84d66; background: #07142a; }
+      h1 { margin: 0 0 5px; color: #f7d27a; font-size: 26px; }
+      header p { margin: 0; color: #b8c9df; }
+      main { max-width: 1540px; margin: 20px auto; padding: 0 22px 34px; }
+      h2 { margin: 24px 0 10px; color: #f7d27a; font-size: 18px; }
+      .board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 14px; }
+      figure { margin: 0; padding: 9px; background: #0d2342; border: 1px solid #d6a84d55; border-radius: 10px; }
+      img { display: block; width: 100%; height: auto; background: #081a33; border-radius: 6px; }
+      img.crop-face { height: 300px; object-fit: cover; object-position: top; }
+      figcaption { min-height: 3.2em; padding: 9px 2px 2px; color: #f7d27a; font-weight: 650; }
+      small { display: block; color: #b8c9df; font-weight: 400; }
+      @media (max-width: 1050px) { .board { grid-template-columns: repeat(3, minmax(190px, 1fr)); } }
+      @media (max-width: 720px) { .board { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Santa V5 · Visual Quality Recovery</h1>
+      <p>Inspeção humana das capturas reais do Visual QA Gate. Poses full-frame em 1080×1920; antes/depois da correção de composição.</p>
+    </header>
+    <main>
+      <h2>Comparação rastreável</h2>
+      <section class="board">
+        <figure><img src="/exports/visual-qa/mission-014/audit-before/production/wave-raised.png" alt="Santa V5 antes da correção em WAVE_HELLO" /><figcaption>Antes · WAVE_HELLO<small>deriva herdada do walk-in; captura 680 px</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-after/production/wave-raised.png" alt="Santa V5 depois da correção de âncora em WAVE_HELLO" /><figcaption>Depois · WAVE_HELLO<small>âncora estabilizada; captura 680 px</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-before/production/point-hold.png" alt="Santa V5 antes da correção em POINT_AT" /><figcaption>Antes · POINT_AT<small>personagem deslocado e mão cortada</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-after/production/point-hold.png" alt="Santa V5 depois da correção em POINT_AT" /><figcaption>Depois · POINT_AT<small>âncora de apresentação corrigida</small></figcaption></figure>
+      </section>
+
+      <h2>Resultado em resolução de produção</h2>
+      <section class="board">
+        <figure><img src="/exports/visual-qa/mission-014/audit-production-1080-final/production/neutral.png" alt="Santa V5 em repouso" /><figcaption>Repouso<small>proporções, pés e simetria</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/closeups/face-neutral.png" alt="Rosto do Santa V5" /><figcaption>Rosto ampliado<small>olhos, óculos, barba e alinhamento</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/closeups/face-blink.png" alt="Santa V5 piscando" /><figcaption>Piscada<small>pálpebras alinhadas</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/closeups/face-mouth.png" alt="Santa V5 falando" /><figcaption>Fala<small>boca animável; sem alegar fonemas</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-production-1080-final/production/feet-neutral.png" alt="Pés do Santa V5" /><figcaption>Pés<small>botas visíveis e abaixo dos encaixes</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-production-1080-final/production/wave-raised.png" alt="Santa V5 acenando" /><figcaption>WAVE_HELLO<small>braço elevado, mão visível</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-production-1080-final/production/point-hold.png" alt="Santa V5 apontando à direita" /><figcaption>POINT_AT direita<small>mão e manga dentro do palco</small></figcaption></figure>
+        <figure><img src="/exports/visual-qa/mission-014/audit-production-1080-final/production/point-left-hold.png" alt="Santa V5 apontando à esquerda" /><figcaption>POINT_AT esquerda<small>composição deslocada para preservar a manga</small></figcaption></figure>
+      </section>
+    </main>
+  </body>
+</html>

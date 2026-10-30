@@ -405,3 +405,18 @@ them; `qa-report.mjs` validates workspace-contained evidence; and
 never edits the official pack. The DEV page reads only the generated local
 report and images. A future multimodal adapter may consume the evidence
 contract, but unavailable capability is recorded as `not-executed`.
+
+### Mission 014 visual-quality boundary
+
+The V5 visual audit confirmed that composition ownership belongs at the scene
+adapter boundary, not inside the pack or the QA tool. `SantaV5SceneRenderer`
+overrides `sceneAt` for named presenter clips so WAVE_HELLO and POINT_AT do not
+inherit the V3 walk-in position. The left POINT_AT presentation uses a
+composition-only x offset to keep the existing calibrated arm and assets inside
+the frame; the IK target, hierarchy and pack contract remain unchanged.
+
+The Visual Inspector now captures full frames at 1080×1920 while preserving
+compact facial close-ups. The stage, QA capture and deterministic video demos
+continue to use the same `LayeredCharacterRenderer`; no FFmpeg-only animation
+was introduced. The V5 runtime is still a rigid layered 2.5D system without
+mesh deformation, physics or phonetic alignment.

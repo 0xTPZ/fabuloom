@@ -479,6 +479,20 @@ export class SantaV5SceneRenderer extends SantaV3SceneRenderer {
     });
   }
 
+  /**
+   * Named presenter clips own the body pose and must not inherit the V3
+   * walk-in composition. Keeping the V5 anchor stable prevents WAVE/POINT
+   * captures from drifting outside the stage while preserving V3 choreography
+   * for the unanimated compatibility path.
+   */
+  sceneAt(timeMs, durationMs) {
+    const scene = santaV3SceneAt(timeMs, durationMs);
+    if (!this.rig.animationId?.()) return scene;
+    const presentationTarget = this.rig.presentationTargetInfo?.();
+    const characterX = presentationTarget?.arm === "left" ? 180 : 60;
+    return { ...scene, action: "idle", seated: 0, characterX, characterY: 560, cupState: "table", gesture: 0 };
+  }
+
   renderFrame(options = {}) {
     const animationId = this.rig.animationId?.();
     const expression = animationId === "WAVE_HELLO"
