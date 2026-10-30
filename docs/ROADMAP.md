@@ -50,6 +50,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   V3 compatibility, browser-stage selection and real-engine MP4 comparison
   implemented in Mission 011.1. Final painted art, broader gesture authoring
   and human visual approval remain future work.
+- Santa V5 production rig — higher-fidelity original transparent character
+  pieces, fine-grained joint hierarchy, Stage selection and deterministic
+  H.264/AAC demonstration implemented in Mission 012.1. Human review remains
+  necessary for final cinematic polish; phonetic alignment and a general scene
+  editor remain future work.
 
 ## Later
 

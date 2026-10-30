@@ -224,3 +224,95 @@ python .\examples\santa_v4_video_demo.py `
 The command validates the local V4 pack, contiguous PNG frames, measured WAV
 duration, H.264/AAC output and V3/V4 comparison frame. It does not synthesize
 new audio. Word, phoneme and viseme timing remain unavailable.
+
+## Santa V5 rig and video capture
+
+Mission 012.1 validates the final V5 layer contract, deterministic transforms,
+independent head/torso motion and visible hand channels:
+
+```powershell
+node --test .\frontend\tests\test_santa_v5_art.mjs
+```
+
+For visual review, start the loopback stage server and open
+`/santa-v5-preview.html`. The preview uses the same fine-grained pack as the
+Stage. To produce the measured local demonstration and frame comparisons:
+
+```powershell
+$env:PYTHONPATH = 'E:\Fabuloom\studio\src'
+& 'E:\Fabuloom\workspace\.venv\Scripts\python.exe' .\examples\santa_v5_video_demo.py --overwrite
+```
+
+The capture validates a contiguous 30 FPS PNG sequence, 1080x1920 composition,
+the real measured `pm_santa` WAV duration, and FFprobe H.264/AAC output. The
+comparison artifacts are written under `E:\Fabuloom\workspace\exports\videos`.
+RMS mouth motion is intentionally not phoneme or viseme alignment.
+
+Mission 012.3 adds `frontend/tests/test_santa_v5_calibration.mjs`. It checks
+the measured alpha metadata, action-specific amplitude limits, deterministic
+draw plans and independent head/hand transforms. The visual tools are local
+DEV pages; their screenshots and the silent 8-second reel are generated under
+the workspace export directory and are not committed.
+
+Mission 012.4 extends those checks with local-to-stage landmark conversion,
+landmark/pivot proximity for shoulders, elbows, wrists, knees and ankles,
+finite hierarchical transforms, bounded gait channels and continuity checks at
+walk/seated phase boundaries. Visual review remains mandatory because the long
+coat can conceal some seated knee motion even when the transforms are valid.
+
+Mission 012.5 adds `frontend/tests/test_animation_keyframes.mjs` and
+`frontend/tests/test_santa_v5_wave.mjs`. They cover clip validation, finite
+numeric parameters, easing/interpolation, additive channel composition,
+absolute-time determinism after seek, continuity, RMS/breathing composition,
+joint movement and landmark hierarchy checks for `WAVE_HELLO`.
+
+The visual DEV tool is `/santa-v5-calibration.html`; select `WAVE_HELLO` to
+inspect keyframes and use play, pause or seek. The five-pose board is
+`/santa-v5-wave-gallery.html`. The technical capture is generated with:
+
+```powershell
+& 'E:\Fabuloom\workspace\.venv\Scripts\python.exe' .\examples\santa_v5_wave_demo.py --overwrite
+```
+
+It produces a silent 5-second H.264 MP4 under
+`E:\Fabuloom\workspace\exports\videos\`.
+
+Mission 012.6 adds the dependency-free IK and rendered-endpoint checks:
+
+```powershell
+node --test .\frontend\tests\test_two_bone_ik.mjs .\frontend\tests\test_santa_v5_wave.mjs .\frontend\tests\test_santa_v5_art.mjs .\frontend\tests\test_santa_v5_calibration.mjs
+```
+
+These tests cover reachable and unreachable targets, elbow preference and
+limits, deterministic angle helpers, normalized target overrides, expression
+asset preservation, transformed shoulder/elbow/hand pivots, seek stability,
+and the measured rendered hand error at a full wave pose. The regenerated
+technical MP4 is checked with FFprobe as 150 frames at 30 FPS, 1080x1920,
+H.264, silent and 5.000 seconds. The five-pose board and previous-versus-IK
+comparison remain workspace-only review artifacts.
+
+Mission 012.7 adds the provider-independent target and presenter tests:
+
+```powershell
+node --test .\\frontend\\tests\\test_presentation_targets.mjs .\\frontend\\tests\\test_santa_v5_point_at.mjs .\\frontend\\tests\\test_santa_v5_art.mjs
+```
+
+They cover normalized and scene-object target resolution, invalid targets,
+configurable POINT_AT phases/hold, safe out-of-reach planning, right/left arm
+selection, actual left-hand pivot reach, expression asset preservation, and
+out-of-order deterministic seeks. The capture is
+`fabuloom-santa-v5-point-at.mp4`; its accompanying report records the target
+sequence, frame count and the fact that the video is silent by design. The
+pose board is a workspace-only visual review artifact.
+
+Mission 012.8 adds the visual-integrity regression suite and review page:
+
+```powershell
+node --test .\frontend\tests\test_santa_v5_visual_integrity.mjs .\frontend\tests\test_santa_v5_art.mjs .\frontend\tests\test_santa_v5_calibration.mjs
+```
+
+Open `/santa-v5-visual-integrity.html` on the loopback server to review the
+clean facial base, neutral/blink/mouth states, hand neutral/raised/pointing
+states and grounded feet. The screenshot
+`E:\Fabuloom\workspace\exports\santa-v5-visual-integrity.png` is a local QA
+artifact and is not committed.

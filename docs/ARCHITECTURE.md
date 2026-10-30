@@ -172,6 +172,88 @@ on one pose implementation while preserving the V3 pack for comparison and
 compatibility. The new SVG layers are original and local; the runtime does not
 load the generated concept reference.
 
+### Santa V5 rig finalization 012.1
+
+Santa V5 continues the same single-engine rule. `SantaV5Rig` subclasses the
+deterministic Santa rig and `SantaV5SceneRenderer` supplies the V5 pack to the
+existing scene renderer. The pack is more granular than the V5 art preview:
+head, neck, hair, facial overlays, upper/lower limb segments, hands and feet
+each have their own parent and pivot. The head is a child of the neck, while
+the neck is a child of the torso, so head rotation cannot rotate the torso.
+
+`LayeredCharacterRenderer.getLayerDrawPlan()` exposes the exact resolved
+matrices already used for drawing. Scene props use this read-only plan to
+anchor the cup to the transformed `right_hand` layer, avoiding a second,
+divergent hand trajectory. The fallback remains for older packs without an
+explicit hand. Browser Stage and offline capture therefore share the same
+rig, asset transforms, RMS mouth signal and deterministic frame schedule.
+
+`frontend/capture-santa-v5.html` is loopback-only through the existing local
+server. `examples/santa_v5_video_demo.py` reuses measured audio, captures PNG
+frames in the browser, and lets FFmpeg encode the final H.264/AAC file. No
+weights or generated media are committed to the public repository.
+
+### Santa V5 calibration boundary
+
+Santa V5 calibration follows the same single-engine boundary. `SantaV5Rig`
+performs only asset-specific amplitude limits after the shared V3 scene sampler;
+the browser stage, the calibration tool and the offline calibration capture all
+consume `LayeredCharacterRenderer`. Diagnostic overlays are development-only
+and are not part of exported character frames. FFmpeg receives deterministic
+PNG frames only after the browser rig has resolved parent transforms.
+
+Landmark calibration is intentionally downstream of pack validation and
+upstream of visual QA. It consumes resolved layer plans but never changes a
+source image or invents hidden-joint precision. V5 gait and seated corrections
+are deterministic pose-channel adjustments; no physics system or second
+renderer was introduced.
+
+### Santa V5 arm IK boundary 012.6
+
+`frontend/src/two-bone-ik.mjs` is independent of Santa, TTS and the browser.
+It uses Canvas coordinates (+X right, +Y down, clockwise angles), supports
+reach clamping, elbow preference and joint limits, and returns analytic angles,
+joint positions and residual error. The Santa adapter consumes the existing
+landmarks and pack hierarchy rather than introducing a second skeleton.
+
+Because the painted arm layers use non-uniform X/Y scales, the Santa adapter
+also applies a deterministic forward-model refinement to the analytic result.
+The refinement models the actual upper-arm and forearm affine scales used by
+`LayeredCharacterRenderer`; it is not physics and does not replace the shared
+renderer. At full WAVE_HELLO poses the rendered hand pivot is verified against
+the requested target, while the clip's `weight` intentionally produces smooth
+rest/target blending during approach and return.
+
+The `wave` expression changes only the right-hand asset to the palm-facing
+variant. `SantaV5SceneRenderer`, the technical capture and the DEV calibration
+page all select the same expression and rig path. The calibration page exposes
+the target and elbow preference for diagnostics, including a pointer-drag
+override; these controls are development-only and are not a general character
+editor.
+
+### Presenter targeting and POINT_AT 012.7
+
+`frontend/src/presentation-targets.mjs` defines the provider- and character-
+independent `fabuloom.presentation-target/0.1` boundary. A target can be a
+normalized stage point, a stage-pixel point, or the center of a registered
+scene object. Resolution is deterministic and never executes target content.
+
+`frontend/src/presenter-targeting.mjs` owns the reusable `POINT_AT` clip and
+the planning step that keeps the wrist short of the target by a measured
+clearance. The target's actual direction is retained for the pointing finger;
+out-of-reach targets are clamped safely and reported as such instead of being
+silently treated as precise contact. `SantaV5Rig` selects the calibrated right
+or left arm, runs the same two-bone IK and affine forward refinement, and
+applies subtle head/torso follow. The painted `point` and `point-left`
+expressions are only asset overrides; the animation remains provider-neutral.
+
+The clip is sampled from absolute time, so seek, reverse-order capture and
+frame-by-frame export are deterministic. `santa-v5-calibration.html` exposes
+target presets, left/right selection, pointer dragging, timing/hold controls,
+reach diagnostics, and the resolved pointing direction. Stage and capture
+must continue to use this same rig path; FFmpeg receives only the resulting
+frames and does not reimplement the gesture.
+
 ### Studio UI foundation 006.1
 
 The frontend shell is organized into independent visual responsibilities:
@@ -225,3 +307,34 @@ SQLite is the planned local index for projects and metadata. Large media and mod
 ## License boundary
 
 Only original Fabuloom code is covered by the project MIT license. Kokoro model/package, runtime dependencies, voices, and generated media remain subject to their own licenses. Every external integration needs a license/provenance record before distribution; see `docs/KOKORO-INTEGRATION.md`.
+
+## Deterministic keyframe overlays
+
+`frontend/src/animation-keyframes.mjs` provides the independent
+`fabuloom.animation-keyframes/0.1` numeric clip format. It validates ordered
+keyframes, samples them by absolute time with easing, and composes additive
+channel layers without retaining playback state. Character adapters enforce
+their own limits and map channels to the layered hierarchy.
+
+Santa V5 consumes this boundary for `WAVE_HELLO`. The clip owns only the body
+channels it animates; breathing, blinking and RMS mouth motion remain in the
+base rig. This keeps Character Stage and frame capture on one source of truth
+and avoids a second animation implementation in FFmpeg.
+
+### Visual integrity research and engine boundary
+
+Mission 012.8 audited the rendered Canvas plan before considering a backend
+migration. The current `LayeredCharacterRenderer` is a rigid cut-out renderer:
+each transparent PNG has a local pivot, parent transform and draw order; it
+is deterministic for seek and out-of-order frame capture and is already shared
+by the Stage and the FFmpeg bridge. It does not perform mesh deformation,
+weight painting or phonetic facial alignment.
+
+The research comparison is recorded in
+`docs/ANIMATION-TOOLS-RESEARCH.md`. The conclusion is to keep Canvas as the
+runtime/export boundary for the current V5 packs. Godot is the strongest later
+candidate if mesh deformation and an engine-owned 2D skeleton become necessary;
+Inochi2D is promising for specialist 2D deformation but would require a format
+bridge and a separate runtime; Blender is best treated as an offline authoring
+and render option because its armature/Grease Pencil pipeline is heavier than
+the local Stage. None of these tools was installed or used in this mission.

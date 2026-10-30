@@ -85,7 +85,14 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
     if (offsetX || offsetY) local = multiply(local, translate(offsetX, offsetY));
     local = multiply(local, rotate(layerRotation(layer, pack, pose)));
     let animatedY = 1;
-    if (pack.bindings.eye_open === layer.id) animatedY = Math.max(0.08, clamp(pose.eye_open));
+    let animatedOpacity = layer.opacity === undefined ? 1 : clamp(layer.opacity);
+    if (pack.bindings.eye_open === layer.id) {
+      // Eyelids are authored as a closed-state overlay.  They must disappear
+      // in the open state; scaling the bitmap alone leaves closed eyes visible
+      // in every neutral frame and can also distort the eyelid artwork.
+      const eyeOpen = clamp(pose.eye_open);
+      animatedOpacity *= 1 - eyeOpen;
+    }
     if (pack.bindings.mouth_open === layer.id) animatedY = 0.58 + clamp(pose.mouth_open) * 0.95;
     if (pack.bindings.breathing === layer.id) {
       local = multiply(local, translate(0, (pose.breathing - 0.5) * frameHeight * 0.012));
@@ -105,7 +112,7 @@ export function buildLayerDrawPlan(pack, width, height, pose, assetSizes = new M
       drawWidth,
       drawHeight,
       intrinsic,
-      opacity: layer.opacity === undefined ? 1 : clamp(layer.opacity),
+      opacity: animatedOpacity,
     };
     plans.set(layer.id, plan);
     return plan;
@@ -249,6 +256,17 @@ export class LayeredCharacterRenderer {
     return this.canvas;
   }
 
+  /**
+   * Expose the resolved plan used by render(). Scene composition can anchor a
+   * prop to the same transformed hand or other layer without recreating the
+   * hierarchy with a second set of coordinates.
+   */
+  getLayerDrawPlan() {
+    if (!this.loaded) return [];
+    const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
+    return buildLayerDrawPlan(this.pack, this.canvas.width, this.canvas.height, this.rig.pose(), assetSizes);
+  }
+
   resolvedAsset(layer) {
     const expression = this.pack.expressions.find((candidate) => candidate.id === this.expression);
     return expression?.overrides?.[layer.id] || layer.asset;
@@ -264,8 +282,7 @@ export class LayeredCharacterRenderer {
       ctx.clearRect(0, 0, width, height);
     }
     if (!this.loaded) return;
-    const assetSizes = new Map([...this.images.entries()].map(([asset, record]) => [asset, record.size]));
-    const plans = buildLayerDrawPlan(this.pack, width, height, this.rig.pose(), assetSizes);
+    const plans = this.getLayerDrawPlan();
     for (const plan of plans) {
       const asset = this.resolvedAsset(plan.layer);
       const record = this.images.get(asset);

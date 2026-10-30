@@ -156,6 +156,37 @@ Santa V4 is intentionally independent from Santa V3. `SantaV4Rig` and
 only the pack and stage title change. The concept reference generated during
 the art pass is a design reference, not a runtime layer or a published model.
 
+### Santa V5 production rig
+
+Mission 012.1 promotes the original transparent PNG direction to the first
+fine-grained V5 rig pass. `frontend/src/santa-v5-pack.mjs` keeps the
+`fabuloom.character/0.1` contract and exposes separate neck, head, hair,
+facial overlays, upper arms, forearms, hands, thighs, shins and feet. Pivots
+and parent transforms are explicit; `SantaV5Rig` reuses the proven V3
+animation catalogue and adds only deterministic mouth, wrist and foot polish.
+
+The pack is selectable in Character Stage as `Santa V5 · pm_santa`. The
+offline exporter `examples/santa_v5_video_demo.py` loads the same
+`SantaV5SceneRenderer` used by the Stage, so the MP4 does not contain a second
+animation implementation. The scene renderer exposes the resolved layer plan
+and anchors the cup to `right_hand` when that layer exists. The RMS mouth
+signal remains an amplitude approximation; word, phoneme and viseme times are
+not fabricated.
+
+The pack is a first production rig pass, not a claim of finished cinematic art.
+Generated PNGs are original Fabuloom assets made for this pass; model weights,
+private media and concept references remain outside the public repository.
+
+### Presenter pointing expression
+
+Mission 012.7 adds the optional `point` and `point-left` expressions to the
+Santa V5 pack. They preserve the neutral and wave hands and swap only the
+selected hand asset for an index-pointing original. The expression is selected
+by `SantaV5SceneRenderer` from the resolved `PresentationTarget`; it is not a
+second animation system. A pack that does not provide a pointing-hand asset
+can still consume the provider-independent clip, but should report that its
+visual hand cannot communicate the final finger direction.
+
 ## Validation and security
 
 `frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.
@@ -171,3 +202,54 @@ The validator is only a first defense. A future secure importer must enforce arc
 5. Plan a dedicated character pack editor in Mission 007B.
 
 No private Topazioverse art, proprietary Animus code, model weights or personal data should be included by default. The open format should allow contributors to author their own characters.
+
+### V5 calibration metadata
+
+Santa V5 keeps the `fabuloom.character/0.1` pack format. Its normalized
+`position`, `size` and `anchor` values are the authoritative rig parameters;
+`frontend/src/santa-v5-calibration.mjs` contains measured alpha bounds only for
+diagnostics. Alpha bounds do not change the source PNGs.
+
+The calibration tool exposes the same hierarchy consumed by
+`LayeredCharacterRenderer`, including parent transforms, draw order and
+transformed pivots. A V5 adapter constrains only action amplitudes that exceed
+the painted overlap zones. This preserves the V3/V4 formats and keeps the
+runtime provider-independent.
+
+### Anatomical landmarks
+
+`frontend/src/character-landmarks.mjs` is a small reusable diagnostic layer,
+not a new character format. A landmark stores a layer ID, normalized local
+coordinates, confidence and an explanatory note. The renderer's resolved
+matrix converts it into stage coordinates; this avoids treating the center of
+an image box as an anatomical joint. Additional V5 channels (`pelvis_x`,
+`pelvis_rotation` and foot offsets) remain additive to `fabuloom.character/0.1`
+and are validated like the existing animation bindings.
+
+### V5 wave expression and arm IK
+
+The Santa V5 pack includes a `wave` expression that overrides only
+`right_hand` with the palm-facing `hand-right-wave.png` asset; the original
+`hand-right.png` remains the neutral asset. `WAVE_HELLO` controls a normalized
+hand target through the independent `two-bone-ik.mjs` module. The runtime
+calibrates the right-arm layer pivots to the shoulder, elbow and wrist
+landmarks, then refines the analytic solution against the pack's non-uniform
+render scales. This is a compatible pose/asset extension, not a new character
+format or a second skeleton.
+
+### Visual integrity and facial layering
+
+The V5 production draw plan uses `head-clean.png` as the head base. The
+previous `head.png` remains in the asset folder as a preserved reference, but
+must not be used together with the independent facial overlays because it is a
+complete painted head. The pack's face order is:
+
+```text
+head-clean → eyes → eyelids → brows → glasses → beard → mouth
+```
+
+`eyelids` is a closed-state overlay: `eye_open = 1` makes it transparent and
+`eye_open = 0` makes it fully visible. This prevents the neutral pose from
+looking permanently blinked. `frontend/tests/test_santa_v5_visual_integrity.mjs`
+also checks deterministic seek sampling, wrist-chain joins and grounded foot
+pivots without decoding model files.

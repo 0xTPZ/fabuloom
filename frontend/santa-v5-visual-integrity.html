@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · integridade visual</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, sans-serif; }
+      body { margin: 0; background: #07142a; color: #f7e2a0; }
+      header { max-width: 1180px; margin: 24px auto 12px; padding: 0 18px; }
+      h1 { margin: 0 0 8px; font-size: 1.35rem; }
+      p { color: #d7e4f8; }
+      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 1180px; margin: 0 auto 32px; padding: 0 18px; }
+      figure { margin: 0; padding: 10px; background: #0d2342; border: 1px solid #d6a84d66; border-radius: 12px; }
+      figure.face { grid-column: span 2; }
+      canvas { display: block; width: 100%; height: auto; background: linear-gradient(#10294e, #050913); border-radius: 8px; }
+      figcaption { padding-top: 9px; font-weight: 600; }
+      small { display: block; padding-top: 3px; color: #b7c7df; font-weight: 400; }
+      @media (max-width: 620px) { figure.face { grid-column: span 1; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Santa V5 — integridade visual do rig</h1>
+      <p>Comparação técnica da base facial limpa, estados de fala e articulações das mãos e pés. Todos os quadros usam o mesmo plano de desenho do Character Stage.</p>
+    </header>
+    <main>
+      <figure class="face"><canvas id="face-neutral" width="520" height="360"></canvas><figcaption>Rosto neutro · base limpa + camadas independentes</figcaption></figure>
+      <figure class="face"><canvas id="face-blink" width="520" height="360"></canvas><figcaption>Piscada</figcaption></figure>
+      <figure class="face"><canvas id="face-mouth" width="520" height="360"></canvas><figcaption>Boca durante fala RMS</figcaption></figure>
+      <figure><canvas id="hands-neutral" width="360" height="600"></canvas><figcaption>Mãos neutras</figcaption></figure>
+      <figure><canvas id="hands-raised" width="360" height="600"></canvas><figcaption>Mão elevada<small>Palma aberta, junta do punho preservada</small></figcaption></figure>
+      <figure><canvas id="hands-point" width="360" height="600"></canvas><figcaption>Mão apontando<small>Asset de apontar sem trocar a hierarquia</small></figcaption></figure>
+      <figure><canvas id="feet-neutral" width="360" height="600"></canvas><figcaption>Pés neutros<small>Botas apoiadas no plano de palco</small></figcaption></figure>
+    </main>
+    <script type="module">
+      import { LayeredCharacterRenderer, LayeredCharacterRig } from "./src/layered-character.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+
+      const root = new URL("./", location.href).href;
+      const faceIds = new Set(["head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"]);
+      const faceLayers = SANTA_V5_PACK.layers
+        .filter((layer) => faceIds.has(layer.id))
+        .map((layer) => layer.id === "head"
+          ? { ...layer, parent: null, position: [0.5, 0.54], size: [0.86, 0.9], z: 0 }
+          : { ...layer, z: layer.z - 6 });
+      const faceLayerSet = new Set(faceLayers.map((layer) => layer.id));
+      const facePack = {
+        ...SANTA_V5_PACK,
+        id: "topazio-narrator-santa-v5-face-integrity",
+        name: "Santa V5 face integrity preview",
+        layers: faceLayers,
+        expressions: SANTA_V5_PACK.expressions
+          .filter((expression) => ["neutral", "smile"].includes(expression.id))
+          .map((expression) => ({
+            ...expression,
+            overrides: Object.fromEntries(Object.entries(expression.overrides).filter(([id]) => faceLayerSet.has(id))),
+          })),
+        bindings: Object.fromEntries(Object.entries(SANTA_V5_PACK.bindings).filter(([, id]) => faceLayerSet.has(id))),
+      };
+
+      async function render(id, pack, { expression = "neutral", timeMs = 0, amplitude = 0, pose = {}, playing = false } = {}) {
+        const canvas = document.querySelector(`#${id}`);
+        const rig = new LayeredCharacterRig();
+        const renderer = new LayeredCharacterRenderer(canvas, rig, pack, { assetRoot: root });
+        await renderer.load();
+        renderer.setExpression(expression);
+        renderer.renderFrame({ timeMs, speechAmplitude: amplitude, isPlaying: playing });
+        if (Object.keys(pose).length) {
+          rig.currentPose = { ...rig.pose(), ...pose };
+          renderer.render();
+        }
+      }
+
+      Promise.all([
+        render("face-neutral", facePack),
+        render("face-blink", facePack, { pose: { eye_open: 0.05 } }),
+        render("face-mouth", facePack, { amplitude: 0.92, playing: true }),
+        render("hands-neutral", SANTA_V5_PACK),
+        render("hands-raised", SANTA_V5_PACK, { expression: "wave", pose: { right_arm_rotation: -0.55, right_forearm_rotation: 0.2, right_hand_rotation: -0.12 } }),
+        render("hands-point", SANTA_V5_PACK, { expression: "point", pose: { right_arm_rotation: -0.62, right_forearm_rotation: 0.16, right_hand_rotation: 0.04 } }),
+        render("feet-neutral", SANTA_V5_PACK),
+      ]).catch((error) => { document.body.dataset.error = error.message; console.error(error); });
+    </script>
+  </body>
+</html>
