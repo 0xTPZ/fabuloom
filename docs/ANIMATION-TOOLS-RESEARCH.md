@@ -60,3 +60,23 @@ The runnable comparison is available through
 Canvas renderer and deterministic frame capture as the Stage. It demonstrates
 the data-layer alternative only; it does not claim that masked raster bands
 are equivalent to weighted mesh deformation.
+
+### Mission 016 executable mesh proof
+
+Mission 016 obtained the official Godot 4.7.2 stable Windows x86_64 build as a
+workspace-local portable runtime. No installation, PATH change, registry change
+or global dependency was made. The runtime was exercised with Compatibility /
+OpenGL on the Radeon RX 580 and rendered the isolated Santa V5 right-arm lab.
+
+The proof uses `Skeleton2D`, `Bone2D` and weighted `Polygon2D` tiles. It contains
+five bones, 96 textured tiles and normalized weights; the evidence JSON records
+non-zero sampled vertex displacement for elbow, raised-hand and pointing poses.
+The same runtime creates the five PNG references and the six-second MP4 frame
+sequence. The capture is therefore a real mesh render, not a crop or a rigid
+sprite rotation.
+
+The lab is at `labs/mesh-rig/`. The approved production assets are preserved;
+only copied textures are used inside the lab. The current Canvas renderer
+remains the production path. Godot is now the preferred next experiment when
+weighted deformation is required, while Inochi2D remains an unexecuted authoring
+alternative. See `docs/MESH-RIG-LAB.md` for commands and outputs.

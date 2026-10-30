@@ -1,0 +1,9 @@
+{
+  "format": "fabuloom.mesh-rig.v1",
+  "engine": "Godot Skeleton2D + Polygon2D",
+  "bone_hierarchy": ["Shoulder", "UpperArm", "Elbow", "Forearm", "WristHand"],
+  "grid": {"columns": 8, "rows": 12, "vertices_per_tile": 4},
+  "required_poses": ["rest", "elbow_45", "elbow_90", "hand_raised", "pointing"],
+  "weights_must_sum_to": 1.0,
+  "official_assets_modified": false
+}

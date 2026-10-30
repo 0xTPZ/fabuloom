@@ -76,6 +76,14 @@ exported to `workspace\\exports\\videos\\fabuloom-santa-v5.mp4`; generated
 media stays outside Git. RMS still drives an expressive mouth approximation,
 not phonetic or viseme alignment.
 
+Mission 016 adds an isolated executable mesh-rig lab for the Santa V5 right arm.
+It uses a copied production texture, a Godot `Skeleton2D`/`Bone2D` hierarchy,
+96 weighted `Polygon2D` tiles and deterministic pose captures. The proof
+produces rest, elbow, raised-hand and pointing frames plus a six-second MP4 from
+the same weighted mesh. The production Canvas renderer and official Santa V5
+assets remain unchanged; this is a measured deformation alternative, not a
+merge or an artistic final approval. See `docs/MESH-RIG-LAB.md`.
+
 ## Technology direction
 
 - Python for audio generation and processing.
