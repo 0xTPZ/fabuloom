@@ -55,6 +55,26 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   H.264/AAC demonstration implemented in Mission 012.1. Human review remains
   necessary for final cinematic polish; phonetic alignment and a general scene
   editor remain future work.
+- Visual Inspector V1 — deterministic loopback captures, versioned frame
+  evidence, landmark/joint/motion diagnostics, tolerant PNG comparisons and a
+  read-only DEV page implemented in Mission 013. Automatic art correction,
+  external vision models and final artistic approval remain future work.
+- Visual Inspector V1.1 — controlled known-defect fixtures, alpha-footprint
+  join checks, side-aware crossing checks, IDLE/WAVE/POINT temporal coverage,
+  evidence overlays and separate technical/artistic references implemented in
+  Mission 013.1. Full per-pixel joint masks, external vision execution and
+  human artistic approval remain future work.
+- Visual Inspector V1.2 — historical PNG/MP4 evidence bank, blind real-image
+  evaluation, pixel masks/components/contour measurements, isolated historical
+  correction replay and provider-neutral multimodal contract implemented in
+  Mission 013.2. Opaque-video segmentation remains heuristic; external model
+  execution and final artistic approval remain future work.
+
+- Visual QA Gate V1.3 — deterministic smart frame plans, standard evidence
+  packages, technical gate status, bounded assisted correction with safe
+  rollback, historical Santa V5 replay and a DEV review page implemented in
+  Mission 013.3. Multimodal analysis remains explicitly unavailable/offline;
+  human artistic approval remains required.
 
 ## Later
 

@@ -203,6 +203,77 @@ The first reference export is a 1080x1920 H.264/AAC MP4. Its captions are
 segment-level captions based on measured audio boundaries; they are not word
 alignment.
 
+## Visual Inspector V1
+
+The Inspector unit tests are dependency-free and include frame-schema
+serialization, known-good Santa V5 evidence, artificial joint gaps, facial
+asset duplication, blink states, insufficient evidence, motion discontinuity,
+deterministic rectangle transforms, and tolerant PNG comparison:
+
+```powershell
+node --test .\frontend\tests\test_visual_inspector.mjs
+```
+
+The first end-to-end inspection uses the same renderer through loopback HTTP:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013"
+```
+
+The report is read-only and returns a non-zero correction status only when a
+confirmed error or capture failure is present. Warnings and hypotheses remain
+review states. The comparison baseline is the neutral frame of the same run
+unless an approved PNG is supplied with `--reference`; it is not artistic
+ground truth. Review the generated Markdown, JSON, masks, overlays and the
+DEV page before accepting a visual change.
+
+Mission 013.1 adds nine controlled known-defect fixtures and checks both
+positive detection and the known-good false-positive count. The full report
+also samples IDLE, WAVE_HELLO and POINT_AT sequences and emits highlighted
+fixture evidence plus `visual-inspection-evidence.json`:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.1-final"
+```
+
+The external `--reference PNG` input is recorded as an artistic reference and
+is never substituted for the technical neutral baseline. The current CLI uses
+measured alpha bounds and tolerant PNG differences; pixel-perfect or AI-based
+artistic judgment remains outside the automated acceptance criterion.
+
+## Visual Inspector V1.2 — imagens históricas reais
+
+The real-image path uses only local PNGs and does not require a model, GPU or
+network service. The historical sample bank is created from preserved V3/V4/V5
+MP4 frames plus an isolated replay of the preserved V5 `head.png` asset. The
+original media is never overwritten:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\historical-head-original" `
+  --variant historical-head-original
+
+node .\tools\visual-inspector\real-cli.mjs `
+  --workspace "E:\Fabuloom" `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\real-run" `
+  --review "E:\Fabuloom\workspace\exports\visual-inspector\mission-013.2-real\historical-review.json"
+```
+
+The command writes `historical-dataset-manifest.json` with source paths,
+times, dimensions and SHA-256 hashes. It first writes `blind-results.json`
+without review labels, then optionally computes post-hoc metrics from the
+separate review file. `real-visual-inspection-report.md` records the sample
+size, confirmed defects, artistic differences, inconclusive cases, evidence
+regions and limitations. Results are not comparable to the JSON fixture rate
+unless explicitly reported as separate populations.
+
+For a browser-only check, start the local server and open
+`/visual-inspector-real.html`. Select a local PNG and, optionally, a reference
+PNG. The page does not require an active character and displays pixel evidence,
+confidence and the explicit `IA multimodal: não executada` state.
+
 ## Santa V4 cartoon refinement
 
 Mission 011.1 adds the dependency-free Santa V4 contract and transform tests:
@@ -316,3 +387,15 @@ clean facial base, neutral/blink/mouth states, hand neutral/raised/pointing
 states and grounded feet. The screenshot
 `E:\Fabuloom\workspace\exports\santa-v5-visual-integrity.png` is a local QA
 artifact and is not committed.
+
+Mission 013.3 adds deterministic Visual QA plan/evidence/correction tests:
+
+```powershell
+node --test .\frontend\tests\test_visual_qa.mjs
+```
+
+The full gate is local and uses Edge headless plus the loopback server. It
+does not require internet, GPU, a vision model or model weights. Use
+`qa-gate.mjs --correction` only for the documented historical replay; the
+official production pack remains untouched and artistic approval stays pending
+human review.

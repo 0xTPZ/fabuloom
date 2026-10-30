@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom Visual Inspector capture</title>
+    <link rel="icon" href="./assets/favicon.svg" />
+    <style>html,body{margin:0;background:#050913;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="680" height="1140"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { SantaV5Rig, SantaV5SceneRenderer } from "./src/santa-v5-engine.ts";
+      import { santaV3SceneAt } from "./src/santa-v3-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { SANTA_V5_ALPHA_BOUNDS, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
+      import { resolveLandmarks } from "./src/character-landmarks.mjs";
+      import { buildInspectionFrame } from "./src/visual-inspector-core.mjs";
+
+      const query = new URLSearchParams(location.search);
+      const session = query.get("session");
+      const file = query.get("file") || "frame.json";
+      const mode = query.get("mode") || "neutral";
+      const timeMs = Math.max(0, Number(query.get("timeMs") || 0));
+      const width = Math.max(160, Number(query.get("width") || 680));
+      const height = Math.max(160, Number(query.get("height") || 1140));
+      const close = query.get("close") || "full";
+      const speechAmplitude = Math.max(0, Math.min(1, Number(query.get("speechAmplitude") || 0)));
+      const variant = query.get("variant") || "production-v5";
+      const historicalHeadVariant = variant === "historical-head-original"
+        ? { id: "topazio-narrator-santa-v5-historical-head", layers: SANTA_V5_PACK.layers.map((layer) => layer.id === "head" ? { ...layer, asset: "assets/characters/topazio-narrators-v5/santa/head.png" } : layer) }
+        : null;
+      const workingPack = historicalHeadVariant ? { ...SANTA_V5_PACK, ...historicalHeadVariant, art_status: "historical-preserved-asset" } : SANTA_V5_PACK;
+      const status = document.querySelector("#status");
+      const resourceErrors = [];
+      const consoleErrors = [];
+      const originalConsoleError = console.error.bind(console);
+      console.error = (...args) => { consoleErrors.push(args.map(String).join(" ")); originalConsoleError(...args); };
+      window.addEventListener("error", (event) => { resourceErrors.push(String(event.message || event.filename || "window error")); });
+      window.addEventListener("unhandledrejection", (event) => { consoleErrors.push(String(event.reason?.message || event.reason || "unhandled rejection")); });
+
+      const postJson = async (payload) => {
+        if (!session) return;
+        await fetch(`/capture/${encodeURIComponent(session)}/${encodeURIComponent(file)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      };
+
+      function configureRig(rig) {
+        if (mode === "wave") {
+          rig.setAnimation("WAVE_HELLO", 0);
+        } else if (mode === "point") {
+          rig.setPresentationTarget({
+            format: "fabuloom.presentation-target/0.1",
+            id: "visual-inspector-point-target",
+            label: "inspector target",
+            coordinateSpace: "normalized-stage",
+            position: { x: 0.88, y: 0.18 },
+          }, { arm: "right", width: 1080, height: 1920 });
+          rig.setAnimation("POINT_AT", 0);
+        }
+      }
+
+      function copyFaceClose(renderer, canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#0d2342";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const source = renderer.characterCanvas;
+        const cropWidth = Math.min(source.width, 600);
+        const cropHeight = Math.min(source.height, 620);
+        const cropX = Math.max(0, (source.width - cropWidth) / 2);
+        ctx.drawImage(source, cropX, 0, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+      }
+
+      async function main() {
+        const canvas = document.querySelector("#capture-canvas");
+        canvas.width = width; canvas.height = height;
+        const rig = new SantaV5Rig();
+        configureRig(rig);
+        const renderer = new SantaV5SceneRenderer(canvas, rig, {
+          assetRoot: new URL("./", location.href).href,
+          pack: workingPack,
+          characterWidth: 680,
+          characterHeight: 1550,
+          characterDrawHeight: 1300,
+        });
+        await renderer.load();
+        const isPlaying = mode === "mouth";
+        renderer.renderFrame({ timeMs, durationMs: mode === "wave" ? 4600 : mode === "point" ? 8000 : 20450, speechAmplitude: isPlaying ? speechAmplitude || 0.9 : 0, isPlaying });
+        if (close === "face") copyFaceClose(renderer, canvas);
+        const characterRenderer = renderer.characterRenderer;
+        const plans = characterRenderer.getLayerDrawPlan();
+        const assetSizes = Object.fromEntries([...characterRenderer.images.entries()].map(([asset, record]) => [asset, record.size]));
+        const resolved = Object.fromEntries(workingPack.layers.map((layer) => [layer.id, characterRenderer.resolvedAsset(layer)]));
+        const landmarks = resolveLandmarks(SANTA_V5_ANATOMICAL_LANDMARKS, plans);
+        const frame = buildInspectionFrame({
+          characterId: workingPack.id,
+          pack: workingPack,
+          plans,
+          resolvedAssets: resolved,
+          pose: rig.pose(),
+          timeMs,
+          isPlaying,
+          animationId: rig.animationId?.() || null,
+          expression: characterRenderer.expression,
+          width: characterRenderer.canvas.width,
+          height: characterRenderer.canvas.height,
+          alphaBounds: SANTA_V5_ALPHA_BOUNDS,
+          landmarks,
+          resourceErrors,
+          consoleErrors,
+          view: close === "face" ? "face-close" : "full",
+        });
+        frame.captureCanvas = { width: canvas.width, height: canvas.height };
+        const scene = santaV3SceneAt(timeMs, mode === "wave" ? 4600 : mode === "point" ? 8000 : 20450);
+        frame.sceneComposition = {
+          characterX: scene.characterX,
+          characterY: scene.characterY,
+          characterWidth: renderer.characterCanvas.width,
+          characterCanvasHeight: renderer.characterCanvas.height,
+          characterDrawHeight: renderer.characterDrawHeight,
+          scaleY: renderer.characterDrawHeight / renderer.characterCanvas.height,
+        };
+        frame.assetSizes = assetSizes;
+        frame.presentationTarget = rig.presentationTargetInfo?.() || null;
+        frame.armIK = rig.activeArmIK?.() || null;
+        frame.loadedAssets = [...characterRenderer.images.keys()];
+        frame.captureMode = mode;
+        frame.variant = variant;
+        frame.captureUrl = location.href;
+        await postJson({ format: "fabuloom.visual-inspection-frame/0.1", frame });
+        status.textContent = "completed";
+        document.title = "completed";
+      }
+
+      main().catch(async (error) => {
+        const message = String(error?.stack || error);
+        console.error(error);
+        status.textContent = `error: ${message}`;
+        document.title = "error";
+        await postJson({ format: "fabuloom.visual-inspection-frame/0.1", error: message, resourceErrors, consoleErrors });
+      });
+    </script>
+  </body>
+</html>

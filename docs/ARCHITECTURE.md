@@ -338,3 +338,70 @@ Inochi2D is promising for specialist 2D deformation but would require a format
 bridge and a separate runtime; Blender is best treated as an offline authoring
 and render option because its armature/Grease Pencil pipeline is heavier than
 the local Stage. None of these tools was installed or used in this mission.
+
+### Visual Inspector V1 013
+
+The Visual Inspector is a read-only QA boundary over the existing Character
+Stage renderer. `visual-inspector-capture.html` runs over the local loopback
+server and calls `SantaV5SceneRenderer` / `LayeredCharacterRenderer`; it does
+not create a simplified FFmpeg animation or open local files directly. Each
+capture posts a versioned frame JSON containing resolved layer matrices,
+intrinsic and alpha bounds, pivots, Z order, landmarks, pose, animation state,
+loaded resources and console/resource errors.
+
+`visual-inspector-core.mjs` keeps diagnostics independent from Santa and
+classifies findings as confirmed errors, advisory warnings, or hypotheses
+when evidence is insufficient. Motion checks compare ordered absolute-time
+landmarks, so seek and out-of-order capture remain deterministic. The CLI
+also creates PNG difference masks and overlays with antialiasing tolerance;
+the built-in comparator avoids adding OpenCV or Pixelmatch as runtime
+dependencies. A DEV page exposes the same renderer, overlays and report
+history but cannot modify source assets. Automatic correction is intentionally
+outside the Inspector boundary and human visual review remains required.
+
+Mission 013.1 adds a controlled defect bank and alpha-footprint checks. The
+bank mutates only copied frame JSON and records expected code, severity,
+location and evidence image. Transformed alpha-bound intersections provide a
+conservative pixel-informed signal for visible joint gaps; side-aware torso
+checks catch an arm crossing without applying a universal human-anatomy rule.
+Temporal coverage samples IDLE, WAVE_HELLO and POINT_AT with at least three
+frames each. Technical same-run baselines and optional artistic references are
+stored separately, and the evidence manifest leaves an explicit extension
+point for optional Codex vision analysis without pretending that a model ran.
+
+### Visual Inspector V1.2 — real rendered images
+
+Mission 013.2 adds a second, independent boundary for images produced by
+historical MP4s or isolated Canvas captures. `real-image-inspector.mjs` works
+on decoded RGBA pixels and measures alpha availability, a broad foreground
+mask, connected components, silhouette bounds, edge density and coarse visual
+regions. It can compare those measurements and pixels against a reference, but
+it does not receive a defect label or rig landmark when inspecting a PNG-only
+frame. Opaque video frames are therefore reported as heuristic evidence, not
+as alpha-confirmed joints.
+
+`real-cli.mjs` writes the historical manifest and hashes, then writes
+`blind-results.json` before it accepts the optional post-hoc review file. The
+review file is separate from the analyzer input, so metrics distinguish real
+confirmed defects, artistic version differences, clean samples and
+inconclusive cases. The real-image result is never mixed with the V1.1 JSON
+fixture metrics.
+
+The optional `VisualAnalysisProvider` contract exposes `analyzeImage`,
+`analyzeSequence`, `capabilities` and `providerMetadata`. The default provider
+is explicitly unavailable/offline; no image is sent externally and no model
+answer is synthesized. `visual-inspector-real.html` can inspect a local PNG
+without the active Character Stage. Historical `head.png` replay is allowed
+only through an isolated pack variant; the production V5 pack remains
+unchanged.
+
+### Visual QA Gate V1.3
+
+The QA Gate is an orchestration boundary around the existing Inspector and
+renderer. `qa-plan.mjs` selects meaningful timestamps; `cli.mjs --plan` captures
+them; `qa-report.mjs` validates workspace-contained evidence; and
+`assisted-correction.mjs` limits, validates and reverts isolated attempts.
+`qa-gate.mjs` composes the two variants for the historical Santa V5 case and
+never edits the official pack. The DEV page reads only the generated local
+report and images. A future multimodal adapter may consume the evidence
+contract, but unavailable capability is recorded as `not-executed`.

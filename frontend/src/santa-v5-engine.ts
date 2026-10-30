@@ -474,7 +474,7 @@ export class SantaV5SceneRenderer extends SantaV3SceneRenderer {
   constructor(canvas, rig = new SantaV5Rig(), options = {}) {
     super(canvas, rig, {
       ...options,
-      pack: SANTA_V5_PACK,
+      pack: options.pack || SANTA_V5_PACK,
       title: options.title || "SANTA V5  ·  TOPAZIOVERSE",
     });
   }
