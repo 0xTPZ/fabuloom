@@ -60,6 +60,41 @@ The report checks canvas dimensions, opaque/non-empty samples, deterministic
 differences between timestamps, circular avatar layout and the subtitle safe
 area. It is evidence for human review, not automatic artistic approval.
 
+## Facial correction V1.1
+
+Mission 017.1 keeps the approved Santa V5 PNGs unchanged and corrects only the
+Narrator Mode composition. Inspection of the source files showed that
+`mouth-closed.png` and `mouth-open.png` are complete lower-face plates: they
+already contain the moustache and beard. The previous avatar stacked one of
+those plates over `beard.png`, which made the mouth read as a thin duplicated
+line at export scale.
+
+The corrected experimental narrator pack hides the duplicate beard layer and
+uses one lower-face plate at the beard scale. `mouthStateAt()` maps the RMS
+envelope to closed, slight, moderate and open states; the open plate is selected
+for the two higher states and its vertical motion is deliberately subtle.
+`NarratorFacialRig` now feeds the same `facialPoseAt()` result into
+`LayeredCharacterRenderer`, so head tilt, eyelids, brows, hair and mouth are
+observed in the actual draw plan rather than only in a returned diagnostic
+object. The official Santa V5 pack and assets are not edited. The crop is now a
+square 560×560 source window at `{ x: 260, y: 0 }`, reducing exposed neck while
+preserving the gold/blue frame.
+
+The close-up diagnostic is available at `/narrator-face-lab.html`. It renders
+before/after evidence, explicit blink and mouth states, head movement and
+individual layer toggles through the shared renderer. To regenerate the MP4
+without synthesizing Kokoro again:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_face_correction_demo.py --overwrite
+```
+
+The resulting MP4, before/after board, measured reports and Inspector output are
+generated under `E:\Fabuloom\workspace\exports\videos`. The correction demo
+reuses the Mission 017 WAV and manifest; word, phoneme and viseme timings remain
+unavailable.
+
 ## Known limits
 
 - Mouth motion is an RMS intensity approximation, not phoneme or viseme
@@ -67,6 +102,8 @@ area. It is evidence for human review, not automatic artistic approval.
 - Captions are synchronized to measured audio segments, not individual words.
 - The office scenario is an original SVG composition and intentionally simple.
 - The facial pack is a controlled crop of Santa V5, not a mesh-deformed head.
+- The V1.1 facial composition is experimental and requires human artistic review;
+  it does not replace the approved Santa V5 source pack.
 - MP4 and WAV files are generated artifacts and must stay in the workspace
   export directory.
 

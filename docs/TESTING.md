@@ -477,3 +477,23 @@ node .\tools\visual-inspector\narrator-mode-report.mjs
 The capture report checks 1920×1080 frames, non-empty opaque samples,
 deterministic differences, the circular facial-only avatar and caption safe
 area. Human review remains required.
+
+## Mission 017.1 — facial correction
+
+The facial correction adds a renderer-path contract test and a no-synthesis
+export that reuses the Mission 017 WAV and measured manifest:
+
+```powershell
+node --test .\frontend\tests\test_narrator_mode.mjs .\frontend\tests\test_layered_character.mjs
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  .\examples\narrator_mode_face_correction_demo.py --overwrite
+node .\tools\visual-inspector\narrator-face-correction-report.mjs
+node .\tools\visual-inspector\qa-gate.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-qa\mission-017.1" `
+  --port 8817 --variant production-v5
+```
+
+Open `/narrator-face-lab.html` through the loopback server for enlarged
+before/after review, explicit blink and mouth states, head movement and layer
+visibility toggles. The face lab and all reports are diagnostic evidence; they
+do not perform artistic approval and do not modify official Santa V5 assets.

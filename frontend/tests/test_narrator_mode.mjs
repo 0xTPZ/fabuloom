@@ -7,9 +7,12 @@ import {
   createNarratorModeDescriptor,
   createNarratorTimeline,
   facialPoseAt,
+  mouthStateAt,
+  NarratorFacialRig,
   segmentAt,
   validateNarratorManifest,
 } from "../src/narrator-mode.mjs";
+import { buildLayerDrawPlan, LayeredCharacterRenderer } from "../src/layered-character.ts";
 
 const manifest = {
   id: "narrator-test",
@@ -51,6 +54,8 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   assert.equal(pack.layers.some((layer) => ["left_hand", "right_hand", "torso"].includes(layer.id)), false);
   assert.equal(pack.layers.find((layer) => layer.id === "neck").parent, null);
   assert.equal(pack.layers.find((layer) => layer.id === "head").parent, "neck");
+  assert.equal(pack.layers.find((layer) => layer.id === "beard").opacity, 0);
+  assert.deepEqual(pack.layers.find((layer) => layer.id === "mouth").size, [0.66, 0.42]);
 });
 
 test("facial motion is deterministic and mouth follows RMS only while playing", () => {
@@ -58,6 +63,35 @@ test("facial motion is deterministic and mouth follows RMS only while playing", 
   assert.equal(facialPoseAt(1800, 0.72, true).mouth_open, 0.72);
   assert.equal(facialPoseAt(1800, 0.72, false).mouth_open, 0);
   assert.ok(facialPoseAt(4300, 0, true).eye_open < 1);
+});
+
+test("NarratorFacialRig feeds the actual draw plan and exposes explicit mouth states", () => {
+  const pack = createNarratorAvatarPack();
+  const rig = new NarratorFacialRig();
+  rig.setSpeechAmplitude(0.82);
+  rig.update(4330, true);
+  const pose = rig.pose();
+  const plan = buildLayerDrawPlan(pack, 1080, 1920, pose);
+  const head = plan.find((entry) => entry.layer.id === "head");
+  const eyelids = plan.find((entry) => entry.layer.id === "eyelids");
+  const mouth = plan.find((entry) => entry.layer.id === "mouth");
+  assert.equal(pose.mouth_open, 0.82);
+  assert.ok(pose.eye_open < 1);
+  assert.ok(Math.abs(head.matrix.b) > 0);
+  assert.equal(eyelids.opacity, 1);
+  assert.ok(mouth.drawHeight > 0);
+  assert.equal(mouthStateAt(0, true), "closed");
+  assert.equal(mouthStateAt(0.2, true), "slight");
+  assert.equal(mouthStateAt(0.5, true), "moderate");
+  assert.equal(mouthStateAt(0.9, true), "open");
+
+  const canvas = { width: 1080, height: 1920, getContext: () => ({}) };
+  const renderer = new LayeredCharacterRenderer(canvas, rig, pack, {
+    assetResolver: (layer, currentPose, expressionAsset) => layer.id === "mouth" && currentPose.mouth_open >= 0.34
+      ? "assets/characters/topazio-narrators-v5/santa/mouth-open.png"
+      : expressionAsset,
+  });
+  assert.equal(renderer.resolvedAsset(pack.layers.find((layer) => layer.id === "mouth")), "assets/characters/topazio-narrators-v5/santa/mouth-open.png");
 });
 
 test("descriptor exposes real segment timing and horizontal export geometry", () => {

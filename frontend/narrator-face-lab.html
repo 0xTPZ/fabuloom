@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fabuloom · laboratório facial do Narrator Mode</title>
+  <style>
+    :root { color-scheme: dark; font-family: Segoe UI, sans-serif; background: #061329; color: #fff7dc; }
+    body { margin: 0; padding: 24px; background: radial-gradient(circle at 70% 10%, #15335b, #061329 60%); }
+    main { max-width: 1260px; margin: 0 auto; }
+    h1 { color: #f7d27a; font-size: 28px; margin: 0 0 6px; }
+    p { color: #b7c5dc; margin: 0 0 16px; }
+    canvas { display: block; width: min(1200px, 100%); height: auto; border: 1px solid #c58c2b; background: #07172e; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 16px 0; }
+    label { color: #d9e5f7; }
+    select, button { color: #fff7dc; background: #0d2342; border: 1px solid #547cad; border-radius: 4px; padding: 6px 9px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #f7d27a; }
+    .layers { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #234a79; }
+    .status { color: #f7d27a; min-height: 1.4em; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Fabuloom · laboratório facial · Narrator Mode V1.1</h1>
+  <p>O painel da direita usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. O painel da esquerda é um quadro real da MISSÃO 017.</p>
+  <div class="controls">
+    <label>Pose:
+      <select id="state">
+        <option value="open">Olhos abertos</option>
+        <option value="blink">Piscada</option>
+        <option value="closed">Boca fechada</option>
+        <option value="open-mouth">Boca aberta</option>
+        <option value="tilt">Cabeça inclinada</option>
+      </select>
+    </label>
+    <label>RMS: <input id="amplitude" type="range" min="0" max="1" step="0.01" value="0.72"></label>
+    <button id="render">Renderizar comparação</button>
+  </div>
+  <div class="layers" id="layers"></div>
+  <canvas id="lab" width="1200" height="900"></canvas>
+  <div class="status" id="status"></div>
+</main>
+<script type="module">
+  import { NarratorAvatarRenderer, createNarratorAvatarPack, mouthStateAt } from "./src/narrator-mode.mjs";
+
+  const canvas = document.querySelector("#lab");
+  const context = canvas.getContext("2d");
+  const status = document.querySelector("#status");
+  const state = document.querySelector("#state");
+  const amplitude = document.querySelector("#amplitude");
+  const source = new Image();
+  source.src = "/exports/videos/.fabuloom-narrator-mode-v1-frames/000240.png";
+  await new Promise((resolve, reject) => { source.onload = resolve; source.onerror = reject; });
+
+  const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: document.baseURI });
+  await avatar.load();
+  const visible = new Set(avatar.pack.layers.map((layer) => layer.id));
+  const layersElement = document.querySelector("#layers");
+  for (const layer of avatar.pack.layers) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox"; input.checked = true; input.dataset.layer = layer.id;
+    input.addEventListener("change", () => { input.checked ? visible.add(layer.id) : visible.delete(layer.id); render(); });
+    label.append(input, ` ${layer.id}`);
+    layersElement.append(label);
+  }
+  avatar.setLayerVisibility((layer) => visible.has(layer.id));
+
+  function settings() {
+    const selected = state.value;
+    if (selected === "blink") return { timeMs: 4330, speechAmplitude: 0.42 };
+    if (selected === "closed") return { timeMs: 1200, speechAmplitude: 0 };
+    if (selected === "open-mouth") return { timeMs: 1800, speechAmplitude: 0.88 };
+    if (selected === "tilt") return { timeMs: 7600, speechAmplitude: 0.46 };
+    return { timeMs: 1800, speechAmplitude: Number(amplitude.value) };
+  }
+
+  function drawPanelTitle(text, x, y) {
+    context.fillStyle = "#f7d27a"; context.font = "700 22px Segoe UI"; context.fillText(text, x, y);
+  }
+
+  function render() {
+    context.fillStyle = "#061329"; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#f7d27a"; context.font = "700 26px Segoe UI"; context.fillText("ANTES · quadro real da MISSÃO 017", 38, 42);
+    context.fillStyle = "#b7c5dc"; context.font = "16px Segoe UI"; context.fillText("placa facial duplicada e pescoço mais exposto", 38, 68);
+    context.save(); context.beginPath(); context.arc(285, 290, 210, 0, Math.PI * 2); context.clip(); context.drawImage(source, 30, 630, 420, 420, 75, 80, 420, 420); context.restore();
+    context.strokeStyle = "#f7d27a"; context.lineWidth = 7; context.beginPath(); context.arc(285, 290, 210, 0, Math.PI * 2); context.stroke();
+
+    context.fillStyle = "#f7d27a"; context.font = "700 26px Segoe UI"; context.fillText("DEPOIS · renderizador real", 660, 42);
+    context.fillStyle = "#b7c5dc"; context.font = "16px Segoe UI"; context.fillText("placa única, boca explícita, crop corrigido", 660, 68);
+    const pose = settings();
+    avatar.renderTo(context, { x: 700, y: 80, size: 420, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0 });
+    drawPanelTitle(`${state.options[state.selectedIndex].text} · boca ${mouthStateAt(pose.speechAmplitude, pose.speechAmplitude > 0)}`, 660, 548);
+    context.fillStyle = "#d9e5f7"; context.font = "16px Segoe UI"; context.fillText(`t=${pose.timeMs} ms · RMS=${pose.speechAmplitude.toFixed(2)} · camada toggles ativos`, 660, 576);
+    context.fillText("Aprovação artística humana continua obrigatória.", 660, 604);
+    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${avatar.pack.layers.length} camadas visíveis`;
+  }
+  document.querySelector("#render").addEventListener("click", render);
+  state.addEventListener("change", render); amplitude.addEventListener("input", render);
+  render();
+</script>
+</body>
+</html>

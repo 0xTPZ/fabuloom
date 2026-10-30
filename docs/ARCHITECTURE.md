@@ -430,3 +430,16 @@ the independent 1920×1080 scenario and caption-safe layout. The capture page
 uses measured WAV segments and the same absolute-time pose rules; FFmpeg only
 encodes captured frames and muxes the real audio. Preview and export therefore
 share one renderer boundary while the full-body Stage remains independent.
+
+### Narrator Mode V1.1 facial correction
+
+Mission 017.1 keeps Narrator Mode as a composition sibling of Character Stage
+and adds a narrow facial correction boundary. `NarratorFacialRig` is the single
+pose source consumed by both `NarratorAvatarRenderer` and the shared
+`LayeredCharacterRenderer`; the renderer exposes optional asset-resolution and
+layer-visibility hooks for diagnostic packs. The corrected narrator pack is
+derived and experimental: it does not mutate Santa V5, uses one lower-face
+plate instead of stacking a complete beard twice, and crops the avatar through
+a square source window. The face lab and correction exporter use that same
+boundary, while the Visual Inspector and Visual QA Gate only provide evidence;
+neither declares artistic approval.
