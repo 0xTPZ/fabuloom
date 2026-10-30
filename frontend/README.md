@@ -95,3 +95,18 @@ foreground bounds, connected components, broad evidence regions and reference
 differences. Historical evaluation writes blind results before post-hoc human
 review; an unavailable multimodal provider is represented explicitly rather
 than simulated.
+
+## Visual QA Gate V1.3
+
+Open `/visual-qa.html` to review a generated `visual-qa-report.json`. The gate
+records the smart capture plan, execution history, before/after images, diff
+masks, overlays, technical status and human review state. Run it with:
+
+```powershell
+node .\tools\visual-inspector\qa-gate.mjs --correction --max-attempts 1
+```
+
+The correction option is an isolated replay of the preserved historical Santa
+V5 head regression against the clean production variant. It does not edit
+official assets. The multimodal provider is currently unavailable and reports
+`not-executed` rather than fabricating an AI result.

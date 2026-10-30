@@ -70,6 +70,12 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   Mission 013.2. Opaque-video segmentation remains heuristic; external model
   execution and final artistic approval remain future work.
 
+- Visual QA Gate V1.3 — deterministic smart frame plans, standard evidence
+  packages, technical gate status, bounded assisted correction with safe
+  rollback, historical Santa V5 replay and a DEV review page implemented in
+  Mission 013.3. Multimodal analysis remains explicitly unavailable/offline;
+  human artistic approval remains required.
+
 ## Later
 
 - Animus integration after its public boundary and license are verified.

@@ -231,7 +231,7 @@ function markdownReport(report) {
 async function main() {
   const args = process.argv.slice(2);
   if (hasArgument(args, "--help")) {
-    console.log("Usage: node tools/visual-inspector/cli.mjs [--output DIR] [--reference PNG] [--port PORT] [--variant production-v5|historical-head-original]");
+    console.log("Usage: node tools/visual-inspector/cli.mjs [--output DIR] [--reference PNG] [--port PORT] [--variant production-v5|historical-head-original] [--plan JSON]");
     return;
   }
   const edge = executablePath();
@@ -240,6 +240,7 @@ async function main() {
   const port = Number(argumentValue(args, "--port", "8786"));
   const referencePath = argumentValue(args, "--reference", null);
   const variant = argumentValue(args, "--variant", "production-v5");
+  const planPath = argumentValue(args, "--plan", null);
   const session = `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
   const captureRoot = path.join(output, "captures");
   const comparisonRoot = path.join(output, "comparisons");
@@ -256,7 +257,9 @@ async function main() {
   try {
     await waitForServer(`http://127.0.0.1:${port}/visual-inspector-capture.html`);
     const captures = [];
-    for (const spec of captureSpecs()) {
+    const selectedSpecs = planPath ? JSON.parse(await readFile(path.resolve(planPath), "utf8")).captures : captureSpecs();
+    if (!Array.isArray(selectedSpecs) || !selectedSpecs.length) throw new TypeError("capture plan must contain a non-empty captures array");
+    for (const spec of selectedSpecs) {
       const screenshotFile = path.join(output, `${spec.name}.png`);
       const params = new URLSearchParams({
         session,
@@ -270,8 +273,20 @@ async function main() {
       if (spec.speechAmplitude) params.set("speechAmplitude", String(spec.speechAmplitude));
       if (variant !== "production-v5") params.set("variant", variant);
       const url = `http://127.0.0.1:${port}/visual-inspector-capture.html?${params}`;
-      const result = await runProcess(edge, ["--headless", "--disable-gpu", "--hide-scrollbars", "--run-all-compositor-stages-before-draw", "--window-size=680,1920", "--virtual-time-budget=7000", `--screenshot=${screenshotFile}`, url], { cwd: studioRoot });
-      const payload = await readJsonEventually(path.join(captureRoot, session, `${spec.name}.json`));
+      let result = null;
+      let payload = null;
+      let lastCaptureError = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        result = await runProcess(edge, ["--headless", "--disable-gpu", "--hide-scrollbars", "--run-all-compositor-stages-before-draw", "--window-size=680,1920", "--virtual-time-budget=7000", `--screenshot=${screenshotFile}`, url], { cwd: studioRoot });
+        try {
+          payload = await readJsonEventually(path.join(captureRoot, session, `${spec.name}.json`));
+          lastCaptureError = null;
+          break;
+        } catch (error) {
+          lastCaptureError = error;
+        }
+      }
+      if (!payload) throw lastCaptureError || new Error(`capture did not produce a completion record: ${spec.name}`);
       if (!payload.frame) {
         captures.push({ ...spec, screenshot: relativePath(output, screenshotFile), error: payload.error || result.stderr || serverError });
         continue;
@@ -354,7 +369,8 @@ async function main() {
         mode: referencePath ? "technical-and-artistic" : "technical-baseline-only",
         note: "The neutral frame detects same-run changes; it is not approval authority.",
       },
-      captures: captures.map((capture) => ({ name: capture.name, mode: capture.mode, timeMs: capture.timeMs, sequence: capture.sequence, screenshot: capture.screenshot, frame: capture.frame || null, error: capture.error || null })),
+      capturePlan: { provided: Boolean(planPath), path: planPath ? path.resolve(planPath) : null, selected: selectedSpecs.map(({ name, mode, timeMs, sequence, reason }) => ({ name, mode, timeMs, sequence: sequence || null, reason: reason || null })) },
+      captures: captures.map((capture) => ({ name: capture.name, mode: capture.mode, timeMs: capture.timeMs, sequence: capture.sequence, reason: capture.reason || null, screenshot: capture.screenshot, frame: capture.frame || null, error: capture.error || null })),
       frameDiagnostics,
       motionDiagnostics,
       comparisons,

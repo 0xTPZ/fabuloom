@@ -161,3 +161,35 @@ node .\tools\visual-inspector\real-cli.mjs `
 
 Para inspeção manual sem o Character Stage, abra
 `http://127.0.0.1:8765/visual-inspector-real.html` e selecione um PNG local.
+
+## Visual QA Gate V1.3
+
+Mission 013.3 adiciona `tools/visual-inspector/qa-gate.mjs` e a página DEV
+`/visual-qa.html`. O gate monta um plano determinístico para Santa V5 com
+início/fim, keyframes, quadros intermediários, extremos, estados faciais,
+contatos e trocas de pose. Cada captura carrega o motivo de sua seleção e é
+produzida pelo mesmo `LayeredCharacterRenderer` usado no palco.
+
+Execução técnica somente:
+
+```powershell
+node .\tools\visual-inspector\qa-gate.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-qa\mission-013.3" `
+  --port 8813
+```
+
+O ciclo experimental de correção histórica compara a variante preservada
+`historical-head-original` com a variante de produção `production-v5`:
+
+```powershell
+node .\tools\visual-inspector\qa-gate.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-qa\mission-013.3" `
+  --port 8813 --correction --max-attempts 1
+```
+
+O ciclo possui limite de tentativas, evidência antes/depois, máscara, overlay,
+estado de reversão e escopo explícito `experimental-historical-replay`. Ele não
+sobrescreve assets oficiais. O pacote `visual-qa-evidence.json` e a interface
+DEV exibem o histórico, os frames selecionados, o gate técnico e a revisão
+artística pendente. Sem um `VisualAnalysisProvider` configurado, o resultado é
+`not-executed`; nenhum modelo ou serviço externo é simulado.

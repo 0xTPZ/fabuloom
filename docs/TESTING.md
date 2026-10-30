@@ -387,3 +387,15 @@ clean facial base, neutral/blink/mouth states, hand neutral/raised/pointing
 states and grounded feet. The screenshot
 `E:\Fabuloom\workspace\exports\santa-v5-visual-integrity.png` is a local QA
 artifact and is not committed.
+
+Mission 013.3 adds deterministic Visual QA plan/evidence/correction tests:
+
+```powershell
+node --test .\frontend\tests\test_visual_qa.mjs
+```
+
+The full gate is local and uses Edge headless plus the loopback server. It
+does not require internet, GPU, a vision model or model weights. Use
+`qa-gate.mjs --correction` only for the documented historical replay; the
+official production pack remains untouched and artistic approval stays pending
+human review.

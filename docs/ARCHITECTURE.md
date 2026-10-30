@@ -394,3 +394,14 @@ answer is synthesized. `visual-inspector-real.html` can inspect a local PNG
 without the active Character Stage. Historical `head.png` replay is allowed
 only through an isolated pack variant; the production V5 pack remains
 unchanged.
+
+### Visual QA Gate V1.3
+
+The QA Gate is an orchestration boundary around the existing Inspector and
+renderer. `qa-plan.mjs` selects meaningful timestamps; `cli.mjs --plan` captures
+them; `qa-report.mjs` validates workspace-contained evidence; and
+`assisted-correction.mjs` limits, validates and reverts isolated attempts.
+`qa-gate.mjs` composes the two variants for the historical Santa V5 case and
+never edits the official pack. The DEV page reads only the generated local
+report and images. A future multimodal adapter may consume the evidence
+contract, but unavailable capability is recorded as `not-executed`.
