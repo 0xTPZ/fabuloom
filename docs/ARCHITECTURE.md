@@ -338,3 +338,23 @@ Inochi2D is promising for specialist 2D deformation but would require a format
 bridge and a separate runtime; Blender is best treated as an offline authoring
 and render option because its armature/Grease Pencil pipeline is heavier than
 the local Stage. None of these tools was installed or used in this mission.
+
+### Visual Inspector V1 013
+
+The Visual Inspector is a read-only QA boundary over the existing Character
+Stage renderer. `visual-inspector-capture.html` runs over the local loopback
+server and calls `SantaV5SceneRenderer` / `LayeredCharacterRenderer`; it does
+not create a simplified FFmpeg animation or open local files directly. Each
+capture posts a versioned frame JSON containing resolved layer matrices,
+intrinsic and alpha bounds, pivots, Z order, landmarks, pose, animation state,
+loaded resources and console/resource errors.
+
+`visual-inspector-core.mjs` keeps diagnostics independent from Santa and
+classifies findings as confirmed errors, advisory warnings, or hypotheses
+when evidence is insufficient. Motion checks compare ordered absolute-time
+landmarks, so seek and out-of-order capture remain deterministic. The CLI
+also creates PNG difference masks and overlays with antialiasing tolerance;
+the built-in comparator avoids adding OpenCV or Pixelmatch as runtime
+dependencies. A DEV page exposes the same renderer, overlays and report
+history but cannot modify source assets. Automatic correction is intentionally
+outside the Inspector boundary and human visual review remains required.

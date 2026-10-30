@@ -203,6 +203,31 @@ The first reference export is a 1080x1920 H.264/AAC MP4. Its captions are
 segment-level captions based on measured audio boundaries; they are not word
 alignment.
 
+## Visual Inspector V1
+
+The Inspector unit tests are dependency-free and include frame-schema
+serialization, known-good Santa V5 evidence, artificial joint gaps, facial
+asset duplication, blink states, insufficient evidence, motion discontinuity,
+deterministic rectangle transforms, and tolerant PNG comparison:
+
+```powershell
+node --test .\frontend\tests\test_visual_inspector.mjs
+```
+
+The first end-to-end inspection uses the same renderer through loopback HTTP:
+
+```powershell
+node .\tools\visual-inspector\cli.mjs `
+  --output "E:\Fabuloom\workspace\exports\visual-inspector\mission-013"
+```
+
+The report is read-only and returns a non-zero correction status only when a
+confirmed error or capture failure is present. Warnings and hypotheses remain
+review states. The comparison baseline is the neutral frame of the same run
+unless an approved PNG is supplied with `--reference`; it is not artistic
+ground truth. Review the generated Markdown, JSON, masks, overlays and the
+DEV page before accepting a visual change.
+
 ## Santa V4 cartoon refinement
 
 Mission 011.1 adds the dependency-free Santa V4 contract and transform tests:

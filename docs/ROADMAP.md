@@ -55,6 +55,10 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   H.264/AAC demonstration implemented in Mission 012.1. Human review remains
   necessary for final cinematic polish; phonetic alignment and a general scene
   editor remain future work.
+- Visual Inspector V1 — deterministic loopback captures, versioned frame
+  evidence, landmark/joint/motion diagnostics, tolerant PNG comparisons and a
+  read-only DEV page implemented in Mission 013. Automatic art correction,
+  external vision models and final artistic approval remain future work.
 
 ## Later
 
