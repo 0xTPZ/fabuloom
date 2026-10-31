@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head><meta charset="utf-8"/><title>Fabuloom cinematic story capture</title><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style></head>
+  <body><canvas id="capture-canvas" width="1920" height="1080"></canvas><pre id="status">initializing</pre>
+    <script type="module">
+      import { NarratorAvatarRenderer, NARRATOR_FACE_CROP, createNarratorTimeline, validateNarratorManifest, segmentAt } from "./src/narrator-mode.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const timelineUrl = params.get("timeline");
+      const fps = Number(params.get("fps") || 30);
+      const canvas = document.querySelector("#capture-canvas");
+      const context = canvas.getContext("2d");
+      const WIDTH = canvas.width; const HEIGHT = canvas.height;
+      const status = document.querySelector("#status");
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+      const ascii = (view, offset, length) => String.fromCharCode(...new Uint8Array(view.buffer, view.byteOffset + offset, length));
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url); if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+        const buffer = await response.arrayBuffer(); const view = new DataView(buffer);
+        if (view.byteLength < 44 || ascii(view, 0, 4) !== "RIFF" || ascii(view, 8, 4) !== "WAVE") throw new Error(`invalid WAV header for ${url}`);
+        let offset = 12; let sampleRate = 0; let channels = 0; let bits = 0; let dataOffset = -1; let dataLength = 0;
+        while (offset + 8 <= view.byteLength) {
+          const id = ascii(view, offset, 4); const length = view.getUint32(offset + 4, true); const start = offset + 8;
+          if (id === "fmt " && length >= 16) { if (view.getUint16(start, true) !== 1) throw new Error("only PCM WAV is supported"); channels = view.getUint16(start + 2, true); sampleRate = view.getUint32(start + 4, true); bits = view.getUint16(start + 14, true); }
+          else if (id === "data") { dataOffset = start; dataLength = Math.min(length, view.byteLength - start); }
+          offset = start + length + (length % 2);
+        }
+        if (sampleRate <= 0 || channels !== 1 || bits !== 16 || dataOffset < 0) throw new Error(`capture requires mono PCM-16 WAV: ${url}`);
+        const samples = new Float32Array(Math.floor(dataLength / 2)); for (let i = 0; i < samples.length; i += 1) samples[i] = view.getInt16(dataOffset + i * 2, true) / 32768;
+        return { sampleRate, samples };
+      }
+
+      function exportUrl(value) {
+        const normalized = decodeURIComponent(String(value)).replaceAll("\\", "/");
+        const marker = "/workspace/exports/"; const index = normalized.toLowerCase().indexOf(marker);
+        if (index < 0) throw new Error(`asset is outside workspace exports: ${value}`);
+        const relative = normalized.slice(index + marker.length).replace(/^\/+/, "");
+        const parts = relative.split("/"); if (!relative || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe export asset: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function composeSamples(manifest, wavs, sampleRate) { const total = Math.max(1, Math.round(manifest.duration_ms * sampleRate / 1000)); const samples = new Float32Array(total); for (const [index, segment] of manifest.segments.entries()) { const start = Math.max(0, Math.round(segment.start_ms * sampleRate / 1000)); if (start < total) samples.set(wavs[index].samples.subarray(0, total - start), start); } return samples; }
+      function makeRmsReader(samples, sampleRate) { const half = Math.max(1, Math.round(sampleRate * .018)); return (timeMs) => { const center = Math.round(timeMs / 1000 * sampleRate); const start = Math.max(0, center - half); const end = Math.min(samples.length, center + half); if (end <= start) return 0; let sum = 0; for (let i = start; i < end; i += 1) sum += samples[i] * samples[i]; return Math.max(0, Math.min(1, (Math.sqrt(sum / (end - start)) - .012) * 7)); }; }
+      function clamp(value, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
+      function coverImage(image, timeMs, scene, alpha) {
+        const progress = clamp((timeMs - scene.start_ms) / Math.max(1, scene.end_ms - scene.start_ms));
+        const base = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+        let zoom = 1; let panX = 0; let panY = 0;
+        if (scene.camera === "progressive_zoom") zoom = 1 + progress * 0.085;
+        if (scene.camera === "crystal_pulse") zoom = 1 + progress * 0.10;
+        if (scene.camera === "lateral_pan") { zoom = 1.045; panX = (-0.08 + progress * 0.16); panY = progress * 0.015; }
+        const scale = base * zoom; const width = image.naturalWidth * scale; const height = image.naturalHeight * scale;
+        const x = (WIDTH - width) / 2 + panX * Math.max(0, width - WIDTH); const y = (HEIGHT - height) / 2 + panY * Math.max(0, height - HEIGHT);
+        context.save(); context.globalAlpha = alpha; context.drawImage(image, x, y, width, height);
+        if (scene.camera === "crystal_pulse") { const pulse = (Math.sin(progress * Math.PI * 6) + 1) / 2; const glow = context.createRadialGradient(WIDTH * .62, HEIGHT * .43, 30, WIDTH * .62, HEIGHT * .43, 510); glow.addColorStop(0, `rgba(66,150,255,${0.06 + pulse * .12})`); glow.addColorStop(1, "rgba(66,150,255,0)"); context.fillStyle = glow; context.fillRect(0, 0, WIDTH, HEIGHT); }
+        if (scene.camera === "lateral_pan") { const darken = 0.12 + progress * 0.22; context.fillStyle = `rgba(0,3,12,${darken})`; context.fillRect(0, 0, WIDTH, HEIGHT); }
+        context.restore();
+      }
+      function sceneWeight(timeMs, scene, index, scenes, fadeMs) { if (timeMs < scene.start_ms - fadeMs / 2 || timeMs > scene.end_ms + fadeMs / 2) return 0; let value = 1; if (index > 0 && timeMs < scene.start_ms + fadeMs / 2) value = Math.min(value, (timeMs - scene.start_ms + fadeMs / 2) / fadeMs); if (index < scenes.length - 1 && timeMs > scene.end_ms - fadeMs / 2) value = Math.min(value, (scene.end_ms + fadeMs / 2 - timeMs) / fadeMs); return clamp(value); }
+      function wrap(text, maxWidth) { const words = String(text).split(/\s+/); const lines = []; let line = ""; context.font = "600 30px Segoe UI"; for (const word of words) { const candidate = line ? `${line} ${word}` : word; if (line && context.measureText(candidate).width > maxWidth) { lines.push(line); line = word; } else line = candidate; } if (line) lines.push(line); return lines; }
+      function drawSubtitle(segment) { if (!segment) return; const x = 1210; const y = 846; const width = 1320; const lines = wrap(segment.text, width - 60); const height = lines.length * 42 + 34; context.save(); context.fillStyle = "rgba(3,12,28,.82)"; context.fillRect(x - width / 2, y - 20, width, height); context.strokeStyle = "rgba(247,210,122,.8)"; context.lineWidth = 2; context.strokeRect(x - width / 2, y - 20, width, height); context.fillStyle = "#fff7dc"; context.textAlign = "center"; context.textBaseline = "top"; lines.forEach((line, index) => context.fillText(line, x, y + index * 42)); context.restore(); }
+      async function sendFrame(index, timeMs) { const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG encoding failed")), "image/png")); const response = await fetch(`/capture/${encodeURIComponent(session)}/${String(index).padStart(6, "0")}.png`, { method: "POST", headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`); }
+
+      async function main() {
+        if (!session || !timelineUrl) fail("session and timeline are required"); if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps");
+        const timelineResponse = await fetch(timelineUrl); if (!timelineResponse.ok) fail(`timeline request failed with HTTP ${timelineResponse.status}`); const plan = await timelineResponse.json();
+        const manifestResponse = await fetch(`/exports/${plan.manifest}`); if (!manifestResponse.ok) fail(`manifest request failed with HTTP ${manifestResponse.status}`); const manifest = await manifestResponse.json(); validateNarratorManifest(manifest);
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(exportUrl(segment.audio_uri)))); const sampleRate = wavs[0].sampleRate; if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
+        const amplitudeAt = makeRmsReader(composeSamples(manifest, wavs, sampleRate));
+        const images = {}; for (const scene of plan.scenes) { const image = document.createElement("img"); image.src = `/exports/${scene.image}`; await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`scene image failed: ${scene.image}`)); }); images[scene.id] = image; }
+        const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href }); await avatar.load();
+        const timeline = createNarratorTimeline(manifest); const frameCount = Math.ceil(manifest.duration_ms / 1000 * fps); const fadeMs = plan.transition_ms;
+        for (let index = 0; index < frameCount; index += 1) {
+          const timeMs = Math.round(index * 1000 / fps); context.clearRect(0, 0, WIDTH, HEIGHT); context.fillStyle = "#030914"; context.fillRect(0, 0, WIDTH, HEIGHT);
+          plan.scenes.forEach((scene, sceneIndex) => { const weight = sceneWeight(timeMs, scene, sceneIndex, plan.scenes, fadeMs); if (weight > 0) coverImage(images[scene.id], timeMs, scene, weight); });
+          const titleAlpha = clamp(Math.min((2500 - timeMs) / 800, 1)); if (titleAlpha > 0) { context.save(); context.globalAlpha = titleAlpha; context.fillStyle = "rgba(3,12,28,.7)"; context.fillRect(82, 74, 780, 118); context.fillStyle = "#f7d27a"; context.font = "700 42px Segoe UI"; context.fillText("O Último Cristal de Arenhast", 120, 120); context.fillStyle = "#dcecff"; context.font = "22px Segoe UI"; context.fillText("FABULOOM CINEMATIC STORY TEST", 120, 163); context.restore(); }
+          avatar.renderTo(context, { x: 74, y: 674, size: 318, timeMs, speechAmplitude: amplitudeAt(timeMs), isPlaying: true, crop: NARRATOR_FACE_CROP });
+          drawSubtitle(segmentAt(timeline, timeMs));
+          context.fillStyle = "rgba(247,210,122,.92)"; context.font = "20px Segoe UI"; context.textAlign = "right"; context.fillText("SANTA · pm_santa · pt-BR", WIDTH - 76, 60); context.fillStyle = "rgba(255,255,255,.75)"; context.font = "18px Segoe UI"; context.fillText("TOPAZIOVERSE ARCHIVES", WIDTH - 76, 88); context.textAlign = "left";
+          await sendFrame(index, timeMs);
+        }
+        const completion = { mode: "cinematic-story-test-v1", voice_id: manifest.metadata?.voice_id || "pm_santa", language: "pt-BR", duration_ms: manifest.duration_ms, sample_rate: sampleRate, canvas: { width: WIDTH, height: HEIGHT }, fps, frame_count: frameCount, timing_source: "measured_wav_segments", mouth_source: "pcm16_rms_envelope", captions: "measured_segment_ranges", scene_schedule: plan.scenes, transition_ms: fadeMs, word_phoneme_viseme_timing: "unavailable" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) }); if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>

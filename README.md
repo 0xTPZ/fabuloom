@@ -142,3 +142,10 @@ Santa V5 assets and V1.3 facial alignment remain unchanged. The no-synthesis
 V1.4 MP4 and before/after, enlarged transition, asset and color-map evidence
 are generated under `workspace\exports\videos`; artistic approval remains
 human.
+
+Mission 018 adds the reproducible Cinematic Story Test V1. It reuses the
+Narrator Mode V1.4 avatar, real Kokoro `pm_santa` audio, measured segment
+timing, three original scene backgrounds, deterministic Canvas camera effects,
+and FFmpeg export. Generated media remains outside Git under
+`workspace\exports`; see `docs/CINEMATIC-STORY-TEST.md` for reproduction and
+the FilmCraft/EffectCraft audit boundary.
