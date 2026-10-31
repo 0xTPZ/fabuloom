@@ -5,6 +5,8 @@ import {
   ALEX_NARRATOR_PACK_CARTOON_V1,
   DORA_NARRATOR_PACK_CARTOON_V1,
   TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1,
+  TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES,
+  validateCartoonFrameProfile,
 } from "../src/topazio-narrator-packs-cartoon-v1.mjs";
 
 const root = new URL("../", import.meta.url);
@@ -40,4 +42,27 @@ test("cartoon packs use one identity base and compact explicit mouth states", ()
       assert.match(svg, /stroke=/);
     }
   }
+});
+
+test("cartoon framing profiles preserve square assets and keep facial states in the head frame", () => {
+  for (const [character, pack] of [["dora", DORA_NARRATOR_PACK_CARTOON_V1], ["alex", ALEX_NARRATOR_PACK_CARTOON_V1]]) {
+    const profile = TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES[character];
+    assert.deepEqual(pack.framing.base_size, profile.base_size);
+    assert.deepEqual(pack.framing.base_position, profile.base_position);
+    assert.equal(pack.framing.asset_aspect_preserved, true);
+    assert.ok(Math.abs(profile.base_size[0] * (1080 / 1920) - profile.base_size[1]) < 1e-9);
+    const head = pack.layers.find((layer) => layer.id === "head");
+    const mouth = pack.layers.find((layer) => layer.id === "mouth");
+    const eyelids = pack.layers.find((layer) => layer.id === "eyelids");
+    assert.deepEqual(head.size, profile.base_size);
+    assert.deepEqual(head.position, profile.base_position);
+    assert.equal(mouth.parent, "head");
+    assert.deepEqual(mouth.position, profile.mouth_position);
+    assert.deepEqual(mouth.size, profile.mouth_scale);
+    assert.deepEqual(eyelids.position, profile.eyelids_position);
+    assert.deepEqual(eyelids.size, profile.eyelids_scale);
+  }
+  assert.throws(() => validateCartoonFrameProfile({
+    base_size: [1.2, 0.3], base_position: [0.5, 0.2], mouth_position: [0.5, 0.5], mouth_scale: [1, 1], eyelids_position: [0.5, 0.5], eyelids_scale: [1, 1],
+  }), /cartoon base_size/);
 });
