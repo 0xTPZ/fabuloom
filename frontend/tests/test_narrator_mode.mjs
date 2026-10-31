@@ -98,7 +98,7 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   assert.ok(pack.layers.find((layer) => layer.id === "mouth").size[1] > 0.5);
 });
 
-test("official Dora and Alex use their own V4 art-reforge sources while Santa keeps V5", () => {
+test("official Dora and Alex use facial recovery sources while Santa keeps V5", () => {
   const dora = createOfficialNarratorAvatarPack("dora");
   const alex = createOfficialNarratorAvatarPack("alex");
   const santa = createOfficialNarratorAvatarPack("santa");
@@ -110,10 +110,12 @@ test("official Dora and Alex use their own V4 art-reforge sources while Santa ke
   assert.match(dora.art_status, /awaiting-art-approval/);
   assert.match(alex.art_status, /awaiting-art-approval/);
   assert.match(santa.art_status, /production-face/);
-  assert.match(dora.art_status, /art-reforge-v4-experimental-awaiting-art-approval/);
-  assert.match(alex.art_status, /art-reforge-v4-experimental-awaiting-art-approval/);
+  assert.match(dora.art_status, /facial-system-recovery-v1-experimental-awaiting-art-approval/);
+  assert.match(alex.art_status, /facial-system-recovery-v1-experimental-awaiting-art-approval/);
   assert.match(dora.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v4\/dora\/head-clean\.png$/);
   assert.match(alex.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v4\/alex\/head-clean\.png$/);
+  assert.match(dora.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-recovery-v1\/dora\/mouth-closed\.svg$/);
+  assert.match(alex.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-recovery-v1\/alex\/mouth-closed\.svg$/);
   assert.deepEqual(dora.layers.map((layer) => layer.id), ["head", "eyelids", "mouth"]);
   assert.deepEqual(alex.layers.map((layer) => layer.id), ["head", "eyelids", "mouth"]);
   assert.match(santa.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v5\/santa\/head-clean\.png$/);

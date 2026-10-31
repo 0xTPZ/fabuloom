@@ -9,7 +9,7 @@
 
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
-import { TOPAZIO_NARRATOR_PACKS_V4 } from "./topazio-narrator-packs-v4.mjs";
+import { TOPAZIO_NARRATOR_PACKS_RECOVERY_V1 } from "./topazio-narrator-packs-recovery-v1.mjs";
 import { validateCharacterPack } from "./character-pack.mjs";
 
 export const NARRATOR_MODE_FORMAT = "fabuloom.narrator-mode/0.1";
@@ -97,8 +97,8 @@ const FACE_LAYER_IDS = new Set([
 const FACE_ORDER = ["hair_back", "neck", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"];
 const OFFICIAL_NARRATOR_SOURCE_PACKS = Object.freeze({
   santa: SANTA_V5_PACK,
-  dora: TOPAZIO_NARRATOR_PACKS_V4.dora,
-  alex: TOPAZIO_NARRATOR_PACKS_V4.alex,
+  dora: TOPAZIO_NARRATOR_PACKS_RECOVERY_V1.dora,
+  alex: TOPAZIO_NARRATOR_PACKS_RECOVERY_V1.alex,
 });
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -295,10 +295,11 @@ export function avatarCircleBounds(width, height, options = {}) {
 
 export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
-  if (sourcePack.art_status === "art-reforge-v4-experimental-awaiting-art-approval") {
-    // V4 packs are already authored in the narrator-local coordinate system.
-    // Do not apply the historical Santa alpha-alignment heuristics to them:
-    // their facial plates intentionally use explicit per-layer transforms.
+  if (sourcePack.visual_contract === "fabuloom.narrator-visual-contract/0.1"
+    || sourcePack.visual_contract === "fabuloom.narrator-facial-recovery/0.1") {
+    // Official narrator packs are authored in a narrator-local coordinate
+    // system. Do not apply Santa's historical alpha heuristics to them:
+    // their facial plates use explicit per-layer transforms.
     return Object.freeze(validateCharacterPack(sourcePack));
   }
   const isSantaV5 = sourcePack.id === SANTA_V5_PACK.id;

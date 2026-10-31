@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom · Mouth Recovery Lab</title>
+    <style>
+      :root { color-scheme: dark; font-family: "Segoe UI", sans-serif; background: #061329; color: #fff7dc; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 50% 20%, #163b70, #061329 68%); }
+      main { display: grid; gap: 16px; justify-items: center; padding: 24px; }
+      canvas { width: min(72vw, 640px); height: auto; border: 2px solid #f7d27a; border-radius: 20px; background: #081a35; }
+      nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+      button { border: 1px solid #f7d27a; border-radius: 999px; padding: 8px 14px; color: #fff7dc; background: #102b52; cursor: pointer; }
+      button[aria-pressed="true"] { background: #72512b; }
+      #status { margin: 0; color: #9fc8ff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Protótipo mínimo · boca facial</h1>
+      <canvas id="lab-canvas" width="640" height="720"></canvas>
+      <nav id="states" aria-label="Estados da boca"></nav>
+      <p id="status">carregando renderer compartilhado…</p>
+    </main>
+    <script type="module">
+      import { createMouthRecoveryRenderer, MOUTH_RECOVERY_STATES, renderMouthRecoveryState } from "./src/mouth-recovery-lab.mjs";
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const canvas = document.querySelector("#lab-canvas");
+      const status = document.querySelector("#status");
+      const buttons = document.querySelector("#states");
+      const renderer = createMouthRecoveryRenderer(canvas);
+      const labels = { closed: "fechada", slight: "leve", moderate: "moderada", open: "aberta", smile: "sorriso" };
+      let current = "closed";
+      for (const state of MOUTH_RECOVERY_STATES) {
+        const button = document.createElement("button");
+        button.textContent = labels[state]; button.dataset.state = state; button.setAttribute("aria-pressed", String(state === current));
+        button.onclick = () => { current = state; for (const other of buttons.children) other.setAttribute("aria-pressed", String(other.dataset.state === state)); renderMouthRecoveryState(renderer, state, 0); status.textContent = `estado: ${labels[state]}`; };
+        buttons.append(button);
+      }
+      const send = async (index, state) => {
+        renderMouthRecoveryState(renderer, state, index * 1000 / 30);
+        const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG encoding failed")), "image/png"));
+        const response = await fetch(`/capture/${encodeURIComponent(session)}/${String(index).padStart(6, "0")}.png`, { method: "POST", headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(index * 1000 / 30) }, body: blob });
+        if (!response.ok) throw new Error(`frame upload failed: ${response.status}`);
+      };
+      async function capture() {
+        const framesPerState = 12;
+        for (let stateIndex = 0; stateIndex < MOUTH_RECOVERY_STATES.length; stateIndex += 1) {
+          for (let hold = 0; hold < framesPerState; hold += 1) await send(stateIndex * framesPerState + hold, MOUTH_RECOVERY_STATES[stateIndex]);
+        }
+        const completion = { mode: "mouth-recovery-lab-v1", states: MOUTH_RECOVERY_STATES, fps: 30, frame_count: framesPerState * MOUTH_RECOVERY_STATES.length, canvas: { width: canvas.width, height: canvas.height }, renderer: "LayeredCharacterRenderer", timing_source: "deterministic_state_sequence" };
+        const response = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });
+        if (!response.ok) throw new Error(`completion upload failed: ${response.status}`);
+        status.textContent = "captura concluída";
+      }
+      try { await renderer.load(); renderMouthRecoveryState(renderer, current, 0); status.textContent = session ? "capturando…" : "estado: fechada"; if (session) await capture(); }
+      catch (error) { status.textContent = `erro: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: error.message, stack: error.stack }) }).catch(() => {}); }
+    </script>
+  </body>
+</html>
