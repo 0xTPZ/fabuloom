@@ -117,3 +117,10 @@ and real before/after visual evidence. Artistic approval remains human and the
 official pack remains preserved.
 
 Core contract details and invariants are documented in `docs/CONTRACTS.md`. Test instructions are in `docs/TESTING.md`.
+
+Mission 017.2 finalizes the Narrator Mode avatar framing. Real alpha-bound
+measurement replaced the clipped V1.1 source window with a bounded 590×590
+crop at `{ x: 245, y: 35 }` and an explicit normalized face safe area. The
+browser lab exposes offset, zoom, safe-area and reset controls through the same
+renderer used by export. The no-synthesis V1.2 MP4 and visual evidence remain
+outside Git under `workspace\exports\videos`; artistic approval remains human.

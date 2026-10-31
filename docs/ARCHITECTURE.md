@@ -443,3 +443,15 @@ plate instead of stacking a complete beard twice, and crops the avatar through
 a square source window. The face lab and correction exporter use that same
 boundary, while the Visual Inspector and Visual QA Gate only provide evidence;
 neither declares artistic approval.
+
+### Narrator Mode V1.2 final avatar framing
+
+Mission 017.2 changes only the source-window contract at the narrator renderer
+boundary. The real transformed alpha bounds are measured before choosing the
+approved square crop `{ x: 245, y: 35, width: 590, height: 590 }`; the
+normalized safe area is `{ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 }`.
+`adjustNarratorFaceCrop()` is the shared deterministic path for lab controls and
+offline capture. It clamps offset/zoom changes to the 1080×1920 source canvas,
+while `renderTo({ crop })` makes the selected window explicit instead of
+duplicating composition logic in the exporter. Official Santa V5 assets remain
+the source of truth and generated media remains outside Git.

@@ -1,15 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  adjustNarratorFaceCrop,
   NARRATOR_CANVAS,
+  NARRATOR_FACE_CROP,
+  NARRATOR_FACE_SAFE_AREA,
   avatarCircleBounds,
   createNarratorAvatarPack,
   createNarratorModeDescriptor,
   createNarratorTimeline,
+  faceSafeAreaForCrop,
   facialPoseAt,
   mouthStateAt,
   NarratorFacialRig,
   segmentAt,
+  validateNarratorFaceCrop,
+  validateNarratorFaceSafeArea,
   validateNarratorManifest,
 } from "../src/narrator-mode.mjs";
 import { buildLayerDrawPlan, LayeredCharacterRenderer } from "../src/layered-character.ts";
@@ -46,6 +52,22 @@ test("avatar circle is contained and its defaults are horizontal Narrator Mode s
   assert.equal(bounds.right <= NARRATOR_CANVAS.width, true);
   assert.equal(bounds.bottom <= NARRATOR_CANVAS.height, true);
   assert.throws(() => avatarCircleBounds(100, 100, { x: 80, y: 0, size: 30 }), /inside/);
+});
+
+test("facial crop and safe area are square, bounded and deterministic", () => {
+  assert.deepEqual(NARRATOR_FACE_CROP, { x: 245, y: 35, width: 590, height: 590 });
+  assert.deepEqual(validateNarratorFaceCrop(NARRATOR_FACE_CROP), NARRATOR_FACE_CROP);
+  assert.deepEqual(validateNarratorFaceSafeArea(NARRATOR_FACE_SAFE_AREA), NARRATOR_FACE_SAFE_AREA);
+  const safe = faceSafeAreaForCrop();
+  assert.ok(safe.left > NARRATOR_FACE_CROP.x && safe.top > NARRATOR_FACE_CROP.y);
+  assert.ok(safe.right < NARRATOR_FACE_CROP.x + NARRATOR_FACE_CROP.width);
+  assert.ok(safe.bottom < NARRATOR_FACE_CROP.y + NARRATOR_FACE_CROP.height);
+  assert.throws(() => validateNarratorFaceCrop({ x: 0, y: 0, width: 500, height: 480 }), /square/);
+  assert.throws(() => validateNarratorFaceCrop({ x: 600, y: 0, width: 600, height: 600 }), /source canvas/);
+  const adjusted = adjustNarratorFaceCrop(NARRATOR_FACE_CROP, { offsetX: 24, offsetY: -18, zoom: 1.12 });
+  assert.deepEqual(adjusted, adjustNarratorFaceCrop(NARRATOR_FACE_CROP, { offsetX: 24, offsetY: -18, zoom: 1.12 }));
+  assert.equal(adjusted.width, adjusted.height);
+  assert.ok(adjusted.x >= 0 && adjusted.y >= 0);
 });
 
 test("Santa face pack contains only facial layers and uses head-local hierarchy", () => {

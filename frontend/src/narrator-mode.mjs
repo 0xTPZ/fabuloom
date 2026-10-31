@@ -16,7 +16,9 @@ export const NARRATOR_SCENE_FORMAT = "fabuloom.narrator-scene/0.1";
 export const NARRATOR_FPS = 30;
 export const NARRATOR_CANVAS = Object.freeze({ width: 1920, height: 1080 });
 export const NARRATOR_AVATAR_DEFAULT = Object.freeze({ x: 74, y: 676, size: 330, borderWidth: 8 });
-export const NARRATOR_FACE_CROP = Object.freeze({ x: 260, y: 0, width: 560, height: 560 });
+export const NARRATOR_SOURCE_CANVAS = Object.freeze({ width: 1080, height: 1920 });
+export const NARRATOR_FACE_CROP = Object.freeze({ x: 245, y: 35, width: 590, height: 590 });
+export const NARRATOR_FACE_SAFE_AREA = Object.freeze({ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 });
 
 const FACE_LAYER_IDS = new Set([
   "neck", "hair_back", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth",
@@ -27,6 +29,55 @@ const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(va
 
 function assertPositiveInteger(value, label) {
   if (!Number.isInteger(value) || value <= 0) throw new TypeError(`${label} must be a positive integer`);
+}
+
+function assertUnitInterval(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) throw new TypeError(`${label} must be in [0,1]`);
+}
+
+export function validateNarratorFaceCrop(crop = NARRATOR_FACE_CROP) {
+  if (!crop || typeof crop !== "object") throw new TypeError("face crop must be an object");
+  const values = [crop.x, crop.y, crop.width, crop.height];
+  if (!values.every((value) => Number.isFinite(value))) throw new TypeError("face crop must contain finite values");
+  if (crop.width <= 0 || crop.height <= 0 || crop.width !== crop.height) throw new TypeError("face crop must be a positive square");
+  if (crop.x < 0 || crop.y < 0 || crop.x + crop.width > NARRATOR_SOURCE_CANVAS.width || crop.y + crop.height > NARRATOR_SOURCE_CANVAS.height) {
+    throw new RangeError("face crop must stay inside the narrator source canvas");
+  }
+  return Object.freeze({ x: crop.x, y: crop.y, width: crop.width, height: crop.height });
+}
+
+export function validateNarratorFaceSafeArea(safeArea = NARRATOR_FACE_SAFE_AREA) {
+  if (!safeArea || typeof safeArea !== "object") throw new TypeError("face safe area must be an object");
+  for (const [key, value] of Object.entries(safeArea)) assertUnitInterval(value, `face safe area ${key}`);
+  if (safeArea.left >= safeArea.right || safeArea.top >= safeArea.bottom) throw new TypeError("face safe area must have positive dimensions");
+  return Object.freeze({ left: safeArea.left, top: safeArea.top, right: safeArea.right, bottom: safeArea.bottom });
+}
+
+export function faceSafeAreaForCrop(crop = NARRATOR_FACE_CROP, safeArea = NARRATOR_FACE_SAFE_AREA) {
+  const validCrop = validateNarratorFaceCrop(crop);
+  const validSafeArea = validateNarratorFaceSafeArea(safeArea);
+  return Object.freeze({
+    left: validCrop.x + validCrop.width * validSafeArea.left,
+    top: validCrop.y + validCrop.height * validSafeArea.top,
+    right: validCrop.x + validCrop.width * validSafeArea.right,
+    bottom: validCrop.y + validCrop.height * validSafeArea.bottom,
+    width: validCrop.width * (validSafeArea.right - validSafeArea.left),
+    height: validCrop.height * (validSafeArea.bottom - validSafeArea.top),
+  });
+}
+
+export function adjustNarratorFaceCrop(crop = NARRATOR_FACE_CROP, options = {}) {
+  const base = validateNarratorFaceCrop(crop);
+  const zoom = Number(options.zoom ?? 1);
+  const offsetX = Number(options.offsetX ?? 0);
+  const offsetY = Number(options.offsetY ?? 0);
+  if (![zoom, offsetX, offsetY].every(Number.isFinite) || zoom <= 0) throw new TypeError("face framing values must be finite and zoom must be positive");
+  const size = base.width / zoom;
+  const centerX = base.x + base.width / 2 + offsetX;
+  const centerY = base.y + base.height / 2 + offsetY;
+  const x = Math.max(0, Math.min(NARRATOR_SOURCE_CANVAS.width - size, centerX - size / 2));
+  const y = Math.max(0, Math.min(NARRATOR_SOURCE_CANVAS.height - size, centerY - size / 2));
+  return validateNarratorFaceCrop({ x, y, width: size, height: size });
 }
 
 export function validateNarratorManifest(manifest) {
@@ -176,8 +227,8 @@ export class NarratorAvatarRenderer {
     if (!canvas || typeof canvas.getContext !== "function") throw new TypeError("a target canvas is required");
     this.canvas = canvas;
     this.sourceCanvas = options.sourceCanvas || document.createElement("canvas");
-    this.sourceCanvas.width = 1080;
-    this.sourceCanvas.height = 1920;
+    this.sourceCanvas.width = NARRATOR_SOURCE_CANVAS.width;
+    this.sourceCanvas.height = NARRATOR_SOURCE_CANVAS.height;
     this.pack = options.pack || createNarratorAvatarPack();
     this.rig = options.rig || new NarratorFacialRig();
     const mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
@@ -191,7 +242,7 @@ export class NarratorAvatarRenderer {
           : mouthOpenAsset;
       },
     });
-    this.crop = Object.freeze(options.crop || NARRATOR_FACE_CROP);
+    this.crop = validateNarratorFaceCrop(options.crop || NARRATOR_FACE_CROP);
     this.visibleLayers = null;
     this.loaded = false;
   }
@@ -206,6 +257,7 @@ export class NarratorAvatarRenderer {
   renderTo(context, options = {}) {
     if (!this.loaded) throw new Error("narrator avatar assets are not loaded");
     const bounds = avatarCircleBounds(this.canvas.width, this.canvas.height, options);
+    const crop = validateNarratorFaceCrop(options.crop || this.crop);
     this.renderer.renderFrame({ timeMs: options.timeMs, speechAmplitude: options.speechAmplitude, isPlaying: options.isPlaying });
     const radius = bounds.size / 2;
     context.save();
@@ -214,7 +266,7 @@ export class NarratorAvatarRenderer {
     context.clip();
     context.fillStyle = "#07172e";
     context.fillRect(bounds.x, bounds.y, bounds.size, bounds.size);
-    context.drawImage(this.sourceCanvas, this.crop.x, this.crop.y, this.crop.width, this.crop.height, bounds.x, bounds.y, bounds.size, bounds.size);
+    context.drawImage(this.sourceCanvas, crop.x, crop.y, crop.width, crop.height, bounds.x, bounds.y, bounds.size, bounds.size);
     context.restore();
     context.save();
     context.beginPath();
