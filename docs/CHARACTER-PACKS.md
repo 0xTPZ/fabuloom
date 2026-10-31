@@ -293,3 +293,10 @@ Mission 015 records the actual alpha bounds of the source and derived PNGs in
 `workspace/exports/visual-qa/mission-015/`. Godot `Skeleton2D`, `Polygon2D`,
 Inochi2D and Blender were checked for local executables; none was available,
 so no mesh-deformation proof was executed and no tool was installed.
+## MISSÃO 023.3 — recuperação do sistema facial
+
+O renderer agora pré-carrega assets declarados em mapas `facial_states`, evitando
+que uma troca de boca por RMS selecione uma imagem ainda ausente e deixe a camada
+invisível. Dora e Alex recebem packs experimentais `facial-system-recovery-v1`
+com bocas SVG vetoriais no mesmo canvas facial. V2, V3 e V4 continuam preservados;
+Santa V5 permanece a referência e o gate segue `AWAITING_ART_APPROVAL`.

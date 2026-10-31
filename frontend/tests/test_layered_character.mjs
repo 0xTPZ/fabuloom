@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FANTASY_NARRATOR_PACK } from "../src/fantasy-narrator-pack.mjs";
 import { validateCharacterPack } from "../src/character-pack.mjs";
-import { buildLayerDrawPlan, frameSchedule, LayeredCharacterRenderer, LayeredCharacterRig } from "../src/layered-character.ts";
+import { buildLayerDrawPlan, collectCharacterAssetPaths, frameSchedule, LayeredCharacterRenderer, LayeredCharacterRig } from "../src/layered-character.ts";
 
 test("fantasy narrator pack validates and resolves layered transforms", () => {
   validateCharacterPack(FANTASY_NARRATOR_PACK);
@@ -96,6 +96,24 @@ test("transparent renderer option is explicit and preserves default stage backgr
   const transparentRenderer = new LayeredCharacterRenderer(canvas, new LayeredCharacterRig(), FANTASY_NARRATOR_PACK, { renderBackground: false });
   assert.equal(defaultRenderer.renderBackground, true);
   assert.equal(transparentRenderer.renderBackground, false);
+});
+
+test("renderer asset collection includes every declared facial state", () => {
+  const pack = {
+    ...FANTASY_NARRATOR_PACK,
+    facial_states: {
+      mouth: {
+        closed: "assets/test/mouth-closed.svg",
+        slight: "assets/test/mouth-slight.svg",
+        moderate: "assets/test/mouth-moderate.svg",
+        open: "assets/test/mouth-open.svg",
+        smile: "assets/test/mouth-smile.svg",
+      },
+    },
+  };
+  const paths = collectCharacterAssetPaths(pack);
+  for (const path of Object.values(pack.facial_states.mouth)) assert.ok(paths.includes(path));
+  assert.equal(new Set(paths).size, paths.length);
 });
 
 test("frame schedule is deterministic and bounded", () => {

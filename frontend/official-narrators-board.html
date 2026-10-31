@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Fabuloom · Official Narrators V4 · Art Gate</title>
+    <title>Fabuloom · Official Narrators · Facial Recovery 023.3</title>
     <style>
       :root { color-scheme: dark; font: 14px/1.4 "Segoe UI", sans-serif; }
       body { margin: 0; background: #061329; color: #edf4ff; }
@@ -31,19 +31,19 @@
   </head>
   <body>
     <header>
-      <h1>Fabuloom · Official Narrators · V4 Art Reforge</h1>
+      <h1>Fabuloom · Official Narrators · Facial Recovery 023.3</h1>
       <p>Prancha de comparação renderizada pelo mesmo <code>NarratorAvatarRenderer</code> usado no Studio.</p>
       <span class="gate">AWAITING_ART_APPROVAL</span>
     </header>
     <main>
       <section class="reference" aria-label="Referências de identidade visual">
         <figure><img src="/assets/characters/topazio-narrators/santa.png" alt="Retrato de referência de Santa V5" /><figcaption>Santa V5<small>referência aprovada · pm_santa</small></figcaption></figure>
-        <figure><img src="/assets/characters/topazio-narrators-v4/dora/head-clean.png" alt="Arte V4 de Dora" /><figcaption>Dora V4<small>base frontal animável · pf_dora</small></figcaption></figure>
-        <figure><img src="/assets/characters/topazio-narrators-v4/alex/head-clean.png" alt="Arte V4 de Alex" /><figcaption>Alex V4<small>base frontal animável · pm_alex</small></figcaption></figure>
+        <figure><img src="/assets/characters/topazio-narrators-v4/dora/head-clean.png" alt="Base preservada de Dora" /><figcaption>Dora · Recovery 023.3<small>boca vetorial no mesmo canvas · pf_dora</small></figcaption></figure>
+        <figure><img src="/assets/characters/topazio-narrators-v4/alex/head-clean.png" alt="Base preservada de Alex" /><figcaption>Alex · Recovery 023.3<small>boca vetorial no mesmo canvas · pm_alex</small></figcaption></figure>
         <figure><img src="/assets/characters/topazio-narrators/santa.png" alt="Santa V5 preservado" /><figcaption>Preservação<small>Santa V5 não foi substituído nesta missão</small></figcaption></figure>
       </section>
       <section id="board" class="board" aria-label="Estados faciais renderizados"></section>
-      <p class="status">Dora V4 e Alex V4 seguem a linguagem estilizada do Santa V5, com rostos frontais e bases sem boca para receber placas faciais alinhadas. O mesmo NarratorAvatarRenderer resolve estados de boca fechada, leve, aberta e sorriso, além de piscada, cabeça e respiração. V2/V3 permanecem disponíveis para compatibilidade; a aprovação artística humana continua necessária antes de qualquer estado de produção.</p>
+      <p class="status">Dora e Alex usam as cabeças V4 preservadas e estados de boca vetoriais no mesmo canvas. O mesmo NarratorAvatarRenderer pré-carrega e resolve boca fechada, leve, moderada, aberta e sorriso, além de piscada, cabeça e respiração. V2/V3/V4 permanecem disponíveis para compatibilidade; a aprovação artística humana continua necessária.</p>
     </main>
     <script type="module">
       import { NarratorAvatarRenderer } from "./src/narrator-mode.mjs";
@@ -81,7 +81,7 @@
           avatar.renderTo(canvas.getContext("2d"), { x: 56, y: 44, size: 540, timeMs, speechAmplitude: amplitude, isPlaying });
         }
       }
-      document.title = "AWAITING_ART_APPROVAL · Official Narrators V4";
+      document.title = "AWAITING_ART_APPROVAL · Facial Recovery 023.3";
     </script>
   </body>
 </html>

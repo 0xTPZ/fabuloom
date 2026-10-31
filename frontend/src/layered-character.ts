@@ -33,6 +33,28 @@ function sourceSizeFor(layer, assetSizes) {
   return assetSizes.get(layer.asset) || layer.source_size || [1024, 1024];
 }
 
+function collectAssetStrings(value, assets) {
+  if (typeof value === "string") {
+    assets.add(value);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const child of Object.values(value)) collectAssetStrings(child, assets);
+}
+
+/**
+ * Return every declared sprite path, including stateful facial assets.
+ * Facial state maps are data-only and must be loaded before a resolver can
+ * switch to them; otherwise a valid state can silently render no pixels.
+ */
+export function collectCharacterAssetPaths(pack) {
+  validateCharacterPack(pack);
+  const assets = new Set(pack.layers.map((layer) => layer.asset));
+  for (const expression of pack.expressions) collectAssetStrings(expression.overrides, assets);
+  collectAssetStrings(pack.facial_states, assets);
+  return Object.freeze([...assets]);
+}
+
 function layerRotation(layer, pack, pose) {
   let rotation = 0;
   if (pack.bindings.head_rotation === layer.id) rotation += pose.head_rotation;
@@ -224,11 +246,7 @@ export class LayeredCharacterRenderer {
   }
 
   async load() {
-    const assets = new Set(this.pack.layers.map((layer) => layer.asset));
-    for (const expression of this.pack.expressions) {
-      for (const asset of Object.values(expression.overrides)) assets.add(asset);
-    }
-    await Promise.all([...assets].map((asset) => this.loadImage(asset)));
+    await Promise.all(collectCharacterAssetPaths(this.pack).map((asset) => this.loadImage(asset)));
     this.loaded = true;
     return this;
   }
@@ -333,7 +351,10 @@ export class LayeredCharacterRenderer {
     for (const plan of plans) {
       if (this.layerVisibility && !this.layerVisibility(plan.layer, this.rig.pose())) continue;
       const asset = this.resolvedAsset(plan.layer);
-      const record = this.images.get(asset);
+      // A resolver may select a state dynamically. If an external pack
+      // returns an undeclared or failed state asset, preserve the base layer
+      // instead of silently erasing the face.
+      const record = this.images.get(asset) || this.images.get(plan.layer.asset);
       if (!record?.image) continue;
       ctx.save();
       const matrix = plan.matrix;
