@@ -316,3 +316,19 @@ packs; Santa V5 and all previous V2/V3/V4/recovery packs remain available.
 path. The art gate is still `AWAITING_ART_APPROVAL`; RMS is an intensity-based
 mouth approximation, not phoneme or viseme alignment. See
 `docs/CHARACTER-ART-CONSISTENCY-023.4.md` for evidence and output paths.
+
+## MISSÃO 023.4.1 — framing facial por pack
+
+Os assets cartoon quadrados de Dora e Alex são renderizados no canvas-fonte
+1080×1920 com perfis explícitos em
+`TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES`. O campo `base_size` preserva a
+proporção física (`[0.68, 0.3825]`) e `base_position` mantém cabelo, queixo,
+gola e ombros dentro do `NARRATOR_FACE_CROP`. Boca e pálpebras continuam filhas
+da cabeça e recebem escala/posição do mesmo perfil; isso evita que uma
+calibração local quebre a sincronização de rotação, respiração, piscada ou RMS.
+
+O laboratório DEV é `frontend/facial-framing-lab.html` e a prancha reproduzível
+é `frontend/facial-framing-state-board.html`. A evidência da missão fica em
+`workspace/exports/videos/facial-framing-v1/`; vídeos e áudios não são
+versionados. Santa V5 continua sendo referência preservada. Consulte
+`docs/FACIAL-FRAMING-023.4.1.md` para os valores, diagnóstico e limitações.

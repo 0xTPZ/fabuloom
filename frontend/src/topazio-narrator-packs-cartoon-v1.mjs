@@ -23,13 +23,72 @@ export const TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1 = Object.freeze({
 
 const ROOT = "assets/characters/topazio-narrators-cartoon-v1";
 const SOURCE_SIZE = Object.freeze([...TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1.source_size]);
-const BASE_SIZE = Object.freeze([0.68, 0.68]);
-const BASE_POSITION = Object.freeze([0.5, 0.32]);
+export const TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS = Object.freeze([1080, 1920]);
+
+// The narrator source canvas is 1080x1920 while the cartoon head assets are
+// square.  A single normalized value for both axes stretched the face
+// vertically before it reached the circular crop.  These profiles keep the
+// rendered square square and are deliberately pack-local: the shared
+// renderer and Santa V5 framing remain unchanged.
+export const TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES = Object.freeze({
+  dora: Object.freeze({
+    base_size: Object.freeze([0.68, 0.3825]),
+    base_position: Object.freeze([0.5, 0.205]),
+    mouth_position: Object.freeze([0.5, 0.5]),
+    mouth_scale: Object.freeze([1, 1]),
+    eyelids_position: Object.freeze([0.5, 0.5]),
+    eyelids_scale: Object.freeze([1, 1]),
+  }),
+  alex: Object.freeze({
+    base_size: Object.freeze([0.68, 0.3825]),
+    base_position: Object.freeze([0.5, 0.205]),
+    mouth_position: Object.freeze([0.5, 0.5]),
+    mouth_scale: Object.freeze([1, 1]),
+    eyelids_position: Object.freeze([0.5, 0.5]),
+    eyelids_scale: Object.freeze([1, 1]),
+  }),
+});
+
+function unit(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new TypeError(`${label} must be in [0,1]`);
+  }
+}
+
+function normalizedPoint(value, label) {
+  if (!Array.isArray(value) || value.length !== 2) throw new TypeError(`${label} must be a 2D point`);
+  value.forEach((item) => unit(item, label));
+  return Object.freeze([...value]);
+}
+
+function positivePoint(value, label) {
+  const result = normalizedPoint(value, label);
+  if (result.some((item) => item <= 0)) throw new TypeError(`${label} must be positive`);
+  return result;
+}
+
+export function validateCartoonFrameProfile(profile) {
+  if (!profile || typeof profile !== "object") throw new TypeError("cartoon frame profile must be an object");
+  const baseSize = positivePoint(profile.base_size, "cartoon base_size");
+  const expectedHeight = baseSize[0] * TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS[0] / TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS[1];
+  if (Math.abs(expectedHeight - baseSize[1]) > 0.005) throw new RangeError("cartoon base_size must preserve the square asset aspect");
+  return Object.freeze({
+    base_size: baseSize,
+    base_position: normalizedPoint(profile.base_position, "cartoon base_position"),
+    mouth_position: normalizedPoint(profile.mouth_position, "cartoon mouth_position"),
+    mouth_scale: positivePoint(profile.mouth_scale, "cartoon mouth_scale"),
+    eyelids_position: normalizedPoint(profile.eyelids_position, "cartoon eyelids_position"),
+    eyelids_scale: positivePoint(profile.eyelids_scale, "cartoon eyelids_scale"),
+  });
+}
+
+for (const profile of Object.values(TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES)) validateCartoonFrameProfile(profile);
 
 function point(value) { return Object.freeze([...value]); }
 function asset(character, name) { return `${ROOT}/${character}/${name}`; }
 
 function createPack({ id, name, character, voice_id }) {
+  const frame = validateCartoonFrameProfile(TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES[character]);
   const states = Object.freeze({
     closed: asset(character, "mouth-closed.svg"),
     slight: asset(character, "mouth-slight.svg"),
@@ -54,7 +113,20 @@ function createPack({ id, name, character, voice_id }) {
       source_size: point(SOURCE_SIZE),
       head_pivot: point([0.5, 0.5]),
       mouth_center: point([0.5, character === "dora" ? 0.52 : 0.53]),
-      mouth_scale: point([1, 1]),
+      mouth_scale: point(frame.mouth_scale),
+    }),
+    framing: Object.freeze({
+      format: "fabuloom.narrator-cartoon-framing/0.1",
+      source_canvas: TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS,
+      asset_aspect_preserved: true,
+      base_size: frame.base_size,
+      base_position: frame.base_position,
+      head_pivot: point([0.5, 0.5]),
+      mouth_position: frame.mouth_position,
+      mouth_scale: frame.mouth_scale,
+      eyelids_position: frame.eyelids_position,
+      eyelids_scale: frame.eyelids_scale,
+      visible_frame: "NARRATOR_FACE_CROP",
     }),
     facial_states: Object.freeze({ mouth: states }),
     layers: [
@@ -64,8 +136,8 @@ function createPack({ id, name, character, voice_id }) {
         asset: base,
         parent: null,
         anchor: point([0.5, 0.5]),
-        position: point(BASE_POSITION),
-        size: point(BASE_SIZE),
+        position: frame.base_position,
+        size: frame.base_size,
         source_size: point(SOURCE_SIZE),
         z: 0,
       },
@@ -75,8 +147,8 @@ function createPack({ id, name, character, voice_id }) {
         asset: eyelids,
         parent: "head",
         anchor: point([0.5, 0.5]),
-        position: point([0.5, 0.5]),
-        size: point([1, 1]),
+        position: frame.eyelids_position,
+        size: frame.eyelids_scale,
         source_size: point(SOURCE_SIZE),
         z: 1,
       },
@@ -86,8 +158,8 @@ function createPack({ id, name, character, voice_id }) {
         asset: states.closed,
         parent: "head",
         anchor: point([0.5, 0.5]),
-        position: point([0.5, 0.5]),
-        size: point([0.9, 0.9]),
+        position: frame.mouth_position,
+        size: frame.mouth_scale,
         source_size: point(SOURCE_SIZE),
         mouth_motion: "subtle",
         z: 2,
