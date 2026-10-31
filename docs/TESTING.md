@@ -612,3 +612,35 @@ manifest with `examples/cinematic_story_lipsync_demo.py`. It writes a five-state
 mouth board, V1/V1.1 comparison and lower-face difference crop, then validates
 the corrected MP4 with FFprobe and a complete FFmpeg decode. The evidence does
 not treat changing hair, eyes or scenery as lip-sync proof.
+
+## Mission 020 — official promo
+
+Mission 020 adds dependency-free profile validation for the official promo:
+
+```powershell
+node --test .\frontend\tests\test_official_promo_profile.mjs
+```
+
+The full frontend suite includes these three tests. The completed run for this
+mission passed 125 Node tests. The Python suite passed 35 tests with one
+opt-in real-model test skipped:
+
+```powershell
+node --test .\frontend\tests\*.mjs
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+python -m unittest discover -s tests -p 'test_*.py'
+```
+
+The real promo export is reproducible with:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+python .\examples\official_promo_demo.py --reuse-manifest --overwrite
+```
+
+The export validates both MP4s with FFprobe and a complete FFmpeg decode. The
+profile validator confirms the six-scene schedule, safe relative paths,
+measured segment IDs, subtitle overflow policy, `pm_santa`/pt-BR selection and
+explicit export codecs. The existing Visual Inspector can produce the
+evidence-only report described in `docs/OFFICIAL-PROMO.md`; it is not an
+artistic approval gate.

@@ -165,3 +165,11 @@ generated media remains outside Git. See
 `docs/VERTICAL-CINEMATIC-STORY.md` for reproduction and Visual Inspector
 evidence. The profile explicitly records that word/phoneme/viseme timing is not
 available and that final artistic review remains human.
+
+Mission 020 adds the first official Fabuloom Studio promo pipeline. It uses the
+real local Character Stage capture, Kokoro `pm_santa`, six measured scenes,
+original procedural music/SFX and two vertical exports: a main version with
+music and a TikTok-ready version without music. The generated MP4s and
+evidence remain outside Git under `workspace\exports`. See
+`docs/OFFICIAL-PROMO.md` for reproduction, claims, licensing boundaries and
+the evidence-only inspection command.
