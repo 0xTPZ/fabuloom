@@ -19,6 +19,42 @@ export const NARRATOR_AVATAR_DEFAULT = Object.freeze({ x: 74, y: 676, size: 330,
 export const NARRATOR_SOURCE_CANVAS = Object.freeze({ width: 1080, height: 1920 });
 export const NARRATOR_FACE_CROP = Object.freeze({ x: 245, y: 35, width: 590, height: 590 });
 export const NARRATOR_FACE_SAFE_AREA = Object.freeze({ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 });
+export const NARRATOR_FACE_REFERENCE = Object.freeze({
+  width: 1316,
+  height: 1195,
+  coordinateSystem: "head-local-v1",
+  landmarks: Object.freeze({
+    headCenter: Object.freeze({ x: 658, y: 598 }),
+    leftEye: Object.freeze({ x: 526, y: 540 }),
+    rightEye: Object.freeze({ x: 790, y: 540 }),
+    nose: Object.freeze({ x: 658, y: 650 }),
+    glasses: Object.freeze({ x: 658, y: 540 }),
+    brows: Object.freeze({ x: 658, y: 390 }),
+    moustache: Object.freeze({ x: 658, y: 710 }),
+    mouth: Object.freeze({ x: 658, y: 785 }),
+    beardBase: Object.freeze({ x: 658, y: 1035 }),
+  }),
+});
+
+// Measured alpha bounds in each official facial PNG. These values are used to
+// position the painted pixels, not the transparent bitmap rectangles.
+export const NARRATOR_FACE_ALPHA_BOUNDS = Object.freeze({
+  "hair-front.png": Object.freeze([111, 78, 1425, 921]),
+  "eyes-open.png": Object.freeze([196, 279, 1579, 627]),
+  "eyelids-closed.png": Object.freeze([243, 291, 1609, 673]),
+  "brows.png": Object.freeze([133, 310, 1643, 612]),
+  "glasses.png": Object.freeze([51, 444, 1270, 781]),
+  "mouth-closed.png": Object.freeze([270, 255, 1263, 884]),
+});
+
+export const NARRATOR_FACE_ALPHA_TARGETS = Object.freeze({
+  hair_front: Object.freeze([95, 25, 1220, 820]),
+  eyes: Object.freeze([400, 460, 930, 620]),
+  eyelids: Object.freeze([400, 460, 930, 620]),
+  brows: Object.freeze([390, 330, 930, 450]),
+  glasses: Object.freeze([360, 430, 960, 650]),
+  mouth: Object.freeze([350, 625, 970, 1045]),
+});
 
 const FACE_LAYER_IDS = new Set([
   "neck", "hair_back", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth",
@@ -78,6 +114,42 @@ export function adjustNarratorFaceCrop(crop = NARRATOR_FACE_CROP, options = {}) 
   const x = Math.max(0, Math.min(NARRATOR_SOURCE_CANVAS.width - size, centerX - size / 2));
   const y = Math.max(0, Math.min(NARRATOR_SOURCE_CANVAS.height - size, centerY - size / 2));
   return validateNarratorFaceCrop({ x, y, width: size, height: size });
+}
+
+function faceAssetName(asset) {
+  return String(asset || "").split(/[\\/]/).pop();
+}
+
+function alignLayerAlphaToHead(layer, targetBounds) {
+  const assetName = faceAssetName(layer.asset);
+  const sourceBounds = NARRATOR_FACE_ALPHA_BOUNDS[assetName];
+  if (!sourceBounds || !targetBounds) return layer;
+  const [sourceLeft, sourceTop, sourceRight, sourceBottom] = sourceBounds;
+  const [targetLeft, targetTop, targetRight, targetBottom] = targetBounds;
+  const sourceWidth = sourceRight - sourceLeft;
+  const sourceHeight = sourceBottom - sourceTop;
+  const targetWidth = targetRight - targetLeft;
+  const targetHeight = targetBottom - targetTop;
+  const intrinsic = assetName === "eyes-open.png" || assetName === "brows.png"
+    ? (assetName === "eyes-open.png" ? [1774, 887] : [1774, 887])
+    : assetName === "eyelids-closed.png" ? [1851, 850]
+      : assetName === "glasses.png" || assetName === "mouth-open.png" ? [1316, 1195]
+        : assetName === "mouth-closed.png" ? [1536, 1024]
+          : [1536, 1024];
+  const scaleX = targetWidth / sourceWidth;
+  const scaleY = targetHeight / sourceHeight;
+  const sourceCenterX = (sourceLeft + sourceRight) / 2;
+  const sourceCenterY = (sourceTop + sourceBottom) / 2;
+  const targetCenterX = (targetLeft + targetRight) / 2;
+  const targetCenterY = (targetTop + targetBottom) / 2;
+  layer.size = [intrinsic[0] * scaleX / NARRATOR_FACE_REFERENCE.width, intrinsic[1] * scaleY / NARRATOR_FACE_REFERENCE.height];
+  layer.position = [
+    (targetCenterX + (intrinsic[0] / 2 - sourceCenterX) * scaleX) / NARRATOR_FACE_REFERENCE.width,
+    (targetCenterY + (intrinsic[1] / 2 - sourceCenterY) * scaleY) / NARRATOR_FACE_REFERENCE.height,
+  ];
+  layer.face_coordinate_system = NARRATOR_FACE_REFERENCE.coordinateSystem;
+  layer.face_alpha_target = [...targetBounds];
+  return layer;
 }
 
 export function validateNarratorManifest(manifest) {
@@ -184,13 +256,14 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
       if (copy.id === "neck") { copy.parent = null; copy.position = [0.5, 0.34]; }
       else if (copy.id === "hair_back") { copy.parent = "head"; copy.position = [0.5, 0.32]; copy.size = [0.98, 0.82]; }
       else if (copy.id !== "head") copy.parent = "head";
+      if (copy.id === "hair_front" || copy.id === "eyes" || copy.id === "eyelids" || copy.id === "brows" || copy.id === "glasses" || copy.id === "mouth") {
+        alignLayerAlphaToHead(copy, NARRATOR_FACE_ALPHA_TARGETS[copy.id]);
+      }
       if (composition === "corrected" && copy.id === "beard") copy.opacity = 0;
       if (composition === "corrected" && copy.id === "mouth") {
         // The approved V5 mouth PNGs are complete lower-face plates (they
         // contain the moustache and beard as well as the lips). Use one plate
         // at the beard scale instead of stacking two copies of the beard.
-        copy.position = [0.5, 0.77];
-        copy.size = [0.66, 0.42];
         copy.mouth_motion = "subtle";
       }
       return copy;
@@ -204,7 +277,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
     name: "Santa V5 · avatar facial do Narrator Mode",
     voice_id: sourcePack.voice_id,
     language: sourcePack.language,
-    art_status: composition === "corrected" ? "production-face-crop-v1.1-experimental-composition" : "production-face-crop-v1",
+    art_status: composition === "corrected" ? "production-face-aligned-v1.3-experimental-composition" : "production-face-crop-v1",
     layers,
     expressions: sourcePack.expressions.map((expression) => ({
       id: expression.id,

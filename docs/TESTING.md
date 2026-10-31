@@ -519,3 +519,24 @@ facial states, the safe-area overlay and the JSON/Markdown Visual Inspector
 report. The Inspector checks pixels and structure; it does not grant artistic
 approval. The audio and manifest are reused, so no Kokoro synthesis is required
 for this validation.
+
+## Mission 017.3 — face alignment
+
+The face-alignment change is covered by head-local landmark/alpha-target
+contracts and the existing renderer tests:
+
+```powershell
+node --test .\frontend\tests\test_narrator_mode.mjs
+node --test .\frontend\tests\*.mjs
+python -m pytest -q
+node .\tools\visual-inspector\narrator-face-alignment-report.mjs
+```
+
+The alignment report samples neutral, head motion, blink and open-mouth frames,
+compares V1.2 and V1.3 at equivalent timestamps, checks 1920×1080 opaque
+frames, and records the `head-local-v1` landmarks and measured alpha bounds.
+The browser lab must be opened through `frontend/server.py`; it uses the same
+renderer/export path, displays a static `head.png` reference and keeps layer
+toggles available. The no-synthesis export reuses the Mission 017 WAV and
+manifest. Technical evidence and the optional QA Gate never replace human
+artistic review.

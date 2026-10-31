@@ -124,6 +124,44 @@ The V1.2 render reuses the Mission 017 WAV and manifest. Human artistic review
 is still required; the framing change does not create word, phoneme or viseme
 timestamps.
 
+## Face alignment V1.3
+
+Mission 017.3 corrects the internal facial composition instead of changing the
+crop. The derived narrator pack defines a `head-local-v1` coordinate system
+based on the intrinsic `head-clean.png` frame (1316×1195). It records explicit
+landmarks for the eyes, glasses, brows, nose, moustache, mouth and beard base.
+
+The official PNGs have different transparent margins and intrinsic sizes. Their
+measured alpha bounds are now aligned to explicit target boxes in head-local
+coordinates before normalized layer transforms are generated. This prevents a
+transparent bitmap rectangle from being mistaken for the painted feature
+position. The official Santa V5 pack and source assets remain unchanged; the
+Narrator Mode composition is marked experimental.
+
+The face lab now exposes the actual renderer draw plan with a local coordinate
+grid, landmarks, measured-alpha target boxes, effective pivots, static
+`head.png` reference, before/after frame and individual layer toggles. It uses
+the same `NarratorAvatarRenderer` path as capture/export. The alignment report
+is generated with:
+
+```powershell
+node E:\Fabuloom\studio\tools\visual-inspector\narrator-face-alignment-report.mjs
+```
+
+The no-synthesis demo reuses the Mission 017 WAV and manifest:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_face_alignment_demo.py --overwrite
+```
+
+The V1.3 MP4, before/after board, pose board, reference board, layer board and
+JSON/Markdown inspection report are workspace artifacts under
+`E:\Fabuloom\workspace\exports\videos`. RMS remains an intensity-based mouth
+approximation; word, phoneme and viseme timestamps are still unavailable.
+Pixels and technical checks are evidence only. Artistic approval remains a
+human review step.
+
 ## Known limits
 
 - Mouth motion is an RMS intensity approximation, not phoneme or viseme

@@ -455,3 +455,22 @@ offline capture. It clamps offset/zoom changes to the 1080×1920 source canvas,
 while `renderTo({ crop })` makes the selected window explicit instead of
 duplicating composition logic in the exporter. Official Santa V5 assets remain
 the source of truth and generated media remains outside Git.
+
+### Narrator Mode V1.3 face alignment
+
+Mission 017.3 adds an internal composition boundary between measured facial
+asset pixels and the shared layered renderer. `NARRATOR_FACE_REFERENCE` defines
+the `head-local-v1` intrinsic coordinate system and stable facial landmarks.
+`NARRATOR_FACE_ALPHA_BOUNDS` records the measured non-transparent bounds of the
+official PNGs, while `NARRATOR_FACE_ALPHA_TARGETS` describes where those pixels
+belong in the clean head frame. `createNarratorAvatarPack()` converts each
+target into normalized layer position/size values; it does not modify the
+source assets or add a second renderer.
+
+The face lab visualizes the resolved `head` matrix, target boxes and actual
+layer pivots. The V1.3 export reuses `NarratorAvatarRenderer`, the Mission 017
+WAV/manifest and the existing FFmpeg path. The visual-inspector report records
+real rendered PNG metrics and before/after differences, but its technical gate
+cannot declare artistic approval. The current coordinate targets are an
+experimental composition under human review and must not be treated as a
+general facial-rig editor contract until approved.
