@@ -173,3 +173,10 @@ music and a TikTok-ready version without music. The generated MP4s and
 evidence remain outside Git under `workspace\exports`. See
 `docs/OFFICIAL-PROMO.md` for reproduction, claims, licensing boundaries and
 the evidence-only inspection command.
+
+Mission 021 adds the official Fabuloom Studio UI shell. The loopback server now
+opens a local-first Dashboard with project, script, scenes, narrator, audio,
+preview and export views. Santa V5 Narrator Mode V1.4 is the main narrator
+reference, while the historical Character Stage and diagnostic laboratories
+remain available under an explicit DEV area. See `docs/UI-REFORGE.md` for the
+audit matrix, compatibility boundary, captures and known limits.

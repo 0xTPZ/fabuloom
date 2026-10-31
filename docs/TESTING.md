@@ -644,3 +644,22 @@ measured segment IDs, subtitle overflow policy, `pm_santa`/pt-BR selection and
 explicit export codecs. The existing Visual Inspector can produce the
 evidence-only report described in `docs/OFFICIAL-PROMO.md`; it is not an
 artistic approval gate.
+
+## Mission 021 — Studio UI Reforge
+
+The new shell contract is tested without a browser or model:
+
+```powershell
+node --test .\frontend\tests\test_studio_config.mjs
+```
+
+For a real local browser check, start the loopback server and open `/`. The
+root route is now `studio.html`; the old Character Stage remains available at
+`/index.html` and is linked from the Area DEV. Verify the Dashboard, Narrators,
+Scenes, Preview and DEV routes. The Preview must eventually show the measured
+`pm_santa` manifest and its segment list; an initial loading state while local
+WAVs decode is expected.
+
+The UI Reforge run passed 128 frontend Node tests and 35 Python tests with one
+existing opt-in real-Kokoro test skipped. This mission does not add a new
+exporter or require network access, GPU or model installation.
