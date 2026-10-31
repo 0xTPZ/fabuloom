@@ -38,21 +38,22 @@
     <main>
       <section class="reference" aria-label="Referências de identidade visual">
         <figure><img src="/assets/characters/topazio-narrators/santa.png" alt="Retrato de referência de Santa V5" /><figcaption>Santa V5<small>referência aprovada · pm_santa</small></figcaption></figure>
-        <figure><img src="/assets/characters/topazio-narrators/dora.png" alt="Retrato de referência de Dora" /><figcaption>Dora<small>retrato V1 · referência de identidade · pf_dora</small></figcaption></figure>
-        <figure><img src="/assets/characters/topazio-narrators/alex.png" alt="Retrato de referência de Alex" /><figcaption>Alex<small>retrato V1 · referência de identidade · pm_alex</small></figcaption></figure>
+        <figure><img src="/assets/characters/topazio-narrators-v3/dora/head-clean.png" alt="Arte V3 de Dora" /><figcaption>Dora V3<small>arte refeita · referência de identidade · pf_dora</small></figcaption></figure>
+        <figure><img src="/assets/characters/topazio-narrators-v3/alex/head-clean.png" alt="Arte V3 de Alex" /><figcaption>Alex V3<small>arte refeita · referência de identidade · pm_alex</small></figcaption></figure>
         <figure><img src="/assets/characters/topazio-narrators/santa.png" alt="Santa V5 preservado" /><figcaption>Preservação<small>Santa V5 não foi substituído nesta missão</small></figcaption></figure>
       </section>
       <section id="board" class="board" aria-label="Estados faciais renderizados"></section>
-      <p class="status">Dora e Alex usam os packs V2 técnicos para provar a ligação visual+voz no rig compartilhado. Os retratos V1 acima não são usados como substituto da animação. A aprovação artística humana continua necessária antes de qualquer estado de produção.</p>
+      <p class="status">Dora V3 e Alex V3 usam bases ilustradas cinematicamente com placas faciais V3 alinhadas no rig compartilhado. A base pintada não é substituída por um retrato estático durante a fala: boca e pálpebras são camadas reais, enquanto cabeça e respiração seguem o mesmo relógio determinístico. A aprovação artística humana continua necessária antes de qualquer estado de produção.</p>
     </main>
     <script type="module">
       import { NarratorAvatarRenderer } from "./src/narrator-mode.mjs";
 
       const states = [
-        ["Neutro", 0, 0, false],
-        ["Sorriso / fala RMS", 1800, 0.78, true],
-        ["Piscada", 4300, 0, false],
-        ["Cabeça em movimento", 6200, 0.24, true],
+        ["Neutro", 0, 0, false, "neutral"],
+        ["Sorriso", 0, 0, false, "smile"],
+        ["Boca aberta / RMS", 1800, 0.78, true, "neutral"],
+        ["Piscada", 4300, 0, false, "neutral"],
+        ["Cabeça em movimento", 6200, 0.24, true, "neutral"],
       ];
       const narrators = [
         ["santa", "Santa V5", "pm_santa"],
@@ -66,7 +67,7 @@
         card.innerHTML = `<h2>${name}</h2><p>${voice} · pt-BR · rig facial compartilhado</p><div class="states"></div>`;
         const statesRoot = card.querySelector(".states");
         board.append(card);
-        for (const [label, timeMs, amplitude, isPlaying] of states) {
+        for (const [label, timeMs, amplitude, isPlaying, expression] of states) {
           const figure = document.createElement("figure");
           const canvas = document.createElement("canvas");
           canvas.width = 640; canvas.height = 640;
@@ -75,6 +76,7 @@
           figure.append(canvas, caption); statesRoot.append(figure);
           const avatar = new NarratorAvatarRenderer(canvas, { characterId: id, assetRoot: new URL("./", location.href).href });
           await avatar.load();
+          avatar.renderer.setExpression(expression);
           avatar.renderTo(canvas.getContext("2d"), { x: 56, y: 44, size: 540, timeMs, speechAmplitude: amplitude, isPlaying });
         }
       }

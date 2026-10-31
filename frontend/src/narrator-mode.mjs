@@ -9,7 +9,7 @@
 
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
-import { TOPAZIO_NARRATOR_PACKS_V2 } from "./topazio-narrator-packs.mjs";
+import { TOPAZIO_NARRATOR_PACKS_V3 } from "./topazio-narrator-packs-v3.mjs";
 import { validateCharacterPack } from "./character-pack.mjs";
 
 export const NARRATOR_MODE_FORMAT = "fabuloom.narrator-mode/0.1";
@@ -97,8 +97,8 @@ const FACE_LAYER_IDS = new Set([
 const FACE_ORDER = ["hair_back", "neck", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"];
 const OFFICIAL_NARRATOR_SOURCE_PACKS = Object.freeze({
   santa: SANTA_V5_PACK,
-  dora: TOPAZIO_NARRATOR_PACKS_V2.dora,
-  alex: TOPAZIO_NARRATOR_PACKS_V2.alex,
+  dora: TOPAZIO_NARRATOR_PACKS_V3.dora,
+  alex: TOPAZIO_NARRATOR_PACKS_V3.alex,
 });
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -299,6 +299,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
   const composition = options.composition || "corrected";
   const showNeckPixels = options.showNeckPixels === true;
   const showBeardPixels = options.showBeardPixels === true;
+  const isArtReforgeV3 = sourcePack.art_status === "art-reforge-v3-experimental-awaiting-art-approval";
   const layers = sourcePack.layers
     .filter((layer) => FACE_LAYER_IDS.has(layer.id))
     .map((layer) => {
@@ -330,6 +331,14 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
     })
     .sort((left, right) => FACE_ORDER.indexOf(left.id) - FACE_ORDER.indexOf(right.id))
     .map((layer, index) => ({ ...layer, z: index }));
+  const bindings = {
+    head_rotation: "head",
+    eye_open: "eyelids",
+    mouth_open: "mouth",
+  };
+  if (layers.some((layer) => layer.id === "hair_front")) bindings.hair_sway = "hair_front";
+  else if (layers.some((layer) => layer.id === "head")) bindings.hair_sway = "head";
+  if (layers.some((layer) => layer.id === "brows")) bindings.brow_raise = "brows";
   const pack = {
     format: "fabuloom.character/0.1",
     rig_profile: sourcePack.rig_profile,
@@ -339,7 +348,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
     language: sourcePack.language,
     art_status: sourcePack.id === SANTA_V5_PACK.id
       ? (composition === "corrected" ? "production-face-aligned-v1.4-neck-fix-experimental-composition" : "production-face-crop-v1")
-      : "technical-layered-prototype-awaiting-art-approval",
+      : (isArtReforgeV3 ? sourcePack.art_status : "technical-layered-prototype-awaiting-art-approval"),
     anatomy_boundary: isSantaV5 && composition === "corrected" ? "head-clean-collar-v1.4" : "source-pack-boundary",
     anatomy_notes: isSantaV5 && composition === "corrected" ? "neck node retained as structural parent; neck pixels hidden because head-clean owns the visible collar boundary" : undefined,
     layers,
@@ -347,13 +356,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
       id: expression.id,
       overrides: Object.fromEntries(Object.entries(expression.overrides).filter(([id]) => FACE_LAYER_IDS.has(id))),
     })),
-    bindings: {
-      head_rotation: "head",
-      eye_open: "eyelids",
-      mouth_open: "mouth",
-      hair_sway: "hair_front",
-      brow_raise: "brows",
-    },
+    bindings,
   };
   validateCharacterPack(pack);
   return Object.freeze(pack);

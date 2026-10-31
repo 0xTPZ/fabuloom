@@ -8,7 +8,7 @@ Nenhum merge automático foi realizado.
 
 ## Auditoria dos assets
 
-Foram encontrados dois níveis para Dora e Alex:
+Foram encontrados três níveis para Dora e Alex:
 
 - `frontend/assets/characters/topazio-narrators/dora.png` e `alex.png`: retratos
   V1 transparentes, visualmente consistentes com o uniforme azul-marinho, azul
@@ -17,6 +17,11 @@ Foram encontrados dois níveis para Dora e Alex:
   com camadas SVG locais para cabeça, cabelo, olhos, pálpebras, sobrancelhas,
   boca, tronco, braços, antebraços, mãos e acessório. São uma base técnica
   reutilizável, ainda não arte final cinematográfica.
+- `frontend/assets/characters/topazio-narrators-v3/`: bases ilustradas refeitas
+  para Dora e Alex, com o mesmo acabamento semi-realista, uniforme Topazioverse,
+  proporções faciais preservadas e placas transparentes de pálpebras e boca
+  alinhadas ao mesmo canvas. São uma geração experimental pronta para o
+  Narrator Mode, ainda sujeita à aprovação artística humana.
 
 Os assets são registrados no repositório como material original local do
 Fabuloom; não foi encontrada fonte externa por arquivo ou licença de terceiros
@@ -33,8 +38,8 @@ substituídos nem reescritos.
 | personagem | voz | idioma | pack visual atual | estado |
 | --- | --- | --- | --- | --- |
 | Santa V5 | `pm_santa` | `pt-BR` | V5 facial corrigido | produção |
-| Dora | `pf_dora` | `pt-BR` | V2 técnico próprio | aguardando aprovação artística |
-| Alex | `pm_alex` | `pt-BR` | V2 técnico próprio | aguardando aprovação artística |
+| Dora | `pf_dora` | `pt-BR` | V3 artístico experimental próprio | aguardando aprovação artística |
+| Alex | `pm_alex` | `pt-BR` | V3 artístico experimental próprio | aguardando aprovação artística |
 
 `NarratorAvatarRenderer` agora aceita a identidade visual por `characterId` e
 troca o pack por `setPack()` no mesmo renderer. O `AudioTimelinePlayer` continua
@@ -53,8 +58,10 @@ Santa, Dora e Alex em estados neutro, fala RMS, piscada e movimento de cabeça:
 
 `frontend/official-narrators-board.html`
 
-Ela inclui os retratos V1 apenas como referência de identidade e informa
-explicitamente `AWAITING_ART_APPROVAL`. Os arquivos de áudio, manifests, frames,
+Ela usa o mesmo renderer para estados neutro, sorriso, boca aberta por RMS,
+piscada e movimento de cabeça, com capturas ampliadas de Dora V3 e Alex V3; a
+referência Santa V5 permanece preservada. A página informa explicitamente
+`AWAITING_ART_APPROVAL`. Os arquivos de áudio, manifests, frames,
 MP4s e relatórios da execução ficam exclusivamente em
 `E:\Fabuloom\workspace\exports\videos\official-narrators-v1` e não entram no
 Git. A execução produziu: Dora `6,230 ms`, Santa `6,380 ms` e Alex `6,355 ms`;
@@ -72,11 +79,22 @@ Ele usa o texto curto original definido na missão, as vozes `pf_dora`,
 do Canvas. A página de captura aceita `character=dora|santa|alex` e continua
 reutilizando o mesmo renderer, sem uma implementação paralela dentro do FFmpeg.
 
+## Resultado da Missão 023.1
+
+- Dora e Alex agora usam bases V3 geradas como identidade artística própria,
+  separadas de Santa V5 e sem alterar seus assets oficiais.
+- A boca fechada é extraída da referência da própria personagem; a boca aberta
+  e as pálpebras usam overlays no mesmo canvas e são resolvidas pelo
+  `NarratorAvatarRenderer` conforme RMS e relógio facial.
+- Capturas locais de 30 FPS confirmaram estado neutro, fala, piscada e troca de
+  identidade para `pf_dora`/`pm_alex` sem regressão do caminho Santa V5.
+
 ## Limitações conhecidas
 
-- Dora e Alex ainda não têm arte final separada com o nível de acabamento do
-  retrato V1/Santa V5; o V2 é uma prova de rig técnico.
-- O retrato V1 não é usado como substituto de animação no preview ou captura.
+- Dora e Alex ainda não têm um rig corporal V3 completo com braços, mãos e
+  acessórios independentes; esta missão concentra-se no Narrator Mode facial.
+- A base ilustrada e as placas faciais são experimentais e aguardam revisão
+  artística do proprietário; não são declaradas como arte final aprovada.
 - O RMS indica abertura aproximada da boca; não é lip-sync fonético.
 - Os manifestos locais existentes continuam sendo a fonte de reprodução no
   Studio; a demonstração curta só deve ser considerada nova quando o comando

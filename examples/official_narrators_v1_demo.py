@@ -74,6 +74,12 @@ def main() -> int:
                     raise FileExistsError(f"frames already exist: {frames_path}; pass --overwrite")
                 for frame in frames_path.glob("*.png"):
                     frame.unlink()
+                # A previous successful capture leaves a completion marker.
+                # Remove it under the explicit overwrite path so _capture
+                # cannot accept stale metadata before the new PNG sequence.
+                for marker in (frames_path / "complete.json", frames_path / "error.json"):
+                    if marker.exists():
+                        marker.unlink()
             frames_path.mkdir(parents=True, exist_ok=True)
             capture = _capture(STUDIO_ROOT, frames_path, manifest_path, args.port, args.capture_timeout, character_id=character_id)
             _render_mp4(frames_path, audio_path, video_path, int(manifest["duration_ms"]), args.overwrite)
