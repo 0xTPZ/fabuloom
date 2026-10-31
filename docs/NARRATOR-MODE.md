@@ -76,7 +76,7 @@ for the two higher states and its vertical motion is deliberately subtle.
 `NarratorFacialRig` now feeds the same `facialPoseAt()` result into
 `LayeredCharacterRenderer`, so head tilt, eyelids, brows, hair and mouth are
 observed in the actual draw plan rather than only in a returned diagnostic
-object. The official Santa V5 pack and assets are not edited. The crop is now a
+object. The official Santa V5 pack and assets are not edited. V1.1 used a
 square 560×560 source window at `{ x: 260, y: 0 }`, reducing exposed neck while
 preserving the gold/blue frame.
 
@@ -95,6 +95,35 @@ generated under `E:\Fabuloom\workspace\exports\videos`. The correction demo
 reuses the Mission 017 WAV and manifest; word, phoneme and viseme timings remain
 unavailable.
 
+## Final avatar framing V1.2
+
+Mission 017.2 keeps the V1.1 facial correction and changes only the source
+window used to compose the circular avatar. Measuring the real transformed alpha
+bounds showed that the former crop ended at `y=560` while the effective beard
+could reach approximately `y=606`; this was a deterministic crop defect, not a
+new asset problem. The approved V1.2 crop is the square
+`{ x: 245, y: 35, width: 590, height: 590 }`, with normalized safe area
+`{ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 }`.
+
+`validateNarratorFaceCrop()`, `faceSafeAreaForCrop()` and
+`adjustNarratorFaceCrop()` keep the crop square, bounded by the 1080×1920
+source canvas, and deterministic. The face lab controls offset X/Y, zoom and
+safe-area overlay, then calls the same `NarratorAvatarRenderer.renderTo()` path
+used by the capture/exporter. Reset returns to the approved V1.2 values.
+
+Regenerate the V1.2 MP4 without new synthesis:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_framing_demo.py --overwrite --reuse-capture
+```
+
+The resulting MP4 and before/after, facial-state, safe-area and Visual
+Inspector evidence remain under `E:\Fabuloom\workspace\exports\videos`.
+The V1.2 render reuses the Mission 017 WAV and manifest. Human artistic review
+is still required; the framing change does not create word, phoneme or viseme
+timestamps.
+
 ## Known limits
 
 - Mouth motion is an RMS intensity approximation, not phoneme or viseme
@@ -102,8 +131,8 @@ unavailable.
 - Captions are synchronized to measured audio segments, not individual words.
 - The office scenario is an original SVG composition and intentionally simple.
 - The facial pack is a controlled crop of Santa V5, not a mesh-deformed head.
-- The V1.1 facial composition is experimental and requires human artistic review;
-  it does not replace the approved Santa V5 source pack.
+- The V1.1/V1.2 facial composition is experimental and requires human artistic
+  review; it does not replace the approved Santa V5 source pack.
 - MP4 and WAV files are generated artifacts and must stay in the workspace
   export directory.
 

@@ -497,3 +497,25 @@ Open `/narrator-face-lab.html` through the loopback server for enlarged
 before/after review, explicit blink and mouth states, head movement and layer
 visibility toggles. The face lab and all reports are diagnostic evidence; they
 do not perform artistic approval and do not modify official Santa V5 assets.
+
+## Mission 017.2 — final avatar framing
+
+The framing change is covered by crop/safe-area validation, bounded offset and
+zoom adjustment, deterministic rendering, facial-state samples and the same
+renderer path used by the exporter:
+
+```powershell
+node --test .\frontend\tests\*.mjs
+$env:PYTHONPATH='E:\Fabuloom\studio\src'
+E:\Fabuloom\workspace\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_*.py'
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  .\examples\narrator_mode_framing_demo.py --overwrite --reuse-capture
+node .\tools\visual-inspector\narrator-face-framing-report.mjs
+ffmpeg -v error -i E:\Fabuloom\workspace\exports\videos\fabuloom-narrator-mode-v1.2-framing.mp4 -f null -
+```
+
+The V1.2 evidence includes the equivalent V1.1/V1.2 frame comparison, five
+facial states, the safe-area overlay and the JSON/Markdown Visual Inspector
+report. The Inspector checks pixels and structure; it does not grant artistic
+approval. The audio and manifest are reused, so no Kokoro synthesis is required
+for this validation.
