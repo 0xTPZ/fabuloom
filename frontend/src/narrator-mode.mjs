@@ -9,7 +9,7 @@
 
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
-import { TOPAZIO_NARRATOR_PACKS_V3 } from "./topazio-narrator-packs-v3.mjs";
+import { TOPAZIO_NARRATOR_PACKS_V4 } from "./topazio-narrator-packs-v4.mjs";
 import { validateCharacterPack } from "./character-pack.mjs";
 
 export const NARRATOR_MODE_FORMAT = "fabuloom.narrator-mode/0.1";
@@ -97,8 +97,8 @@ const FACE_LAYER_IDS = new Set([
 const FACE_ORDER = ["hair_back", "neck", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"];
 const OFFICIAL_NARRATOR_SOURCE_PACKS = Object.freeze({
   santa: SANTA_V5_PACK,
-  dora: TOPAZIO_NARRATOR_PACKS_V3.dora,
-  alex: TOPAZIO_NARRATOR_PACKS_V3.alex,
+  dora: TOPAZIO_NARRATOR_PACKS_V4.dora,
+  alex: TOPAZIO_NARRATOR_PACKS_V4.alex,
 });
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -295,6 +295,12 @@ export function avatarCircleBounds(width, height, options = {}) {
 
 export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
+  if (sourcePack.art_status === "art-reforge-v4-experimental-awaiting-art-approval") {
+    // V4 packs are already authored in the narrator-local coordinate system.
+    // Do not apply the historical Santa alpha-alignment heuristics to them:
+    // their facial plates intentionally use explicit per-layer transforms.
+    return Object.freeze(validateCharacterPack(sourcePack));
+  }
   const isSantaV5 = sourcePack.id === SANTA_V5_PACK.id;
   const composition = options.composition || "corrected";
   const showNeckPixels = options.showNeckPixels === true;
@@ -376,11 +382,18 @@ export class NarratorAvatarRenderer {
     this.pack = options.pack || createOfficialNarratorAvatarPack(options.characterId || "santa");
     this.rig = options.rig || new NarratorFacialRig();
     this.mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
+    this.mouthStateAssets = this.pack.facial_states?.mouth || null;
     this.renderer = new LayeredCharacterRenderer(this.sourceCanvas, this.rig, this.pack, {
       assetRoot: options.assetRoot || document.baseURI,
       renderBackground: false,
       assetResolver: (layer, pose, expressionAsset) => {
-        if (layer.id !== "mouth" || !this.mouthOpenAsset) return expressionAsset;
+        if (layer.id !== "mouth") return expressionAsset;
+        if (this.mouthStateAssets) {
+          if (this.renderer.expression === "smile" && this.mouthStateAssets.smile) return this.mouthStateAssets.smile;
+          const state = mouthStateAt(pose.mouth_open, true);
+          return this.mouthStateAssets[state] || expressionAsset;
+        }
+        if (!this.mouthOpenAsset) return expressionAsset;
         return mouthStateAt(pose.mouth_open, true) === "closed" || mouthStateAt(pose.mouth_open, true) === "slight"
           ? expressionAsset
           : this.mouthOpenAsset;
@@ -396,14 +409,17 @@ export class NarratorAvatarRenderer {
   async setPack(pack) {
     const previousPack = this.pack;
     const previousMouthOpenAsset = this.mouthOpenAsset;
+    const previousMouthStateAssets = this.mouthStateAssets;
     validateCharacterPack(pack);
     this.pack = pack;
     this.mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
+    this.mouthStateAssets = this.pack.facial_states?.mouth || null;
     try {
       await this.renderer.setPack(pack);
     } catch (error) {
       this.pack = previousPack;
       this.mouthOpenAsset = previousMouthOpenAsset;
+      this.mouthStateAssets = previousMouthStateAssets;
       throw error;
     }
     this.loaded = true;

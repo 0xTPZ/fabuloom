@@ -125,6 +125,14 @@ marked `awaiting-art-approval`; their V2 SVGs prove the identity/voice/rig
 contract but are not presented as final cinematic art. See
 `docs/OFFICIAL-NARRATORS-V1.md` and `frontend/official-narrators-board.html`.
 
+Mission 023.2 adds the V4 art-reforge packs for the Narrator Mode path. Dora
+and Alex now use frontal stylized storybook bases with a common visual contract,
+mouthless head plates and explicit transparent mouth/eyelid state assets. The
+official mapping remains `dora → pf_dora`, `santa → pm_santa`, and
+`alex → pm_alex`; Santa V5 is not modified. The V4 packs are experimental and
+remain behind `AWAITING_ART_APPROVAL`. Details are in
+`docs/NARRATORS-ANIMATION-REFORGE-V4.md`.
+
 The export bridge is intentionally separate from the provider and player.
 `frontend/src/layered-character.ts` exposes `frameSchedule`,
 `LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. A future
