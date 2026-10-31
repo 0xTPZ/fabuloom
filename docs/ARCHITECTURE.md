@@ -308,6 +308,22 @@ SQLite is the planned local index for projects and metadata. Large media and mod
 
 Only original Fabuloom code is covered by the project MIT license. Kokoro model/package, runtime dependencies, voices, and generated media remain subject to their own licenses. Every external integration needs a license/provenance record before distribution; see `docs/KOKORO-INTEGRATION.md`.
 
+### Studio UI Reforge V1
+
+Mission 021 adds `studio.html` as the official loopback entry point. Its shell
+is a presentation and orchestration boundary: it reads existing project
+profiles and narration manifests, uses the shared `NarratorAvatarRenderer` and
+`AudioTimelinePlayer` for preview, and links to already-produced exports. It
+does not replace the versioned Core, timeline, character or production-profile
+contracts and it does not pretend to expose an export job that is not yet
+implemented.
+
+The historical Character Stage remains reachable at `/index.html`, together
+with the face labs and Visual Inspector, but the main navigation labels these
+pages as DEV/legacy. Santa V5 Narrator Mode V1.4 is the primary production
+reference. This separation prevents experimental assets from being presented
+as the current official product while preserving compatibility and diagnostics.
+
 ## Deterministic keyframe overlays
 
 `frontend/src/animation-keyframes.mjs` provides the independent

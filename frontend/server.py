@@ -1,4 +1,4 @@
-"""Loopback-only static server for the Fabuloom Character Stage."""
+"""Loopback-only static server for the Fabuloom Studio."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ NARRATOR_JOB = None
 
 
 class StageHandler(BaseHTTPRequestHandler):
-    server_version = "FabuloomStage/0.3"
+    server_version = "FabuloomStudio/0.1"
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = unquote(urlsplit(self.path).path)
@@ -34,7 +34,7 @@ class StageHandler(BaseHTTPRequestHandler):
             relative = path.removeprefix("/exports/")
         else:
             root = FRONTEND_ROOT
-            relative = path.removeprefix("/") or "index.html"
+            relative = path.removeprefix("/") or "studio.html"
         candidate = (root / relative).resolve()
         try:
             candidate.relative_to(root)
@@ -196,7 +196,7 @@ def main() -> int:
         CAPTURE_ROOT = candidate
         CAPTURE_ROOT.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), StageHandler)
-    print(f"Fabuloom Character Stage: http://127.0.0.1:{args.port}/")
+    print(f"Fabuloom Studio: http://127.0.0.1:{args.port}/")
     print("Only loopback requests are accepted; exports are limited to the Fabuloom workspace.")
     try:
         server.serve_forever()

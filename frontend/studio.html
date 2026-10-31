@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080d17" />
+    <meta name="description" content="Fabuloom Studio: espaço local para roteiros, narradores e produções audiovisuais." />
+    <title>Fabuloom Studio · Creative Production</title>
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./studio.css" />
+  </head>
+  <body>
+    <div class="studio-app">
+      <aside class="studio-sidebar" id="studio-sidebar" aria-label="Navegação do Studio">
+        <div class="brand-lockup">
+          <a href="#dashboard" class="studio-brand" data-route="dashboard" aria-label="Fabuloom Studio">
+            <img src="./assets/logo.svg" alt="Fabuloom" />
+            <span><strong>Fabuloom</strong><small>Creative Studio</small></span>
+          </a>
+          <button class="mobile-close" id="mobile-close" type="button" aria-label="Fechar navegação">×</button>
+        </div>
+        <div class="project-context">
+          <span class="eyebrow">PROJETO ATIVO</span>
+          <strong id="active-project-name">A Última Luz</strong>
+          <span class="context-status"><i class="status-dot"></i> Local · salvo</span>
+        </div>
+        <nav class="studio-nav" id="studio-nav" aria-label="Módulos do Studio">
+          <div class="nav-group-label">PRODUÇÃO</div>
+          <a href="#dashboard" data-route="dashboard" class="nav-link is-active"><span class="nav-symbol">⌂</span><span>Dashboard</span></a>
+          <a href="#projects" data-route="projects" class="nav-link"><span class="nav-symbol">▦</span><span>Projetos</span></a>
+          <a href="#script" data-route="script" class="nav-link"><span class="nav-symbol">≡</span><span>Roteiro</span><em>beta</em></a>
+          <a href="#scenes" data-route="scenes" class="nav-link"><span class="nav-symbol">◇</span><span>Cenas</span><em>beta</em></a>
+          <a href="#narrators" data-route="narrators" class="nav-link"><span class="nav-symbol">✦</span><span>Narradores</span></a>
+          <a href="#audio" data-route="audio" class="nav-link"><span class="nav-symbol">◉</span><span>Áudio</span></a>
+          <a href="#preview" data-route="preview" class="nav-link"><span class="nav-symbol">▷</span><span>Prévia</span></a>
+          <a href="#export" data-route="export" class="nav-link"><span class="nav-symbol">⇩</span><span>Exportação</span></a>
+          <div class="nav-group-label nav-dev-label">DESENVOLVEDOR</div>
+          <a href="#dev" data-route="dev" class="nav-link dev-link"><span class="nav-symbol">⌘</span><span>Área DEV</span></a>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="local-only"><span class="local-icon">⌁</span><span><strong>Modo local</strong><small>Arquivos permanecem no computador.</small></span></div>
+          <span class="build-label">FABULOOM UI 0.1 · LOCAL</span>
+        </div>
+      </aside>
+      <button id="mobile-backdrop" class="mobile-backdrop" type="button" aria-label="Fechar navegação" hidden></button>
+
+      <div class="studio-main">
+        <header class="studio-topbar">
+          <div class="topbar-left"><button id="mobile-open" class="mobile-open" type="button" aria-label="Abrir navegação" aria-expanded="false">☰</button><div class="crumbs"><span>Studio</span><b>/</b><strong id="page-crumb">Dashboard</strong></div></div>
+          <div class="topbar-right"><span class="topbar-local"><i class="status-dot"></i> LOCAL ONLY</span><span class="topbar-version">UI 0.1</span><button class="avatar-button" type="button" aria-label="Perfil local">TP</button></div>
+        </header>
+
+        <main class="studio-content">
+          <div class="content-heading"><div><span class="eyebrow" id="page-eyebrow">OVERVIEW · FABULOOM STUDIO</span><h1 id="page-title">Dê vida às suas histórias.</h1><p id="page-subtitle">Um espaço local para organizar roteiro, voz, cenas e renderização.</p></div><div class="heading-actions"><span class="save-pill"><i class="status-dot"></i><span id="save-label">Estado local</span></span><button class="gold-button" data-route="preview" type="button">Abrir prévia <span>→</span></button></div></div>
+
+          <div class="studio-layout">
+            <div class="route-column">
+              <section class="route-view is-visible" data-view="dashboard">
+                <div class="hero-card"><div><span class="eyebrow">PROJETO EM FOCO</span><h2>A Última Luz</h2><p>Uma demonstração do pipeline Fabuloom com narração, personagem facial e composição cinematográfica.</p><div class="hero-card-actions"><button class="gold-button" data-route="preview" type="button">Continuar produção <span>→</span></button><button class="quiet-button" data-route="projects" type="button">Ver projeto</button></div></div><div class="hero-mark"><span>✦</span><small>Fabuloom<br />Studio</small></div></div>
+                <div class="section-title-row"><div><span class="eyebrow">VISÃO GERAL</span><h2>Estado da produção</h2></div><span class="soft-label">Dados locais</span></div>
+                <div class="metric-grid"><article class="metric-card"><span class="metric-icon blue">◉</span><div><small>Narração</small><strong id="metric-voice">Kokoro · pm_santa</strong><span class="metric-ok">Manifesto medido</span></div></article><article class="metric-card"><span class="metric-icon gold">✦</span><div><small>Narrador</small><strong>Santa V5</strong><span class="metric-ok">Narrator Mode V1.4</span></div></article><article class="metric-card"><span class="metric-icon violet">◇</span><div><small>Perfil ativo</small><strong>Official Promo V1</strong><span class="metric-ok">6 cenas · vertical</span></div></article><article class="metric-card"><span class="metric-icon green">✓</span><div><small>Exportações</small><strong>4 arquivos locais</strong><span class="metric-ok">FFmpeg verificado</span></div></article></div>
+                <div class="dashboard-grid"><article class="surface-card production-card"><div class="card-heading"><div><span class="eyebrow">FLUXO RECOMENDADO</span><h3>Do roteiro ao vídeo</h3></div><span class="status-badge stable">estável</span></div><div class="flow-steps"><div class="flow-step active"><span>01</span><strong>Roteiro</strong><small>Texto e segmentos</small></div><i>→</i><div class="flow-step active"><span>02</span><strong>Narração</strong><small>Voz Kokoro</small></div><i>→</i><div class="flow-step active"><span>03</span><strong>Prévia</strong><small>Canvas + Santa V5</small></div><i>→</i><div class="flow-step"><span>04</span><strong>Exportar</strong><small>MP4 local</small></div></div><div class="card-footnote">O Studio apresenta apenas capacidades já conectadas ao pipeline atual.</div></article><article class="surface-card health-card"><div class="card-heading"><div><span class="eyebrow">COMPONENTES LOCAIS</span><h3>Prontos para uso</h3></div><span class="health-ring">4/4</span></div><ul class="health-list"><li><span class="health-check">✓</span><span><strong>Kokoro TTS</strong><small>Manifestos e WAVs locais</small></span><b>OK</b></li><li><span class="health-check">✓</span><span><strong>Narrator Mode</strong><small>Santa V5 facial</small></span><b>OK</b></li><li><span class="health-check">✓</span><span><strong>Canvas Renderer</strong><small>Preview determinístico</small></span><b>OK</b></li><li><span class="health-check">✓</span><span><strong>FFmpeg</strong><small>Exportações verificadas</small></span><b>OK</b></li></ul></article></div>
+              </section>
+
+              <section class="route-view" data-view="projects"><div class="section-title-row"><div><span class="eyebrow">BIBLIOTECA LOCAL</span><h2>Projetos</h2></div><button class="quiet-button" type="button" disabled title="Persistência de novos projetos será adicionada em uma versão futura">＋ Novo projeto</button></div><div class="project-grid"><article class="project-card is-current"><div class="project-cover cover-night"><span>✦</span></div><div class="project-copy"><div><span class="status-badge stable">ativo</span><small>Atualizado localmente</small></div><h3>A Última Luz</h3><p>Demo narrativa · 6 cenas · pm_santa</p><button class="text-button" data-route="preview" type="button">Abrir produção →</button></div></article><article class="project-card"><div class="project-cover cover-crystal"><span>◇</span></div><div class="project-copy"><div><span class="status-badge reference">referência</span><small>Exportado</small></div><h3>O Último Cristal</h3><p>Vertical Cinematic Story V1</p><button class="text-button" data-route="export" type="button">Ver exportação →</button></div></article></div><div class="notice-card"><span>i</span><p><strong>Persistência local em evolução.</strong> Esta versão organiza produções existentes e preserva os contratos atuais. O cadastro de novos projetos ainda está sinalizado como futuro.</p></div></section>
+
+              <section class="route-view" data-view="script"><div class="section-title-row"><div><span class="eyebrow">CONTEÚDO</span><h2>Roteiro</h2></div><span class="status-badge experimental">experimental</span></div><div class="editor-card surface-card"><div class="editor-toolbar"><span class="field-caption">RASCUNHO LOCAL</span><span id="script-save-state">Salvo no navegador</span></div><label for="script-title">Título</label><input id="script-title" value="A Última Luz" /><label for="script-text">Texto narrativo</label><textarea id="script-text" rows="11">Quando a última estrela desapareceu, o mundo acreditou que a escuridão havia vencido.
+
+Mas, nas profundezas do antigo templo, uma pequena chama ainda resistia.
+
+Era a esperança de alguém que se recusava a desistir.</textarea><div class="editor-footer"><span>Identificação de cenas e segmentação estão disponíveis como dados de produção; geração automática de cenas ainda não é prometida.</span><span id="script-count">0 caracteres</span></div></div></section>
+
+              <section class="route-view" data-view="scenes"><div class="section-title-row"><div><span class="eyebrow">COMPOSIÇÃO</span><h2>Cenas</h2></div><span class="soft-label">Perfis reais</span></div><div class="scene-list" id="scene-list"><div class="loading-row">Consultando perfis locais…</div></div><div class="notice-card"><span>i</span><p><strong>Escopo atual:</strong> visualizar ordem, duração, câmera e transições registradas nos perfis. Edição cinematográfica completa permanece fora desta versão.</p></div></section>
+
+              <section class="route-view" data-view="narrators"><div class="section-title-row"><div><span class="eyebrow">ELENCO OFICIAL</span><h2>Narradores</h2></div><span class="soft-label">Santa V5 é a referência</span></div><article class="featured-narrator surface-card"><div class="narrator-portrait santa-portrait"><span>✦</span></div><div class="narrator-copy"><span class="status-badge stable">produção</span><h3>Santa V5</h3><p>Avatar facial do Narrator Mode V1.4, com rosto aprovado, moldura circular, piscadas e boca controlada pelo RMS real.</p><div class="tag-row"><span>pm_santa</span><span>pt-BR</span><span>RMS</span><span>Canvas</span></div><button class="gold-button" data-narrator="santa" type="button">Usar na prévia <span>→</span></button></div></article><div class="narrator-grid"><article class="small-narrator"><div class="mini-avatar dora-avatar">D</div><div><h3>Dora</h3><p>pf_dora · acolhedora</p><button class="text-button" data-narrator="dora" type="button">Carregar voz →</button></div></article><article class="small-narrator"><div class="mini-avatar alex-avatar">A</div><div><h3>Alex</h3><p>pm_alex · confiante</p><button class="text-button" data-narrator="alex" type="button">Carregar voz →</button></div></article></div><details class="legacy-disclosure"><summary>Referências legadas e experimentais</summary><p>Lia, Ari, Santa V3 e Santa V4 permanecem disponíveis no fluxo DEV para compatibilidade e diagnóstico. Não são apresentados como narradores principais.</p></details></section>
+
+              <section class="route-view" data-view="audio"><div class="section-title-row"><div><span class="eyebrow">SOM</span><h2>Áudio</h2></div><span class="status-badge stable">conectado</span></div><div class="audio-grid"><article class="surface-card audio-card"><div class="card-heading"><div><span class="eyebrow">VOZ</span><h3>Kokoro TTS</h3></div><span class="provider-mark">K</span></div><label for="audio-voice-select">Voz de prévia</label><select id="audio-voice-select"></select><div class="audio-status"><span class="health-check">✓</span><div><strong id="audio-voice-state">pm_santa · pronta</strong><small>Português brasileiro · manifesto medido</small></div></div><div class="capability-line"><span>Amplitude RMS</span><b>Ativo</b></div><div class="capability-line muted"><span>Palavras / fonemas / visemas</span><b>Indisponível</b></div></article><article class="surface-card audio-card"><div class="card-heading"><div><span class="eyebrow">CAMADAS</span><h3>Mixagem</h3></div><span class="soft-label">local</span></div><div class="mix-row"><span class="mix-icon music">♪</span><div><strong>Trilha original</strong><small>Procedural · voice-priority</small></div><span class="status-badge stable">disponível</span></div><div class="mix-row"><span class="mix-icon sfx">✧</span><div><strong>Efeitos</strong><small>Transições originais</small></div><span class="status-badge stable">disponível</span></div><p class="card-footnote">A mixagem final é produzida pelo pipeline FFmpeg. Este painel não simula controles que ainda não existem.</p></article></div></section>
+
+              <section class="route-view" data-view="preview"><div class="section-title-row"><div><span class="eyebrow">COMPOSIÇÃO AO VIVO</span><h2>Prévia</h2></div><span class="status-badge stable">renderer compartilhado</span></div><div class="preview-explanation surface-card"><span class="preview-icon">✦</span><div><strong>Mesma base do Narrator Mode V1.4</strong><p>O canvas persistente ao lado utiliza o `NarratorAvatarRenderer` e a timeline de áudio local. Ele não finge ser o exportador final: a equivalência de composição é indicada pelo renderer compartilhado.</p></div></div><div class="timeline-detail surface-card"><div class="card-heading"><div><span class="eyebrow">SEGMENTOS MEDIDOS</span><h3>Ritmo da narração</h3></div><span id="preview-segment-summary" class="soft-label">aguardando manifesto</span></div><div id="preview-segment-list" class="preview-segment-list"><div class="loading-row">Carregando segmentos…</div></div></div></section>
+
+              <section class="route-view" data-view="export"><div class="section-title-row"><div><span class="eyebrow">SAÍDA</span><h2>Exportação</h2></div><span class="soft-label">arquivos existentes</span></div><div class="export-options surface-card"><div class="export-option selected"><span class="radio-dot"></span><div><strong>Vertical · 1080×1920</strong><small>30 FPS · H.264 · AAC</small></div><span class="status-badge stable">verificado</span></div><div class="export-option"><span class="radio-dot muted-dot"></span><div><strong>Horizontal · 1920×1080</strong><small>Narrator Mode · H.264 · AAC</small></div><span class="status-badge reference">referência</span></div></div><div class="export-list" id="export-list"></div><div class="notice-card"><span>i</span><p><strong>Sem nova renderização nesta interface.</strong> Os links abaixo apontam para exportações locais já produzidas e verificadas pelo pipeline. O comando de exportação completo continua nos exemplos Python.</p></div></section>
+
+              <section class="route-view" data-view="dev"><div class="section-title-row"><div><span class="eyebrow">DESENVOLVIMENTO</span><h2>Área DEV</h2></div><span class="status-badge experimental">não é o fluxo principal</span></div><div class="dev-warning"><span>⌘</span><div><strong>Laboratórios preservados</strong><p>As páginas experimentais continuam acessíveis para calibração, QA e compatibilidade. Elas não representam automaticamente o estado de produção do Studio.</p></div></div><div class="dev-list" id="dev-list"></div></section>
+            </div>
+
+            <aside class="preview-dock" aria-label="Prévia persistente">
+              <div class="dock-heading"><div><span class="eyebrow">PREVIEW</span><h2>Palco do narrador</h2></div><span class="live-badge"><i></i> local</span></div>
+              <div class="canvas-frame"><canvas id="studio-preview" width="1920" height="1080" aria-label="Prévia do Narrator Mode com Santa V5"></canvas><div class="canvas-badge"><span id="canvas-voice">pm_santa</span><span id="canvas-state">PRONTO</span></div></div>
+              <div class="dock-character"><div class="dock-avatar">S</div><div><strong id="dock-character-name">Santa V5</strong><span id="dock-character-role">Narrator Mode V1.4 · pt-BR</span></div><button class="dock-more" data-route="narrators" type="button" aria-label="Ver narradores">•••</button></div>
+              <div class="dock-controls"><button id="preview-play" class="dock-control primary" type="button" aria-label="Reproduzir">▶</button><button id="preview-pause" class="dock-control" type="button" aria-label="Pausar">Ⅱ</button><button id="preview-stop" class="dock-control" type="button" aria-label="Parar">■</button><span id="preview-time" class="dock-time">0:00 / 0:00</span></div>
+              <input id="preview-seek" class="dock-seek" type="range" min="0" max="0" value="0" step="1" aria-label="Posição da prévia" />
+              <div class="dock-timeline"><div class="dock-timeline-head"><span>LINHA DO TEMPO</span><strong id="dock-segment-count">0 segmentos</strong></div><div id="dock-timeline-list" class="dock-timeline-list"><div class="loading-row">Aguardando áudio local…</div></div></div>
+              <div class="dock-note"><span>i</span><p>Tempos medidos do áudio. A boca reage à amplitude RMS; não é alinhamento fonético.</p></div>
+            </aside>
+          </div>
+        </main>
+        <footer class="studio-footer"><span>Fabuloom Studio · local-first production environment</span><span>Santa V5 · Narrator Mode V1.4 · FFmpeg</span><span>© 2026 0xTPZ</span></footer>
+      </div>
+    </div>
+    <script type="module" src="./src/studio-shell.mjs"></script>
+  </body>
+</html>
