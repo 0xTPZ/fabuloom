@@ -300,3 +300,19 @@ que uma troca de boca por RMS selecione uma imagem ainda ausente e deixe a camad
 invisível. Dora e Alex recebem packs experimentais `facial-system-recovery-v1`
 com bocas SVG vetoriais no mesmo canvas facial. V2, V3 e V4 continuam preservados;
 Santa V5 permanece a referência e o gate segue `AWAITING_ART_APPROVAL`.
+
+## MISSÃO 023.4 — consistência artística dos narradores
+
+Mission 023.4 adds the experimental `fabuloom.narrator-cartoon/0.1` packs in
+`topazio-narrators-cartoon-v1` for Dora and Alex. Each narrator has one original
+transparent mouthless identity canvas, a compact independent eyelid overlay,
+and small same-canvas mouth states (`closed`, `slight`, `moderate`, `open`).
+The states keep the mouth proportional to the face and avoid the full-width
+purple vector strips rejected in the 023.3 close-ups.
+
+The official mapping now uses `pf_dora` and `pm_alex` with these experimental
+packs; Santa V5 and all previous V2/V3/V4/recovery packs remain available.
+`NarratorAvatarRenderer` and `LayeredCharacterRenderer` remain the only render
+path. The art gate is still `AWAITING_ART_APPROVAL`; RMS is an intensity-based
+mouth approximation, not phoneme or viseme alignment. See
+`docs/CHARACTER-ART-CONSISTENCY-023.4.md` for evidence and output paths.

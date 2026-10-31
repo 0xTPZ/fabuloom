@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="alexLip" x1="627" y1="642" x2="627" y2="696" gradientUnits="userSpaceOnUse"><stop stop-color="#D77A6F"/><stop offset="1" stop-color="#A65350"/></linearGradient></defs>
+  <g transform="translate(0 -60)"><path d="M535 655C563 639 595 635 627 645C659 635 691 639 719 655C691 682 660 691 627 691C594 691 563 682 535 655Z" fill="url(#alexLip)" stroke="#713E3A" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M552 658C577 665 602 666 627 663C652 666 677 665 702 658" stroke="#F2ADA0" stroke-width="5" stroke-linecap="round" opacity=".75"/></g>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="doraSlight" x1="627" y1="636" x2="627" y2="690" gradientUnits="userSpaceOnUse"><stop stop-color="#5E3540"/><stop offset="1" stop-color="#873E46"/></linearGradient></defs>
+  <g transform="translate(0 -60)"><path d="M526 646C557 631 592 628 627 638C662 628 697 631 728 646C697 665 662 673 627 673C592 673 557 665 526 646Z" fill="url(#doraSlight)" stroke="#713B3B" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M551 651C577 657 602 659 627 657C652 659 677 657 703 651C680 670 654 678 627 678C600 678 574 670 551 651Z" fill="#D7837B"/>
+  <path d="M548 650C573 654 600 655 627 653C654 655 681 654 706 650" stroke="#F5B7A9" stroke-width="4" stroke-linecap="round" opacity=".7"/></g>
+</svg>

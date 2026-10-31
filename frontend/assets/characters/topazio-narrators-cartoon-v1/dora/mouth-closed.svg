@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="doraLip" x1="627" y1="628" x2="627" y2="686" gradientUnits="userSpaceOnUse"><stop stop-color="#D9867D"/><stop offset="1" stop-color="#A95855"/></linearGradient></defs>
+  <g transform="translate(0 -60)"><path d="M526 647C555 631 590 625 627 636C664 625 699 631 728 647C697 677 661 686 627 686C593 686 557 677 526 647Z" fill="url(#doraLip)" stroke="#713B3B" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M545 651C573 657 600 658 627 655C654 658 681 657 709 651" stroke="#F3B3A6" stroke-width="5" stroke-linecap="round" opacity=".8"/></g>
+</svg>
