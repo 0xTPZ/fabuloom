@@ -6,6 +6,7 @@ import {
   NARRATOR_FACE_CROP,
   NARRATOR_FACE_ALPHA_TARGETS,
   NARRATOR_FACE_ALPHA_BOUNDS,
+  NARRATOR_FACE_ANATOMY,
   NARRATOR_FACE_REFERENCE,
   NARRATOR_FACE_SAFE_AREA,
   avatarCircleBounds,
@@ -79,6 +80,10 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   assert.equal(pack.layers.some((layer) => ["left_hand", "right_hand", "torso"].includes(layer.id)), false);
   assert.equal(pack.layers.find((layer) => layer.id === "neck").parent, null);
   assert.equal(pack.layers.find((layer) => layer.id === "head").parent, "neck");
+  assert.equal(pack.layers.find((layer) => layer.id === "neck").opacity, 0);
+  assert.equal(pack.layers.find((layer) => layer.id === "neck").anatomy_role, NARRATOR_FACE_ANATOMY.neck.role);
+  assert.equal(pack.layers.find((layer) => layer.id === "neck").pixel_source, "head-clean.png");
+  assert.equal(pack.anatomy_boundary, "head-clean-collar-v1.4");
   assert.equal(pack.layers.find((layer) => layer.id === "beard").opacity, 0);
   const aligned = pack.layers.filter((layer) => Object.hasOwn(NARRATOR_FACE_ALPHA_TARGETS, layer.id));
   assert.deepEqual(aligned.map((layer) => layer.id), ["hair_front", "eyes", "eyelids", "brows", "glasses", "mouth"]);
@@ -89,6 +94,25 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   }
   assert.deepEqual(NARRATOR_FACE_ALPHA_BOUNDS["eyes-open.png"], [196, 279, 1579, 627]);
   assert.ok(pack.layers.find((layer) => layer.id === "mouth").size[1] > 0.5);
+});
+
+test("neck fix hides duplicate pixels without changing the head hierarchy or transform", () => {
+  const corrected = createNarratorAvatarPack();
+  const source = createNarratorAvatarPack(undefined, { composition: "source" });
+  const rig = new NarratorFacialRig();
+  rig.update(1800, true);
+  const correctedPlan = buildLayerDrawPlan(corrected, 1080, 1920, rig.pose());
+  const sourcePlan = buildLayerDrawPlan(source, 1080, 1920, rig.pose());
+  const correctedNeck = correctedPlan.find((entry) => entry.layer.id === "neck");
+  const sourceNeck = sourcePlan.find((entry) => entry.layer.id === "neck");
+  const correctedHead = correctedPlan.find((entry) => entry.layer.id === "head");
+  const sourceHead = sourcePlan.find((entry) => entry.layer.id === "head");
+  assert.equal(correctedNeck.opacity, 0);
+  assert.notEqual(sourceNeck.opacity, 0);
+  assert.equal(correctedHead.layer.parent, "neck");
+  assert.deepEqual(correctedHead.matrix, sourceHead.matrix);
+  assert.equal(NARRATOR_FACE_ANATOMY.head.pixelSource, "head-clean.png");
+  assert.equal(NARRATOR_FACE_ANATOMY.collar.pixelSource, "head-clean.png");
 });
 
 test("facial motion is deterministic and mouth follows RMS only while playing", () => {

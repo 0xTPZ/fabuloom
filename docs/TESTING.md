@@ -540,3 +540,24 @@ renderer/export path, displays a static `head.png` reference and keeps layer
 toggles available. The no-synthesis export reuses the Mission 017 WAV and
 manifest. Technical evidence and the optional QA Gate never replace human
 artistic review.
+
+## Mission 017.4 — anatomical neck boundary
+
+The V1.4 correction is covered by the Narrator Mode unit tests and by a real
+browser capture/export:
+
+```powershell
+node --test .\frontend\tests\test_narrator_mode.mjs
+node --test .\frontend\tests\*.mjs
+python -m pytest -q
+python .\examples\narrator_mode_neck_fix_demo.py --overwrite
+```
+
+The tests assert that the structural `neck` parent remains in the draw plan,
+its corrected opacity is zero, the head transform is unchanged relative to a
+source-composition pack, and the visible collar owner is `head-clean.png`.
+The demo reuses the measured Mission 017 audio and manifest, probes the output
+with FFprobe, and produces before/after and enlarged transition evidence. The
+face lab must be opened through `frontend/server.py`; its semantic neck/beard
+toggles and color map are diagnostic only. No automated check grants artistic
+approval.

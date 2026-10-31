@@ -474,3 +474,18 @@ real rendered PNG metrics and before/after differences, but its technical gate
 cannot declare artistic approval. The current coordinate targets are an
 experimental composition under human review and must not be treated as a
 general facial-rig editor contract until approved.
+
+### Narrator Mode V1.4 anatomical boundary
+
+Mission 017.4 establishes the lower-face ownership rule from measured asset
+evidence. Both `neck.png` and `head-clean.png` paint a collar/skin boundary;
+`beard.png` and the mouth plates do not. The derived Narrator Mode pack keeps
+the `neck` node in the parent chain but sets its painted opacity to zero. This
+preserves the V1.3 head matrix and hierarchy while preventing two collar
+assemblies from being drawn. The visible collar is owned by `head-clean.png`.
+
+`NARRATOR_FACE_ANATOMY` records this boundary, its diagnostic colors and the
+reason for hiding the redundant pixels. Debug-only pack options can reveal the
+hidden neck/beard pixels in the face lab; they are not used by export. The
+production render path remains the same shared `LayeredCharacterRenderer` and
+the MP4 exporter still consumes deterministic frames from that path.

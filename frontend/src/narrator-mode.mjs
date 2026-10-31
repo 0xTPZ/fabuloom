@@ -19,6 +19,40 @@ export const NARRATOR_AVATAR_DEFAULT = Object.freeze({ x: 74, y: 676, size: 330,
 export const NARRATOR_SOURCE_CANVAS = Object.freeze({ width: 1080, height: 1920 });
 export const NARRATOR_FACE_CROP = Object.freeze({ x: 245, y: 35, width: 590, height: 590 });
 export const NARRATOR_FACE_SAFE_AREA = Object.freeze({ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 });
+export const NARRATOR_FACE_ANATOMY = Object.freeze({
+  neck: Object.freeze({
+    role: "structural-parent-only",
+    pixelSource: "head-clean.png",
+    visibleInCorrectedComposition: false,
+    reason: "head-clean.png already contains the visible lower-face skin and collar boundary",
+    diagnosticColor: "#40c9a2",
+  }),
+  head: Object.freeze({
+    role: "head-and-collar-base",
+    pixelSource: "head-clean.png",
+    visibleInCorrectedComposition: true,
+    diagnosticColor: "#f7d27a",
+  }),
+  beard: Object.freeze({
+    role: "facial-hair",
+    pixelSource: "beard.png",
+    visibleInCorrectedComposition: false,
+    reason: "the approved mouth plates already contain the moustache and beard pixels",
+    diagnosticColor: "#b68a62",
+  }),
+  mouth: Object.freeze({
+    role: "lower-face-plate",
+    pixelSource: "mouth-closed.png / mouth-open.png",
+    visibleInCorrectedComposition: true,
+    diagnosticColor: "#f07f91",
+  }),
+  collar: Object.freeze({
+    role: "head-base-collar",
+    pixelSource: "head-clean.png",
+    visibleInCorrectedComposition: true,
+    diagnosticColor: "#5b8fd9",
+  }),
+});
 export const NARRATOR_FACE_REFERENCE = Object.freeze({
   width: 1316,
   height: 1195,
@@ -249,6 +283,8 @@ export function avatarCircleBounds(width, height, options = {}) {
 export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
   const composition = options.composition || "corrected";
+  const showNeckPixels = options.showNeckPixels === true;
+  const showBeardPixels = options.showBeardPixels === true;
   const layers = sourcePack.layers
     .filter((layer) => FACE_LAYER_IDS.has(layer.id))
     .map((layer) => {
@@ -259,7 +295,17 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
       if (copy.id === "hair_front" || copy.id === "eyes" || copy.id === "eyelids" || copy.id === "brows" || copy.id === "glasses" || copy.id === "mouth") {
         alignLayerAlphaToHead(copy, NARRATOR_FACE_ALPHA_TARGETS[copy.id]);
       }
-      if (composition === "corrected" && copy.id === "beard") copy.opacity = 0;
+      if (composition === "corrected" && copy.id === "neck" && !showNeckPixels) {
+        // Keep the node in the hierarchy so head transforms remain identical
+        // to V1.3, but hide its painted pixels. `neck.png` contains a second
+        // skin/collar assembly; `head-clean.png` is the visible owner of that
+        // boundary in the corrected Narrator Mode composition.
+        copy.opacity = 0;
+        copy.anatomy_role = NARRATOR_FACE_ANATOMY.neck.role;
+        copy.pixel_source = NARRATOR_FACE_ANATOMY.neck.pixelSource;
+        copy.hidden_reason = NARRATOR_FACE_ANATOMY.neck.reason;
+      }
+      if (composition === "corrected" && copy.id === "beard" && !showBeardPixels) copy.opacity = 0;
       if (composition === "corrected" && copy.id === "mouth") {
         // The approved V5 mouth PNGs are complete lower-face plates (they
         // contain the moustache and beard as well as the lips). Use one plate
@@ -277,7 +323,9 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
     name: "Santa V5 · avatar facial do Narrator Mode",
     voice_id: sourcePack.voice_id,
     language: sourcePack.language,
-    art_status: composition === "corrected" ? "production-face-aligned-v1.3-experimental-composition" : "production-face-crop-v1",
+    art_status: composition === "corrected" ? "production-face-aligned-v1.4-neck-fix-experimental-composition" : "production-face-crop-v1",
+    anatomy_boundary: composition === "corrected" ? "head-clean-collar-v1.4" : "source-pack-boundary",
+    anatomy_notes: composition === "corrected" ? "neck node retained as structural parent; neck pixels hidden because head-clean owns the visible collar boundary" : undefined,
     layers,
     expressions: sourcePack.expressions.map((expression) => ({
       id: expression.id,

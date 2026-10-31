@@ -162,6 +162,38 @@ approximation; word, phoneme and viseme timestamps are still unavailable.
 Pixels and technical checks are evidence only. Artistic approval remains a
 human review step.
 
+## Anatomical boundary V1.4
+
+Mission 017.4 audits the actual alpha bounds of the lower face instead of
+adjusting the crop or guessing another pivot. `neck.png` contains both a skin
+neck and a complete blue/gold collar. `head-clean.png` also contains the lower
+skin transition and the visible collar. The beard asset contains facial hair
+only, and the approved mouth plates contain the moustache/beard/lips but no
+collar. The duplicated neck/collar therefore came from two collar-bearing
+layers, not from the mouth or beard alignment.
+
+The corrected derived pack retains `neck` as the structural parent of `head`
+so its hierarchy and transforms remain stable, but sets only the `neck` layer
+opacity to zero. `head-clean.png` remains the visible owner of the collar
+boundary. The official Santa V5 pack and all source PNGs remain unchanged.
+This is an explicit `head-clean-collar-v1.4` boundary, not a new character
+format or a second renderer.
+
+The face lab now includes semantic controls for neck pixels and beard pixels,
+an enlarged lower-face transition rendered through the real source canvas, and
+a color-coded anatomy ownership map. The no-synthesis V1.4 demo is reproducible
+with:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_neck_fix_demo.py --overwrite
+```
+
+It reuses the Mission 017 WAV/manifest and writes the V1.4 MP4, before/after,
+pose, asset, close-up and diagnostic boards under
+`E:\Fabuloom\workspace\exports\videos`. Technical evidence does not replace
+human artistic approval.
+
 ## Known limits
 
 - Mouth motion is an RMS intensity approximation, not phoneme or viseme
