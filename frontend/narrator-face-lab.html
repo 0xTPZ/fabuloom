@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fabuloom · laboratório facial do Narrator Mode V1.3</title>
+  <title>Fabuloom · laboratório facial do Narrator Mode V1.4</title>
   <style>
     :root { color-scheme: dark; font-family: Segoe UI, sans-serif; background: #061329; color: #fff7dc; }
     body { margin: 0; padding: 24px; background: radial-gradient(circle at 70% 10%, #15335b, #061329 60%); }
@@ -17,14 +17,15 @@
     button { cursor: pointer; }
     button:hover { border-color: #f7d27a; }
     .layers { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #234a79; }
+    .anatomy { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #5f4f2b; }
     .status { color: #f7d27a; min-height: 1.4em; margin-top: 12px; }
     code { color: #ffd98c; }
   </style>
 </head>
 <body>
 <main>
-  <h1>Fabuloom · laboratório facial · Narrator Mode V1.3</h1>
-  <p>O painel central usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. As sobreposições são calculadas no plano real do Canvas, em coordenadas locais da cabeça.</p>
+  <h1>Fabuloom · laboratório facial · Narrator Mode V1.4</h1>
+  <p>O painel central usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. A correção anatômica mantém o nó do pescoço para preservar a hierarquia, mas oculta somente os pixels duplicados de <code>neck.png</code>.</p>
   <div class="controls">
     <label>Pose:
       <select id="state">
@@ -45,11 +46,18 @@
     <label><input id="alpha" type="checkbox" checked> caixas alfa</label>
     <label><input id="pivots" type="checkbox" checked> pivôs</label>
     <label><input id="reference" type="checkbox" checked> referência</label>
+    <label><input id="anatomy-map" type="checkbox"> mapa anatômico</label>
     <button id="render">Renderizar comparação</button>
     <button id="reset">Reset aprovado</button>
   </div>
   <div class="layers" id="layers"></div>
-  <canvas id="lab" width="1500" height="1040"></canvas>
+  <div class="anatomy" id="anatomy-controls">
+    <strong>Inspeção da transição:</strong>
+    <label><input id="show-neck" type="checkbox"> pixels do pescoço</label>
+    <label><input id="show-beard" type="checkbox"> camada barba</label>
+    <span>Verde = neck.png · dourado = head-clean/cabeça · azul = gola integrada · rosa = placa da boca</span>
+  </div>
+  <canvas id="lab" width="1500" height="1260"></canvas>
   <div class="status" id="status"></div>
 </main>
 <script type="module">
@@ -61,6 +69,7 @@
     NARRATOR_FACE_REFERENCE,
     NARRATOR_FACE_SAFE_AREA,
     NarratorAvatarRenderer,
+    createNarratorAvatarPack,
     mouthStateAt,
   } from "./src/narrator-mode.mjs";
 
@@ -78,6 +87,9 @@
   const alpha = document.querySelector("#alpha");
   const pivots = document.querySelector("#pivots");
   const reference = document.querySelector("#reference");
+  const anatomyMap = document.querySelector("#anatomy-map");
+  const showNeck = document.querySelector("#show-neck");
+  const showBeard = document.querySelector("#show-beard");
   // Use DOM-created image elements instead of the global Image constructor;
   // this also works in the embedded browser used for local QA.
   const source = document.createElement("img");
@@ -89,8 +101,16 @@
     new Promise((resolve, reject) => { staticReference.onload = resolve; staticReference.onerror = reject; }),
   ]);
 
-  const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: document.baseURI });
-  await avatar.load();
+  const avatarVariants = new Map();
+  for (const neckPixels of [false, true]) {
+    for (const beardPixels of [false, true]) {
+      const key = `${neckPixels ? 1 : 0}${beardPixels ? 1 : 0}`;
+      const variant = new NarratorAvatarRenderer(canvas, { assetRoot: document.baseURI, pack: createNarratorAvatarPack(undefined, { showNeckPixels: neckPixels, showBeardPixels: beardPixels }) });
+      await variant.load();
+      avatarVariants.set(key, variant);
+    }
+  }
+  const avatar = avatarVariants.get("00");
   const visible = new Set(avatar.pack.layers.map((layer) => layer.id));
   const layersElement = document.querySelector("#layers");
   for (const layer of avatar.pack.layers) {
@@ -101,7 +121,7 @@
     label.append(input, ` ${layer.id}`);
     layersElement.append(label);
   }
-  avatar.setLayerVisibility((layer) => visible.has(layer.id));
+  for (const variant of avatarVariants.values()) variant.setLayerVisibility((layer) => visible.has(layer.id));
 
   function settings() {
     const selected = state.value;
@@ -164,9 +184,9 @@
     context.restore();
   }
 
-  function drawAlphaTargets(headPlan, crop, bounds) {
+  function drawAlphaTargets(headPlan, crop, bounds, pack) {
     const colors = { hair_front: "#a9a0ff", eyes: "#62e2ba", eyelids: "#62e2ba", brows: "#e9a4ff", glasses: "#ffcc63", mouth: "#ff8f8f" };
-    for (const layer of avatar.pack.layers) {
+    for (const layer of pack.layers) {
       const assetName = String(layer.asset).split("/").pop();
       if (!layer.face_alpha_target || !NARRATOR_FACE_ALPHA_BOUNDS[assetName]) continue;
       const [left, top, right, bottom] = layer.face_alpha_target;
@@ -175,6 +195,28 @@
       context.fillStyle = colors[layer.id] || "#ffffff"; context.font = "12px Segoe UI";
       context.fillText(`${layer.id} · alfa alvo`, points[0].x + 4, points[0].y + 14);
     }
+  }
+
+  function drawAnatomyMap(headPlan, crop, bounds) {
+    const regions = [
+      ["cabeça + gola integrada", 0, 0, 1316, 1195, "rgba(247,210,122,0.14)", "#f7d27a"],
+      ["pescoço duplicado · neck.png", 270, 860, 1045, 1195, "rgba(64,201,162,0.18)", "#40c9a2"],
+      ["gola proprietária do head-clean", 360, 965, 956, 1165, "rgba(91,143,217,0.20)", "#5b8fd9"],
+      ["placa inferior · mouth", 350, 625, 970, 1045, "rgba(240,127,145,0.12)", "#f07f91"],
+    ];
+    for (const [label, left, top, right, bottom, fill, stroke] of regions) {
+      const points = [[left, top], [right, top], [right, bottom], [left, bottom]].map(([x, y]) => headPoint(x, y, headPlan, crop, bounds));
+      context.save(); context.fillStyle = fill; context.strokeStyle = stroke; context.lineWidth = 2; context.beginPath(); context.moveTo(points[0].x, points[0].y); points.slice(1).forEach((point) => context.lineTo(point.x, point.y)); context.closePath(); context.fill(); context.stroke(); context.fillStyle = stroke; context.font = "12px Segoe UI"; context.fillText(label, points[0].x + 5, points[0].y + 16); context.restore();
+    }
+  }
+
+  function drawLowerFaceCloseup(selectedAvatar, crop) {
+    const x = 1108; const y = 727; const width = 350; const height = 190;
+    const sourceY = crop.y + crop.height * 0.42;
+    context.save(); context.fillStyle = "#000"; context.fillRect(x, y, width, height);
+    context.drawImage(selectedAvatar.sourceCanvas, crop.x, sourceY, crop.width, crop.height * 0.58, x, y, width, height);
+    context.strokeStyle = "#f7d27a"; context.lineWidth = 2; context.strokeRect(x, y, width, height); context.restore();
+    context.fillStyle = "#f7d27a"; context.font = "700 15px Segoe UI"; context.fillText("TRANSIÇÃO AMPLIADA · render real", x, y + height + 22);
   }
 
   function drawPivots(plan, crop, bounds) {
@@ -215,22 +257,25 @@
   function render() {
     context.fillStyle = "#061329"; context.fillRect(0, 0, canvas.width, canvas.height);
     panel("ANTES · quadro real V1", "placa facial anterior", 24, 78, 330, 560);
-    panel("DEPOIS · renderizador real V1.3", "coordenadas locais + plano Canvas", 372, 78, 700, 700);
+    panel("DEPOIS · renderizador real V1.4", "coordenadas locais + plano Canvas", 372, 78, 700, 700);
     panel("REFERÊNCIA ESTÁTICA", "head.png · identidade facial original", 1090, 78, 386, 560);
     drawCircleImage(source, 54, 160, 270);
     const pose = settings();
     const crop = adjustNarratorFaceCrop(NARRATOR_FACE_CROP, { offsetX: Number(offsetX.value), offsetY: Number(offsetY.value), zoom: Number(zoom.value) });
-    const bounds = avatar.renderTo(context, { x: 472, y: 148, size: 500, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0, crop });
+    const selectedAvatar = avatarVariants.get(`${showNeck.checked ? 1 : 0}${showBeard.checked ? 1 : 0}`);
+    const bounds = selectedAvatar.renderTo(context, { x: 472, y: 148, size: 500, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0, crop });
     drawSafeOverlay(bounds, crop);
-    const plan = avatar.renderer.getLayerDrawPlan();
+    const plan = selectedAvatar.renderer.getLayerDrawPlan();
     const headPlan = plan.find((entry) => entry.layer.id === "head");
     if (headPlan) {
       if (grid.checked) drawHeadGrid(headPlan, crop, bounds);
-      if (alpha.checked) drawAlphaTargets(headPlan, crop, bounds);
+      if (alpha.checked) drawAlphaTargets(headPlan, crop, bounds, selectedAvatar.pack);
       if (landmarks.checked) drawLandmarks(headPlan, crop, bounds);
       if (pivots.checked) drawPivots(plan, crop, bounds);
+      if (anatomyMap.checked) drawAnatomyMap(headPlan, crop, bounds);
     }
     if (reference.checked) drawReference(1108, 145, 350, 430);
+    drawLowerFaceCloseup(selectedAvatar, crop);
     context.fillStyle = "#f7d27a"; context.font = "700 20px Segoe UI";
     context.fillText(`${state.options[state.selectedIndex].text} · boca ${mouthStateAt(pose.speechAmplitude, pose.speechAmplitude > 0)}`, 398, 724);
     context.fillStyle = "#d9e5f7"; context.font = "14px Segoe UI";
@@ -238,14 +283,15 @@
     context.fillText("Aprovação artística humana continua obrigatória.", 398, 773);
     drawDiagnostics(plan, 32, 850);
     context.fillStyle = "#b7c5dc"; context.font = "13px Segoe UI";
-    context.fillText("V1.2 à esquerda é evidência histórica; V1.3 ao centro é a composição que será exportada.", 32, 930);
-    context.fillText("As caixas e pontos podem ser desligados para inspeção limpa. As caixas não substituem avaliação visual humana.", 32, 954);
-    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${avatar.pack.layers.length} camadas visíveis · ${plan.length} entradas no draw plan`;
+    context.fillText("V1.3 à esquerda é evidência histórica; V1.4 ao centro é a composição que será exportada.", 32, 930);
+    context.fillText("As caixas e pontos podem ser desligados para inspeção limpa. O mapa anatômico é diagnóstico e não altera o exportador.", 32, 954);
+    context.fillText("Pescoço estrutural: presente no draw plan, opacity 0 na composição corrigida. Gola visível: head-clean.png.", 32, 978);
+    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${selectedAvatar.pack.layers.length} camadas visíveis · ${plan.length} entradas no draw plan · neck opacity ${selectedAvatar.pack.layers.find((layer) => layer.id === "neck")?.opacity ?? 1}`;
   }
 
   document.querySelector("#render").addEventListener("click", render);
-  document.querySelector("#reset").addEventListener("click", () => { offsetX.value = 0; offsetY.value = 0; zoom.value = 1; safe.checked = true; grid.checked = true; landmarks.checked = true; alpha.checked = true; pivots.checked = true; reference.checked = true; render(); });
-  for (const element of [state, amplitude, offsetX, offsetY, zoom, safe, grid, landmarks, alpha, pivots, reference]) { element.addEventListener("input", render); element.addEventListener("change", render); }
+  document.querySelector("#reset").addEventListener("click", () => { offsetX.value = 0; offsetY.value = 0; zoom.value = 1; safe.checked = true; grid.checked = true; landmarks.checked = true; alpha.checked = true; pivots.checked = true; reference.checked = true; anatomyMap.checked = false; showNeck.checked = false; showBeard.checked = false; render(); });
+  for (const element of [state, amplitude, offsetX, offsetY, zoom, safe, grid, landmarks, alpha, pivots, reference, anatomyMap, showNeck, showBeard]) { element.addEventListener("input", render); element.addEventListener("change", render); }
   render();
 </script>
 </body>

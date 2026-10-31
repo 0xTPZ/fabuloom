@@ -133,3 +133,12 @@ The lab now shows grid, landmarks, alpha targets, pivots, static reference and
 layer toggles through the shared renderer. The no-synthesis V1.3 MP4 and
 before/after evidence remain outside Git under `workspace\exports\videos`;
 technical checks do not constitute artistic approval.
+
+Mission 017.4 proves and corrects the lower-face anatomy boundary. `neck.png`
+and `head-clean.png` both paint a neck/collar assembly; the derived Narrator
+Mode pack now preserves the structural neck node but hides only its redundant
+pixels, leaving the visible collar owned by `head-clean.png`. The official
+Santa V5 assets and V1.3 facial alignment remain unchanged. The no-synthesis
+V1.4 MP4 and before/after, enlarged transition, asset and color-map evidence
+are generated under `workspace\exports\videos`; artistic approval remains
+human.
