@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="alexSlight" x1="627" y1="644" x2="627" y2="700" gradientUnits="userSpaceOnUse"><stop stop-color="#3E2731"/><stop offset="1" stop-color="#72343D"/></linearGradient></defs>
+  <g transform="translate(0 -60)"><path d="M535 654C566 638 597 637 627 646C657 637 688 638 719 654C691 674 660 682 627 682C594 682 563 674 535 654Z" fill="url(#alexSlight)" stroke="#713E3A" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M554 659C578 665 603 667 627 665C651 667 676 665 700 659C679 678 653 685 627 685C601 685 575 678 554 659Z" fill="#D47770"/></g>
+</svg>

@@ -9,7 +9,7 @@
 
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
-import { TOPAZIO_NARRATOR_PACKS_RECOVERY_V1 } from "./topazio-narrator-packs-recovery-v1.mjs";
+import { TOPAZIO_NARRATOR_PACKS_CARTOON_V1 } from "./topazio-narrator-packs-cartoon-v1.mjs";
 import { validateCharacterPack } from "./character-pack.mjs";
 
 export const NARRATOR_MODE_FORMAT = "fabuloom.narrator-mode/0.1";
@@ -97,8 +97,8 @@ const FACE_LAYER_IDS = new Set([
 const FACE_ORDER = ["hair_back", "neck", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"];
 const OFFICIAL_NARRATOR_SOURCE_PACKS = Object.freeze({
   santa: SANTA_V5_PACK,
-  dora: TOPAZIO_NARRATOR_PACKS_RECOVERY_V1.dora,
-  alex: TOPAZIO_NARRATOR_PACKS_RECOVERY_V1.alex,
+  dora: TOPAZIO_NARRATOR_PACKS_CARTOON_V1.dora,
+  alex: TOPAZIO_NARRATOR_PACKS_CARTOON_V1.alex,
 });
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -296,7 +296,8 @@ export function avatarCircleBounds(width, height, options = {}) {
 export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
   if (sourcePack.visual_contract === "fabuloom.narrator-visual-contract/0.1"
-    || sourcePack.visual_contract === "fabuloom.narrator-facial-recovery/0.1") {
+    || sourcePack.visual_contract === "fabuloom.narrator-facial-recovery/0.1"
+    || sourcePack.visual_contract === "fabuloom.narrator-cartoon/0.1") {
     // Official narrator packs are authored in a narrator-local coordinate
     // system. Do not apply Santa's historical alpha heuristics to them:
     // their facial plates use explicit per-layer transforms.
@@ -355,7 +356,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
     language: sourcePack.language,
     art_status: sourcePack.id === SANTA_V5_PACK.id
       ? (composition === "corrected" ? "production-face-aligned-v1.4-neck-fix-experimental-composition" : "production-face-crop-v1")
-      : (isArtReforgeV3 ? sourcePack.art_status : "technical-layered-prototype-awaiting-art-approval"),
+      : (isArtReforgeV3 || sourcePack.visual_contract === "fabuloom.narrator-cartoon/0.1" ? sourcePack.art_status : "technical-layered-prototype-awaiting-art-approval"),
     anatomy_boundary: isSantaV5 && composition === "corrected" ? "head-clean-collar-v1.4" : "source-pack-boundary",
     anatomy_notes: isSantaV5 && composition === "corrected" ? "neck node retained as structural parent; neck pixels hidden because head-clean owns the visible collar boundary" : undefined,
     layers,
