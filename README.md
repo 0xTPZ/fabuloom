@@ -155,3 +155,13 @@ the measured WAV sample rate into the absolute-time RMS reader. The corrected
 pipeline records real RMS/mouth-state diagnostics, generates a V1/V1.1 facial
 comparison and reuses the Mission 018 audio without synthesis. See
 `docs/CINEMATIC-STORY-TEST.md` for the evidence command.
+
+Mission 019 adds a reusable vertical cinematic-story profile and export path.
+It uses original five-scene 9:16 artwork, real Kokoro `pm_santa` narration,
+an original deterministic local instrumental bed, measured segment captions,
+the Narrator Mode V1.4 avatar and the existing FFmpeg boundary. The reference
+export is `fabuloom-vertical-story-test-v1.mp4` under the workspace exports;
+generated media remains outside Git. See
+`docs/VERTICAL-CINEMATIC-STORY.md` for reproduction and Visual Inspector
+evidence. The profile explicitly records that word/phoneme/viseme timing is not
+available and that final artistic review remains human.
