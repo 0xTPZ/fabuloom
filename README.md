@@ -124,3 +124,12 @@ crop at `{ x: 245, y: 35 }` and an explicit normalized face safe area. The
 browser lab exposes offset, zoom, safe-area and reset controls through the same
 renderer used by export. The no-synthesis V1.2 MP4 and visual evidence remain
 outside Git under `workspace\exports\videos`; artistic approval remains human.
+
+Mission 017.3 aligns the Narrator Mode face in a measured `head-local-v1`
+coordinate system. The derived pack records facial landmarks and maps the real
+alpha bounds of the official eyes, brows, glasses, hair and lower-face PNGs to
+explicit targets instead of positioning full transparent bitmap rectangles.
+The lab now shows grid, landmarks, alpha targets, pivots, static reference and
+layer toggles through the shared renderer. The no-synthesis V1.3 MP4 and
+before/after evidence remain outside Git under `workspace\exports\videos`;
+technical checks do not constitute artistic approval.

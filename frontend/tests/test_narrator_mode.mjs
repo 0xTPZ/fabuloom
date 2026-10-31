@@ -4,6 +4,9 @@ import {
   adjustNarratorFaceCrop,
   NARRATOR_CANVAS,
   NARRATOR_FACE_CROP,
+  NARRATOR_FACE_ALPHA_TARGETS,
+  NARRATOR_FACE_ALPHA_BOUNDS,
+  NARRATOR_FACE_REFERENCE,
   NARRATOR_FACE_SAFE_AREA,
   avatarCircleBounds,
   createNarratorAvatarPack,
@@ -77,7 +80,15 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   assert.equal(pack.layers.find((layer) => layer.id === "neck").parent, null);
   assert.equal(pack.layers.find((layer) => layer.id === "head").parent, "neck");
   assert.equal(pack.layers.find((layer) => layer.id === "beard").opacity, 0);
-  assert.deepEqual(pack.layers.find((layer) => layer.id === "mouth").size, [0.66, 0.42]);
+  const aligned = pack.layers.filter((layer) => Object.hasOwn(NARRATOR_FACE_ALPHA_TARGETS, layer.id));
+  assert.deepEqual(aligned.map((layer) => layer.id), ["hair_front", "eyes", "eyelids", "brows", "glasses", "mouth"]);
+  for (const layer of aligned) {
+    assert.equal(layer.face_coordinate_system, NARRATOR_FACE_REFERENCE.coordinateSystem);
+    assert.deepEqual(layer.face_alpha_target, NARRATOR_FACE_ALPHA_TARGETS[layer.id]);
+    assert.ok(layer.size.every((value) => value > 0));
+  }
+  assert.deepEqual(NARRATOR_FACE_ALPHA_BOUNDS["eyes-open.png"], [196, 279, 1579, 627]);
+  assert.ok(pack.layers.find((layer) => layer.id === "mouth").size[1] > 0.5);
 });
 
 test("facial motion is deterministic and mouth follows RMS only while playing", () => {

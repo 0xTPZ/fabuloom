@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fabuloom · laboratório facial do Narrator Mode</title>
+  <title>Fabuloom · laboratório facial do Narrator Mode V1.3</title>
   <style>
     :root { color-scheme: dark; font-family: Segoe UI, sans-serif; background: #061329; color: #fff7dc; }
     body { margin: 0; padding: 24px; background: radial-gradient(circle at 70% 10%, #15335b, #061329 60%); }
-    main { max-width: 1260px; margin: 0 auto; }
+    main { max-width: 1520px; margin: 0 auto; }
     h1 { color: #f7d27a; font-size: 28px; margin: 0 0 6px; }
     p { color: #b7c5dc; margin: 0 0 16px; }
-    canvas { display: block; width: min(1200px, 100%); height: auto; border: 1px solid #c58c2b; background: #07172e; }
+    canvas { display: block; width: min(1500px, 100%); height: auto; border: 1px solid #c58c2b; background: #07172e; }
     .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 16px 0; }
     label { color: #d9e5f7; }
     select, button { color: #fff7dc; background: #0d2342; border: 1px solid #547cad; border-radius: 4px; padding: 6px 9px; }
@@ -18,12 +18,13 @@
     button:hover { border-color: #f7d27a; }
     .layers { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #234a79; }
     .status { color: #f7d27a; min-height: 1.4em; margin-top: 12px; }
+    code { color: #ffd98c; }
   </style>
 </head>
 <body>
 <main>
-  <h1>Fabuloom · laboratório facial · Narrator Mode V1.2</h1>
-  <p>O painel da direita usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. O painel da esquerda é um quadro real da MISSÃO 017.</p>
+  <h1>Fabuloom · laboratório facial · Narrator Mode V1.3</h1>
+  <p>O painel central usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. As sobreposições são calculadas no plano real do Canvas, em coordenadas locais da cabeça.</p>
   <div class="controls">
     <label>Pose:
       <select id="state">
@@ -39,15 +40,29 @@
     <label>Offset Y: <input id="offset-y" type="range" min="-80" max="80" step="1" value="0"></label>
     <label>Zoom: <input id="zoom" type="range" min="0.85" max="1.25" step="0.01" value="1"></label>
     <label><input id="safe" type="checkbox" checked> área segura</label>
+    <label><input id="grid" type="checkbox" checked> grade local</label>
+    <label><input id="landmarks" type="checkbox" checked> landmarks</label>
+    <label><input id="alpha" type="checkbox" checked> caixas alfa</label>
+    <label><input id="pivots" type="checkbox" checked> pivôs</label>
+    <label><input id="reference" type="checkbox" checked> referência</label>
     <button id="render">Renderizar comparação</button>
     <button id="reset">Reset aprovado</button>
   </div>
   <div class="layers" id="layers"></div>
-  <canvas id="lab" width="1200" height="900"></canvas>
+  <canvas id="lab" width="1500" height="1040"></canvas>
   <div class="status" id="status"></div>
 </main>
 <script type="module">
-  import { adjustNarratorFaceCrop, faceSafeAreaForCrop, NARRATOR_FACE_CROP, NARRATOR_FACE_SAFE_AREA, NarratorAvatarRenderer, mouthStateAt } from "./src/narrator-mode.mjs";
+  import {
+    adjustNarratorFaceCrop,
+    faceSafeAreaForCrop,
+    NARRATOR_FACE_ALPHA_BOUNDS,
+    NARRATOR_FACE_CROP,
+    NARRATOR_FACE_REFERENCE,
+    NARRATOR_FACE_SAFE_AREA,
+    NarratorAvatarRenderer,
+    mouthStateAt,
+  } from "./src/narrator-mode.mjs";
 
   const canvas = document.querySelector("#lab");
   const context = canvas.getContext("2d");
@@ -58,9 +73,21 @@
   const offsetY = document.querySelector("#offset-y");
   const zoom = document.querySelector("#zoom");
   const safe = document.querySelector("#safe");
-  const source = new Image();
+  const grid = document.querySelector("#grid");
+  const landmarks = document.querySelector("#landmarks");
+  const alpha = document.querySelector("#alpha");
+  const pivots = document.querySelector("#pivots");
+  const reference = document.querySelector("#reference");
+  // Use DOM-created image elements instead of the global Image constructor;
+  // this also works in the embedded browser used for local QA.
+  const source = document.createElement("img");
+  const staticReference = document.createElement("img");
   source.src = "/exports/videos/.fabuloom-narrator-mode-v1-frames/000240.png";
-  await new Promise((resolve, reject) => { source.onload = resolve; source.onerror = reject; });
+  staticReference.src = new URL("assets/characters/topazio-narrators-v5/santa/head.png", document.baseURI).href;
+  await Promise.all([
+    new Promise((resolve, reject) => { source.onload = resolve; source.onerror = reject; }),
+    new Promise((resolve, reject) => { staticReference.onload = resolve; staticReference.onerror = reject; }),
+  ]);
 
   const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: document.baseURI });
   await avatar.load();
@@ -85,42 +112,140 @@
     return { timeMs: 1800, speechAmplitude: Number(amplitude.value) };
   }
 
-  function drawPanelTitle(text, x, y) {
-    context.fillStyle = "#f7d27a"; context.font = "700 22px Segoe UI"; context.fillText(text, x, y);
+  function panel(title, subtitle, x, y, width, height) {
+    context.fillStyle = "#0a1c36"; context.fillRect(x, y, width, height);
+    context.strokeStyle = "#234a79"; context.lineWidth = 2; context.strokeRect(x, y, width, height);
+    context.fillStyle = "#f7d27a"; context.font = "700 22px Segoe UI"; context.fillText(title, x + 18, y + 32);
+    context.fillStyle = "#b7c5dc"; context.font = "15px Segoe UI"; context.fillText(subtitle, x + 18, y + 57);
+  }
+
+  function drawCircleImage(image, x, y, size) {
+    context.save(); context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 3, 0, Math.PI * 2); context.clip();
+    context.fillStyle = "#07172e"; context.fillRect(x, y, size, size);
+    context.drawImage(image, x, y, size, size);
+    context.restore();
+    context.strokeStyle = "#f7d27a"; context.lineWidth = 6; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 4, 0, Math.PI * 2); context.stroke();
+  }
+
+  function transformPoint(matrix, x, y) {
+    return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f };
+  }
+
+  function sourceToPanel(point, crop, bounds) {
+    return { x: bounds.x + (point.x - crop.x) * bounds.size / crop.width, y: bounds.y + (point.y - crop.y) * bounds.size / crop.height };
+  }
+
+  function headPoint(localX, localY, headPlan, crop, bounds) {
+    return sourceToPanel(transformPoint(headPlan.matrix, localX, localY), crop, bounds);
+  }
+
+  function drawMappedLine(points, color, width = 1, dash = []) {
+    context.save(); context.strokeStyle = color; context.lineWidth = width; context.setLineDash(dash); context.beginPath();
+    points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
+    context.stroke(); context.restore();
+  }
+
+  function drawHeadGrid(headPlan, crop, bounds) {
+    const lines = [0, 200, 400, 600, 800, 1000, 1200];
+    for (const x of lines) drawMappedLine([headPoint(x, 0, headPlan, crop, bounds), headPoint(x, NARRATOR_FACE_REFERENCE.height, headPlan, crop, bounds)], "rgba(93, 210, 235, 0.38)", 1, [5, 5]);
+    for (const y of [0, 200, 400, 600, 800, 1000, 1195]) drawMappedLine([headPoint(0, y, headPlan, crop, bounds), headPoint(NARRATOR_FACE_REFERENCE.width, y, headPlan, crop, bounds)], "rgba(93, 210, 235, 0.38)", 1, [5, 5]);
+    const topLeft = headPoint(0, 0, headPlan, crop, bounds);
+    context.fillStyle = "#8fe8f5"; context.font = "12px Segoe UI"; context.fillText("head-local-v1", topLeft.x + 5, topLeft.y + 16);
+  }
+
+  function drawLandmarks(headPlan, crop, bounds) {
+    context.save(); context.font = "12px Segoe UI"; context.textAlign = "left";
+    for (const [name, landmark] of Object.entries(NARRATOR_FACE_REFERENCE.landmarks)) {
+      const point = headPoint(landmark.x, landmark.y, headPlan, crop, bounds);
+      context.fillStyle = "#ffdf8a"; context.strokeStyle = "#321d08"; context.lineWidth = 3;
+      context.beginPath(); context.arc(point.x, point.y, 4, 0, Math.PI * 2); context.fill(); context.stroke();
+      context.fillStyle = "#fff7dc"; context.fillText(name, point.x + 7, point.y - 7);
+    }
+    context.restore();
+  }
+
+  function drawAlphaTargets(headPlan, crop, bounds) {
+    const colors = { hair_front: "#a9a0ff", eyes: "#62e2ba", eyelids: "#62e2ba", brows: "#e9a4ff", glasses: "#ffcc63", mouth: "#ff8f8f" };
+    for (const layer of avatar.pack.layers) {
+      const assetName = String(layer.asset).split("/").pop();
+      if (!layer.face_alpha_target || !NARRATOR_FACE_ALPHA_BOUNDS[assetName]) continue;
+      const [left, top, right, bottom] = layer.face_alpha_target;
+      const points = [[left, top], [right, top], [right, bottom], [left, bottom], [left, top]].map(([x, y]) => headPoint(x, y, headPlan, crop, bounds));
+      drawMappedLine(points, colors[layer.id] || "#ffffff", 2, [6, 4]);
+      context.fillStyle = colors[layer.id] || "#ffffff"; context.font = "12px Segoe UI";
+      context.fillText(`${layer.id} · alfa alvo`, points[0].x + 4, points[0].y + 14);
+    }
+  }
+
+  function drawPivots(plan, crop, bounds) {
+    context.save();
+    for (const entry of plan) {
+      if (!entry.layer.face_alpha_target) continue;
+      const [anchorX, anchorY] = entry.layer.anchor || [0.5, 0.5];
+      const point = sourceToPanel(transformPoint(entry.matrix, entry.intrinsic[0] * anchorX, entry.intrinsic[1] * anchorY), crop, bounds);
+      context.strokeStyle = "#ffffff"; context.lineWidth = 2;
+      context.beginPath(); context.moveTo(point.x - 7, point.y); context.lineTo(point.x + 7, point.y); context.moveTo(point.x, point.y - 7); context.lineTo(point.x, point.y + 7); context.stroke();
+    }
+    context.restore();
   }
 
   function drawSafeOverlay(bounds, crop) {
     if (!safe.checked) return;
     const area = faceSafeAreaForCrop(crop, NARRATOR_FACE_SAFE_AREA);
     const scale = bounds.size / crop.width;
-    context.save();
-    context.setLineDash([8, 7]); context.strokeStyle = "rgba(91, 221, 235, 0.95)"; context.lineWidth = 2;
-    context.strokeRect(bounds.x + (area.left - crop.x) * scale, bounds.y + (area.top - crop.y) * scale, area.width * scale, area.height * scale);
-    context.restore();
+    context.save(); context.setLineDash([8, 7]); context.strokeStyle = "rgba(91, 221, 235, 0.95)"; context.lineWidth = 2;
+    context.strokeRect(bounds.x + (area.left - crop.x) * scale, bounds.y + (area.top - crop.y) * scale, area.width * scale, area.height * scale); context.restore();
+  }
+
+  function drawReference(x, y, width, height) {
+    const ratio = staticReference.naturalWidth / staticReference.naturalHeight;
+    const drawHeight = Math.min(height, width / ratio); const drawWidth = drawHeight * ratio;
+    const drawX = x + (width - drawWidth) / 2; const drawY = y + (height - drawHeight) / 2;
+    context.fillStyle = "#000"; context.fillRect(x, y, width, height); context.drawImage(staticReference, drawX, drawY, drawWidth, drawHeight);
+  }
+
+  function drawDiagnostics(plan, x, y) {
+    context.fillStyle = "#d9e5f7"; context.font = "13px Segoe UI";
+    const aligned = plan.filter((entry) => entry.layer.face_alpha_target);
+    context.fillText(`Sistema: ${NARRATOR_FACE_REFERENCE.coordinateSystem} · cabeça ${NARRATOR_FACE_REFERENCE.width}×${NARRATOR_FACE_REFERENCE.height} · camadas alinhadas: ${aligned.length}`, x, y);
+    context.fillText("Caixas tracejadas = limites alfa-alvo; cruzes = pivôs efetivos do draw plan; pontos = landmarks de referência.", x, y + 21);
+    context.fillText("Os limites alfa de origem são medidos nos PNGs oficiais; nenhuma precisão fonética é inferida.", x, y + 42);
   }
 
   function render() {
     context.fillStyle = "#061329"; context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#f7d27a"; context.font = "700 26px Segoe UI"; context.fillText("ANTES · quadro real da MISSÃO 017", 38, 42);
-    context.fillStyle = "#b7c5dc"; context.font = "16px Segoe UI"; context.fillText("placa facial duplicada e pescoço mais exposto", 38, 68);
-    context.save(); context.beginPath(); context.arc(285, 290, 210, 0, Math.PI * 2); context.clip(); context.drawImage(source, 30, 630, 420, 420, 75, 80, 420, 420); context.restore();
-    context.strokeStyle = "#f7d27a"; context.lineWidth = 7; context.beginPath(); context.arc(285, 290, 210, 0, Math.PI * 2); context.stroke();
-
-    context.fillStyle = "#f7d27a"; context.font = "700 26px Segoe UI"; context.fillText("DEPOIS · renderizador real", 660, 42);
-    context.fillStyle = "#b7c5dc"; context.font = "16px Segoe UI"; context.fillText("placa única, boca explícita, crop corrigido", 660, 68);
+    panel("ANTES · quadro real V1", "placa facial anterior", 24, 78, 330, 560);
+    panel("DEPOIS · renderizador real V1.3", "coordenadas locais + plano Canvas", 372, 78, 700, 700);
+    panel("REFERÊNCIA ESTÁTICA", "head.png · identidade facial original", 1090, 78, 386, 560);
+    drawCircleImage(source, 54, 160, 270);
     const pose = settings();
     const crop = adjustNarratorFaceCrop(NARRATOR_FACE_CROP, { offsetX: Number(offsetX.value), offsetY: Number(offsetY.value), zoom: Number(zoom.value) });
-    const bounds = avatar.renderTo(context, { x: 700, y: 80, size: 420, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0, crop });
+    const bounds = avatar.renderTo(context, { x: 472, y: 148, size: 500, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0, crop });
     drawSafeOverlay(bounds, crop);
-    drawPanelTitle(`${state.options[state.selectedIndex].text} · boca ${mouthStateAt(pose.speechAmplitude, pose.speechAmplitude > 0)}`, 660, 548);
-    context.fillStyle = "#d9e5f7"; context.font = "16px Segoe UI"; context.fillText(`t=${pose.timeMs} ms · RMS=${pose.speechAmplitude.toFixed(2)} · crop ${Math.round(crop.x)},${Math.round(crop.y)},${Math.round(crop.width)}`, 660, 576);
-    context.fillText("Aprovação artística humana continua obrigatória.", 660, 604);
-    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${avatar.pack.layers.length} camadas visíveis`;
+    const plan = avatar.renderer.getLayerDrawPlan();
+    const headPlan = plan.find((entry) => entry.layer.id === "head");
+    if (headPlan) {
+      if (grid.checked) drawHeadGrid(headPlan, crop, bounds);
+      if (alpha.checked) drawAlphaTargets(headPlan, crop, bounds);
+      if (landmarks.checked) drawLandmarks(headPlan, crop, bounds);
+      if (pivots.checked) drawPivots(plan, crop, bounds);
+    }
+    if (reference.checked) drawReference(1108, 145, 350, 430);
+    context.fillStyle = "#f7d27a"; context.font = "700 20px Segoe UI";
+    context.fillText(`${state.options[state.selectedIndex].text} · boca ${mouthStateAt(pose.speechAmplitude, pose.speechAmplitude > 0)}`, 398, 724);
+    context.fillStyle = "#d9e5f7"; context.font = "14px Segoe UI";
+    context.fillText(`t=${pose.timeMs} ms · RMS=${pose.speechAmplitude.toFixed(2)} · crop ${Math.round(crop.x)},${Math.round(crop.y)},${Math.round(crop.width)}`, 398, 750);
+    context.fillText("Aprovação artística humana continua obrigatória.", 398, 773);
+    drawDiagnostics(plan, 32, 850);
+    context.fillStyle = "#b7c5dc"; context.font = "13px Segoe UI";
+    context.fillText("V1.2 à esquerda é evidência histórica; V1.3 ao centro é a composição que será exportada.", 32, 930);
+    context.fillText("As caixas e pontos podem ser desligados para inspeção limpa. As caixas não substituem avaliação visual humana.", 32, 954);
+    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${avatar.pack.layers.length} camadas visíveis · ${plan.length} entradas no draw plan`;
   }
+
   document.querySelector("#render").addEventListener("click", render);
-  document.querySelector("#reset").addEventListener("click", () => { offsetX.value = 0; offsetY.value = 0; zoom.value = 1; safe.checked = true; render(); });
-  state.addEventListener("change", render); amplitude.addEventListener("input", render);
-  offsetX.addEventListener("input", render); offsetY.addEventListener("input", render); zoom.addEventListener("input", render); safe.addEventListener("change", render);
+  document.querySelector("#reset").addEventListener("click", () => { offsetX.value = 0; offsetY.value = 0; zoom.value = 1; safe.checked = true; grid.checked = true; landmarks.checked = true; alpha.checked = true; pivots.checked = true; reference.checked = true; render(); });
+  for (const element of [state, amplitude, offsetX, offsetY, zoom, safe, grid, landmarks, alpha, pivots, reference]) { element.addEventListener("input", render); element.addEventListener("change", render); }
   render();
 </script>
 </body>
