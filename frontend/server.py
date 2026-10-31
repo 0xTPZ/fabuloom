@@ -14,8 +14,32 @@ from urllib.parse import unquote, urlsplit
 
 
 FRONTEND_ROOT = Path(__file__).resolve().parent
-EXPORT_ROOT = Path(r"E:\Fabuloom\workspace\exports").resolve()
-WORKSPACE_ROOT = Path(r"E:\Fabuloom").resolve()
+
+
+def workspace_root_for(frontend_root: Path, configured: str | None = None) -> Path:
+    """Resolve the local workspace without requiring the developer's drive layout."""
+    if configured:
+        return Path(configured).expanduser().resolve()
+    project_root = frontend_root.parent
+    umbrella_root = project_root.parent
+    if (umbrella_root / "workspace").is_dir():
+        return umbrella_root.resolve()
+    return project_root.resolve()
+
+
+def export_root_for(workspace_root: Path, configured: str | None = None) -> Path:
+    """Resolve an export directory that remains contained by the local workspace."""
+    candidate = Path(configured).expanduser() if configured else workspace_root / "workspace" / "exports"
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(workspace_root)
+    except ValueError as exc:
+        raise SystemExit("FABULOOM_EXPORT_ROOT must stay inside FABULOOM_WORKSPACE_ROOT") from exc
+    return resolved
+
+
+WORKSPACE_ROOT = workspace_root_for(FRONTEND_ROOT, os.environ.get("FABULOOM_WORKSPACE_ROOT"))
+EXPORT_ROOT = export_root_for(WORKSPACE_ROOT, os.environ.get("FABULOOM_EXPORT_ROOT"))
 CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None

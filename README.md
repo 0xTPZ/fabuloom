@@ -180,3 +180,12 @@ preview and export views. Santa V5 Narrator Mode V1.4 is the main narrator
 reference, while the historical Character Stage and diagnostic laboratories
 remain available under an explicit DEV area. See `docs/UI-REFORGE.md` for the
 audit matrix, compatibility boundary, captures and known limits.
+
+Mission 022 audits the user journey and clean installation. It records that
+the default `main` branch is still the Core foundation, while the UI shell is
+on `mission-021-ui-reforge`; it also documents the missing project/editor/job
+workflow, the current Dora/Alex integration boundary, and the roadmap for
+Narrator Characters, Character Creator V2 and Production Studio. The loopback
+server now supports explicit portable `FABULOOM_WORKSPACE_ROOT` and
+`FABULOOM_EXPORT_ROOT` values. See `docs/AUDITORIA_GERAL.md` and the linked
+mission reports before treating the project as installable.
