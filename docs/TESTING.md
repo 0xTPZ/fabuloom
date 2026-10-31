@@ -663,3 +663,27 @@ WAVs decode is expected.
 The UI Reforge run passed 128 frontend Node tests and 35 Python tests with one
 existing opt-in real-Kokoro test skipped. This mission does not add a new
 exporter or require network access, GPU or model installation.
+
+## Mission 022 — clean-room and UX audit
+
+The Python discovery command must set the source root explicitly in a fresh
+checkout:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path .\src).Path
+python -m unittest discover -s tests -p 'test_*.py'
+node --test .\frontend\tests\*.mjs
+```
+
+For an isolated Studio server, set workspace roots before starting it:
+
+```powershell
+$env:FABULOOM_WORKSPACE_ROOT = (Resolve-Path .).Path
+$env:FABULOOM_EXPORT_ROOT = Join-Path $env:FABULOOM_WORKSPACE_ROOT 'workspace\exports'
+python .\frontend\server.py --port 8765
+```
+
+The clean-room audit confirmed that no model weights, WAVs, manifestos, scene
+images or MP4s are part of the public clone. The real Kokoro test remains
+opt-in. See `docs/INSTALACAO_LIMPA.md`, `docs/EXPERIENCIA_USUARIO.md` and
+`docs/MATRIZ_FUNCIONALIDADES.md` for the evidence-based limits.
