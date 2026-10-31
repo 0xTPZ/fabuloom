@@ -561,3 +561,21 @@ with FFprobe, and produces before/after and enlarged transition evidence. The
 face lab must be opened through `frontend/server.py`; its semantic neck/beard
 toggles and color map are diagnostic only. No automated check grants artistic
 approval.
+
+## Mission 018 — cinematic story test
+
+The cinematic story test reuses the Narrator Mode V1.4 renderer and validates a
+real Kokoro `pm_santa` narration, measured scene timing, deterministic Canvas
+capture, and FFmpeg encoding:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\cinematic_story_test_demo.py --overwrite
+```
+
+The successful run produced 527 PNG frames and an MP4 probe of 1920×1080,
+H.264 video and AAC mono audio at 24 kHz. The measured narration duration was
+17,555 ms. The real Kokoro integration test remains opt-in because it loads the
+local model; the story pipeline itself exercised the real `pm_santa` model.
+Word, phoneme and viseme timestamps are intentionally not fabricated.
