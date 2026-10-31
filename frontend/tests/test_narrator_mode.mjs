@@ -11,11 +11,13 @@ import {
   NARRATOR_FACE_SAFE_AREA,
   avatarCircleBounds,
   createNarratorAvatarPack,
+  createOfficialNarratorAvatarPack,
   createNarratorModeDescriptor,
   createNarratorTimeline,
   faceSafeAreaForCrop,
   facialPoseAt,
   mouthStateAt,
+  narratorSourcePackFor,
   NarratorFacialRig,
   segmentAt,
   validateNarratorFaceCrop,
@@ -94,6 +96,24 @@ test("Santa face pack contains only facial layers and uses head-local hierarchy"
   }
   assert.deepEqual(NARRATOR_FACE_ALPHA_BOUNDS["eyes-open.png"], [196, 279, 1579, 627]);
   assert.ok(pack.layers.find((layer) => layer.id === "mouth").size[1] > 0.5);
+});
+
+test("official Dora and Alex use their own V2 facial sources while Santa keeps V5", () => {
+  const dora = createOfficialNarratorAvatarPack("dora");
+  const alex = createOfficialNarratorAvatarPack("alex");
+  const santa = createOfficialNarratorAvatarPack("santa");
+  assert.equal(narratorSourcePackFor("dora").voice_id, "pf_dora");
+  assert.equal(narratorSourcePackFor("alex").voice_id, "pm_alex");
+  assert.equal(dora.voice_id, "pf_dora");
+  assert.equal(alex.voice_id, "pm_alex");
+  assert.equal(santa.voice_id, "pm_santa");
+  assert.match(dora.art_status, /awaiting-art-approval/);
+  assert.match(alex.art_status, /awaiting-art-approval/);
+  assert.match(santa.art_status, /production-face/);
+  assert.match(dora.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v2\/dora\/head\.svg$/);
+  assert.match(alex.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v2\/alex\/head\.svg$/);
+  assert.match(santa.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v5\/santa\/head-clean\.png$/);
+  assert.notEqual(dora.layers.find((layer) => layer.id === "head").asset, santa.layers.find((layer) => layer.id === "head").asset);
 });
 
 test("neck fix hides duplicate pixels without changing the head hierarchy or transform", () => {

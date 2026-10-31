@@ -189,3 +189,11 @@ Narrator Characters, Character Creator V2 and Production Studio. The loopback
 server now supports explicit portable `FABULOOM_WORKSPACE_ROOT` and
 `FABULOOM_EXPORT_ROOT` values. See `docs/AUDITORIA_GERAL.md` and the linked
 mission reports before treating the project as installable.
+
+Mission 023 connects the official narrator trio to the same visual and audio
+selection path in Studio. Santa V5 remains the approved production reference;
+Dora (`pf_dora`) and Alex (`pm_alex`) now load their own V2 technical facial
+packs rather than reusing Santa's face. The selection is validated against the
+measured local manifest and the renderer reports `AWAITING_ART_APPROVAL` until
+the owner approves the new art. See `docs/OFFICIAL-NARRATORS-V1.md` and
+`frontend/official-narrators-board.html`.

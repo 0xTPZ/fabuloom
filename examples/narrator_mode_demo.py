@@ -77,13 +77,13 @@ def _wait_for_server(port: int) -> None:
     raise TimeoutError("narrator capture server did not start")
 
 
-def _capture(studio_root: Path, capture_dir: Path, manifest: Path, port: int, timeout: float) -> dict:
+def _capture(studio_root: Path, capture_dir: Path, manifest: Path, port: int, timeout: float, character_id: str = "santa") -> dict:
     env = os.environ.copy(); env["FABULOOM_CAPTURE_DIR"] = str(capture_dir.parent)
     server = subprocess.Popen([sys.executable, str(studio_root / "frontend" / "server.py"), "--port", str(port)], cwd=studio_root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     edge = None; profile = None
     try:
         _wait_for_server(port); profile = Path(tempfile.mkdtemp(prefix=".narrator-edge-", dir=capture_dir.parent))
-        url = f"http://127.0.0.1:{port}/capture-narrator-mode.html?session={quote(capture_dir.name)}&manifest={quote('/exports/' + manifest.name, safe='')}&fps={FPS}"
+        url = f"http://127.0.0.1:{port}/capture-narrator-mode.html?session={quote(capture_dir.name)}&manifest={quote('/exports/' + manifest.name, safe='')}&character={quote(character_id)}&fps={FPS}"
         edge = subprocess.Popen([str(_edge_path()), "--headless=new", "--disable-gpu", "--disable-extensions", "--no-first-run", "--no-default-browser-check", f"--user-data-dir={profile}", f"--window-size={WIDTH},{HEIGHT}", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         complete = capture_dir / "complete.json"; deadline = time.monotonic() + timeout
         while not complete.is_file():

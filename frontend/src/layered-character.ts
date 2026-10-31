@@ -233,6 +233,33 @@ export class LayeredCharacterRenderer {
     return this;
   }
 
+  /**
+   * Replace the data-only pack without introducing a second renderer path.
+   * The caller is responsible for awaiting the returned load before drawing.
+   */
+  async setPack(pack) {
+    const previousPack = this.pack;
+    const previousImages = this.images;
+    const previousLoaded = this.loaded;
+    const previousExpression = this.expression;
+    this.pack = validateCharacterPack(pack);
+    this.images = new Map();
+    this.loaded = false;
+    this.expression = "neutral";
+    this.rig.setExpression("neutral");
+    try {
+      await this.load();
+    } catch (error) {
+      this.pack = previousPack;
+      this.images = previousImages;
+      this.loaded = previousLoaded;
+      this.expression = previousExpression;
+      this.rig.setExpression(previousExpression);
+      throw error;
+    }
+    return this;
+  }
+
   loadImage(asset) {
     if (this.images.has(asset)) return this.images.get(asset).promise;
     const record = { image: null, size: [0, 0], promise: null };
