@@ -149,3 +149,9 @@ timing, three original scene backgrounds, deterministic Canvas camera effects,
 and FFmpeg export. Generated media remains outside Git under
 `workspace\exports`; see `docs/CINEMATIC-STORY-TEST.md` for reproduction and
 the FilmCraft/EffectCraft audit boundary.
+
+Mission 018.1 fixes the cinematic lip-sync regression: the capture now passes
+the measured WAV sample rate into the absolute-time RMS reader. The corrected
+pipeline records real RMS/mouth-state diagnostics, generates a V1/V1.1 facial
+comparison and reuses the Mission 018 audio without synthesis. See
+`docs/CINEMATIC-STORY-TEST.md` for the evidence command.

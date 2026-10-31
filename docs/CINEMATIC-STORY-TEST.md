@@ -57,3 +57,30 @@ The output video is:
 The MP4, WAVs, generated scenes, frame sequence, timeline, SRT, frame board
 and report are workspace artifacts and must not be committed to the public
 repository. Artistic approval remains a human review step.
+
+## Mission 018.1 — lip-sync regression fix
+
+The first cinematic capture had a regression in its inline RMS path: it called
+the reader without the measured WAV sample rate. The resulting absolute-time
+window became `NaN`, so the reader returned zero for every frame even though the
+Kokoro audio was valid. Mission 017.4 passed this argument correctly.
+
+The fix extracts strict mono PCM-16 decoding, absolute-time segment composition
+and the RMS reader into `frontend/src/cinematic-audio.mjs`. The capture page now
+passes the actual sample rate and records RMS, mouth state and selected asset
+diagnostics in `complete.json`. The official Santa V5 assets and scene images
+are unchanged.
+
+Reproduce the corrected video without synthesis:
+
+```powershell
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\cinematic_story_lipsync_demo.py --overwrite
+```
+
+The corrected output, mouth-state board, V1/V1.1 comparison, difference crop
+and RMS report are under `E:\Fabuloom\workspace\exports\videos`. The final
+MP4 reuses the Mission 018 WAV and manifest, remains 1920×1080 H.264/AAC and
+has no word, phoneme or viseme timestamps. Human visual review remains
+required.

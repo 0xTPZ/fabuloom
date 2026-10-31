@@ -579,3 +579,21 @@ H.264 video and AAC mono audio at 24 kHz. The measured narration duration was
 17,555 ms. The real Kokoro integration test remains opt-in because it loads the
 local model; the story pipeline itself exercised the real `pm_santa` model.
 Word, phoneme and viseme timestamps are intentionally not fabricated.
+
+## Mission 018.1 — lip-sync regression
+
+The regression test covers strict mono PCM-16 decoding, absolute-time segment
+composition, RMS amplitude, silence handling and deterministic repeated reads:
+
+```powershell
+node --test .\frontend\tests\test_cinematic_audio.mjs
+node --test .\frontend\tests\*.mjs
+$env:PYTHONPATH = "E:\Fabuloom\studio\src"
+E:\Fabuloom\workspace\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+The real audiovisual proof is generated from the existing Mission 018 WAV and
+manifest with `examples/cinematic_story_lipsync_demo.py`. It writes a five-state
+mouth board, V1/V1.1 comparison and lower-face difference crop, then validates
+the corrected MP4 with FFprobe and a complete FFmpeg decode. The evidence does
+not treat changing hair, eyes or scenery as lip-sync proof.
