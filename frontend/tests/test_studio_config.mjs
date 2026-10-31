@@ -19,6 +19,9 @@ test("Studio UI contract exposes stable and experimental sections", () => {
 
 test("official narrators keep Santa V5 as the primary reference", () => {
   assert.equal(officialNarratorById("santa").voiceId, "pm_santa");
+  assert.equal(officialNarratorById("santa").status, "production");
+  assert.equal(officialNarratorById("dora").status, "awaiting-art-approval");
+  assert.equal(officialNarratorById("alex").status, "awaiting-art-approval");
   assert.equal(OFFICIAL_NARRATORS.length, 3);
   assert.ok(DEV_LINKS.every((link) => link.href.startsWith("/")));
 });

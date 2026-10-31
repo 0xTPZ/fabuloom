@@ -9,6 +9,7 @@
 
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { SANTA_V5_PACK } from "./santa-v5-pack.mjs";
+import { TOPAZIO_NARRATOR_PACKS_V2 } from "./topazio-narrator-packs.mjs";
 import { validateCharacterPack } from "./character-pack.mjs";
 
 export const NARRATOR_MODE_FORMAT = "fabuloom.narrator-mode/0.1";
@@ -94,6 +95,11 @@ const FACE_LAYER_IDS = new Set([
   "neck", "hair_back", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth",
 ]);
 const FACE_ORDER = ["hair_back", "neck", "head", "hair_front", "eyes", "eyelids", "brows", "glasses", "beard", "mouth"];
+const OFFICIAL_NARRATOR_SOURCE_PACKS = Object.freeze({
+  santa: SANTA_V5_PACK,
+  dora: TOPAZIO_NARRATOR_PACKS_V2.dora,
+  alex: TOPAZIO_NARRATOR_PACKS_V2.alex,
+});
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number(value) || 0));
 
@@ -268,6 +274,13 @@ export class NarratorFacialRig extends LayeredCharacterRig {
   }
 }
 
+export function narratorSourcePackFor(characterId = "santa") {
+  const key = String(characterId || "santa").toLowerCase();
+  const pack = OFFICIAL_NARRATOR_SOURCE_PACKS[key];
+  if (!pack) throw new Error(`Unknown official narrator visual: ${characterId}`);
+  return pack;
+}
+
 export function avatarCircleBounds(width, height, options = {}) {
   assertPositiveInteger(width, "width");
   assertPositiveInteger(height, "height");
@@ -282,6 +295,7 @@ export function avatarCircleBounds(width, height, options = {}) {
 
 export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {}) {
   validateCharacterPack(sourcePack);
+  const isSantaV5 = sourcePack.id === SANTA_V5_PACK.id;
   const composition = options.composition || "corrected";
   const showNeckPixels = options.showNeckPixels === true;
   const showBeardPixels = options.showBeardPixels === true;
@@ -295,7 +309,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
       if (copy.id === "hair_front" || copy.id === "eyes" || copy.id === "eyelids" || copy.id === "brows" || copy.id === "glasses" || copy.id === "mouth") {
         alignLayerAlphaToHead(copy, NARRATOR_FACE_ALPHA_TARGETS[copy.id]);
       }
-      if (composition === "corrected" && copy.id === "neck" && !showNeckPixels) {
+      if (isSantaV5 && composition === "corrected" && copy.id === "neck" && !showNeckPixels) {
         // Keep the node in the hierarchy so head transforms remain identical
         // to V1.3, but hide its painted pixels. `neck.png` contains a second
         // skin/collar assembly; `head-clean.png` is the visible owner of that
@@ -305,7 +319,7 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
         copy.pixel_source = NARRATOR_FACE_ANATOMY.neck.pixelSource;
         copy.hidden_reason = NARRATOR_FACE_ANATOMY.neck.reason;
       }
-      if (composition === "corrected" && copy.id === "beard" && !showBeardPixels) copy.opacity = 0;
+      if (isSantaV5 && composition === "corrected" && copy.id === "beard" && !showBeardPixels) copy.opacity = 0;
       if (composition === "corrected" && copy.id === "mouth") {
         // The approved V5 mouth PNGs are complete lower-face plates (they
         // contain the moustache and beard as well as the lips). Use one plate
@@ -319,13 +333,15 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
   const pack = {
     format: "fabuloom.character/0.1",
     rig_profile: sourcePack.rig_profile,
-    id: "topazio-narrator-santa-v5-face",
-    name: "Santa V5 · avatar facial do Narrator Mode",
+    id: `${sourcePack.id}-narrator-face`,
+    name: `${sourcePack.name} · avatar facial do Narrator Mode`,
     voice_id: sourcePack.voice_id,
     language: sourcePack.language,
-    art_status: composition === "corrected" ? "production-face-aligned-v1.4-neck-fix-experimental-composition" : "production-face-crop-v1",
-    anatomy_boundary: composition === "corrected" ? "head-clean-collar-v1.4" : "source-pack-boundary",
-    anatomy_notes: composition === "corrected" ? "neck node retained as structural parent; neck pixels hidden because head-clean owns the visible collar boundary" : undefined,
+    art_status: sourcePack.id === SANTA_V5_PACK.id
+      ? (composition === "corrected" ? "production-face-aligned-v1.4-neck-fix-experimental-composition" : "production-face-crop-v1")
+      : "technical-layered-prototype-awaiting-art-approval",
+    anatomy_boundary: isSantaV5 && composition === "corrected" ? "head-clean-collar-v1.4" : "source-pack-boundary",
+    anatomy_notes: isSantaV5 && composition === "corrected" ? "neck node retained as structural parent; neck pixels hidden because head-clean owns the visible collar boundary" : undefined,
     layers,
     expressions: sourcePack.expressions.map((expression) => ({
       id: expression.id,
@@ -343,6 +359,10 @@ export function createNarratorAvatarPack(sourcePack = SANTA_V5_PACK, options = {
   return Object.freeze(pack);
 }
 
+export function createOfficialNarratorAvatarPack(characterId = "santa", options = {}) {
+  return createNarratorAvatarPack(narratorSourcePackFor(characterId), options);
+}
+
 export class NarratorAvatarRenderer {
   constructor(canvas, options = {}) {
     if (!canvas || typeof canvas.getContext !== "function") throw new TypeError("a target canvas is required");
@@ -350,17 +370,17 @@ export class NarratorAvatarRenderer {
     this.sourceCanvas = options.sourceCanvas || document.createElement("canvas");
     this.sourceCanvas.width = NARRATOR_SOURCE_CANVAS.width;
     this.sourceCanvas.height = NARRATOR_SOURCE_CANVAS.height;
-    this.pack = options.pack || createNarratorAvatarPack();
+    this.pack = options.pack || createOfficialNarratorAvatarPack(options.characterId || "santa");
     this.rig = options.rig || new NarratorFacialRig();
-    const mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
+    this.mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
     this.renderer = new LayeredCharacterRenderer(this.sourceCanvas, this.rig, this.pack, {
       assetRoot: options.assetRoot || document.baseURI,
       renderBackground: false,
       assetResolver: (layer, pose, expressionAsset) => {
-        if (layer.id !== "mouth" || !mouthOpenAsset) return expressionAsset;
+        if (layer.id !== "mouth" || !this.mouthOpenAsset) return expressionAsset;
         return mouthStateAt(pose.mouth_open, true) === "closed" || mouthStateAt(pose.mouth_open, true) === "slight"
           ? expressionAsset
-          : mouthOpenAsset;
+          : this.mouthOpenAsset;
       },
     });
     this.crop = validateNarratorFaceCrop(options.crop || NARRATOR_FACE_CROP);
@@ -369,6 +389,23 @@ export class NarratorAvatarRenderer {
   }
 
   async load() { await this.renderer.load(); this.loaded = true; return this; }
+
+  async setPack(pack) {
+    const previousPack = this.pack;
+    const previousMouthOpenAsset = this.mouthOpenAsset;
+    validateCharacterPack(pack);
+    this.pack = pack;
+    this.mouthOpenAsset = this.pack.expressions.find((expression) => expression.id === "smile")?.overrides?.mouth || null;
+    try {
+      await this.renderer.setPack(pack);
+    } catch (error) {
+      this.pack = previousPack;
+      this.mouthOpenAsset = previousMouthOpenAsset;
+      throw error;
+    }
+    this.loaded = true;
+    return this;
+  }
 
   setLayerVisibility(visibility) {
     this.visibleLayers = visibility;
@@ -461,6 +498,13 @@ export class NarratorSceneRenderer {
     this.amplitudeAt = options.amplitudeAt || (() => 0);
     this.subtitles = options.subtitles || new SubtitleRenderer();
     this.sceneId = options.sceneId || "topazio-storyteller-office";
+    this.narratorName = options.narratorName || "Santa V5";
+    this.voiceId = options.voiceId || "pm_santa";
+  }
+
+  setNarratorIdentity({ name, voiceId } = {}) {
+    if (name) this.narratorName = String(name);
+    if (voiceId) this.voiceId = String(voiceId);
   }
 
   renderFrame({ timeMs = 0, isPlaying = true } = {}) {
@@ -477,7 +521,7 @@ export class NarratorSceneRenderer {
     if (this.avatar) this.avatar.renderTo(ctx, { timeMs, isPlaying, speechAmplitude: this.amplitudeAt(timeMs) });
     const segment = this.timeline ? segmentAt(this.timeline, timeMs) : null;
     this.subtitles.render(ctx, segment);
-    ctx.fillStyle = "rgba(247,210,122,0.9)"; ctx.font = "22px Segoe UI, sans-serif"; ctx.textAlign = "right"; ctx.fillText("SANTA · pm_santa · pt-BR", width - 84, height - 42);
+    ctx.fillStyle = "rgba(247,210,122,0.9)"; ctx.font = "22px Segoe UI, sans-serif"; ctx.textAlign = "right"; ctx.fillText(`${this.narratorName.toUpperCase()} · ${this.voiceId} · pt-BR`, width - 84, height - 42);
     return { segment, pose: facialPoseAt(timeMs, this.amplitudeAt(timeMs), isPlaying), sceneId: this.sceneId };
   }
 }

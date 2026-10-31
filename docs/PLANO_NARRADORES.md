@@ -11,8 +11,9 @@ tenham identidade visual própria integrada ao mesmo caminho de renderização.
 - `topazio-narrator-packs.mjs` possui packs V1 de retrato e packs V2
   animation-ready com camadas SVG, expressões e bindings.
 - O Character Stage legado consegue preparar os packs V2.
-- O Studio UI atual mantém Santa V5 no canvas e altera apenas o manifesto/voz
-  selecionado para Dora ou Alex. Isso é intencional e deve continuar explícito.
+- O Studio agora troca visual e voz coordenadamente: Santa usa o V5 facial
+  corrigido; Dora e Alex usam seus packs V2 técnicos e seus manifestos Kokoro
+  correspondentes. O contrato da UI marca ambos como `awaiting-art-approval`.
 
 ## Contrato da MISSÃO 023
 
@@ -37,5 +38,7 @@ duas operações coordenadas, verificando que o `voice_id` efetivamente carregad
 corresponde ao narrador selecionado. Testes devem cobrir troca durante parado,
 pausado e reproduzindo, seek, ausência de assets e determinismo.
 
-Não copiar arte privada nem redesenhar Santa V5 nesta missão.
+Não copiar arte privada nem redesenhar Santa V5 nesta missão. A prancha de gate
+artístico está em `frontend/official-narrators-board.html`; a promoção de Dora e
+Alex para produção depende de revisão humana.
 

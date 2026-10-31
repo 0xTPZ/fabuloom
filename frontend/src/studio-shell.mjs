@@ -2,6 +2,7 @@ import { AudioTimelinePlayer } from "./audio.ts";
 import {
   NarratorAvatarRenderer,
   NarratorSceneRenderer,
+  createOfficialNarratorAvatarPack,
   createNarratorTimeline,
 } from "./narrator-mode.mjs";
 import { manifestVoiceId, narrationForCharacter, narrationForUrl, TOPAZIO_NARRATION_CATALOG } from "./topazio-narrations.mjs";
@@ -29,6 +30,7 @@ let manifest = null;
 let sceneRenderer = null;
 let avatarRenderer = null;
 let selectedNarration = narrationForCharacter("santa");
+let activeNarrator = officialNarratorById("santa");
 let loadToken = 0;
 
 const ROUTE_COPY = Object.freeze({
@@ -154,19 +156,23 @@ function updatePlaybackUi() {
   updateSegmentHighlights(player?.activeSegment() || null);
 }
 
-function updateVoiceIdentity(item) {
+function updateVoiceIdentity(item, actualVoice = item?.voiceId) {
   const narrator = officialNarratorById(item?.characterId || "santa");
-  const name = narrator?.id === "santa" ? "Santa V5" : `Santa V5 · voz ${narrator?.name || "local"}`;
+  const name = narrator?.name || "Santa V5";
+  const visualStatus = narrator?.status === "production" ? "visual aprovado" : "visual técnico · aguardando arte";
+  $("#dock-avatar").textContent = name.slice(0, 1).toUpperCase();
   $("#dock-character-name").textContent = name;
-  $("#dock-character-role").textContent = `Narrator Mode V1.4 · ${item?.voiceId || narrator?.voiceId || "pm_santa"} · pt-BR`;
-  $("#canvas-voice").textContent = item?.voiceId || narrator?.voiceId || "pm_santa";
+  $("#metric-narrator").textContent = name;
+  $("#dock-character-role").textContent = `Narrator Mode V1.4 · ${actualVoice || narrator?.voiceId || "pm_santa"} · pt-BR · ${visualStatus}`;
+  $("#canvas-voice").textContent = actualVoice || item?.voiceId || narrator?.voiceId || "pm_santa";
+  $("#studio-preview").setAttribute("aria-label", `Prévia do Narrator Mode com ${name}`);
+  if (sceneRenderer) sceneRenderer.setNarratorIdentity({ name, voiceId: actualVoice || narrator?.voiceId });
 }
 
 async function loadNarration(item) {
   const requested = item || selectedNarration;
   if (!requested) return false;
   selectedNarration = requested;
-  updateVoiceIdentity(requested);
   const token = ++loadToken;
   setStatus(`Carregando ${requested.voiceId}…`);
   $("#audio-voice-state").textContent = `${requested.voiceId} · carregando`;
@@ -194,9 +200,18 @@ async function loadNarration(item) {
       await nextPlayer.dispose();
       return false;
     }
+    const narrator = officialNarratorById(requested.characterId || "santa");
+    if (!avatarRenderer) throw new Error("renderer visual ainda não está pronto");
+    await avatarRenderer.setPack(createOfficialNarratorAvatarPack(requested.characterId || "santa"));
+    if (token !== loadToken) {
+      await nextPlayer.dispose();
+      return false;
+    }
     manifest = nextManifest;
     player = nextPlayer;
+    activeNarrator = narrator || activeNarrator;
     sceneRenderer.timeline = createNarratorTimeline(nextManifest);
+    updateVoiceIdentity(requested, actualVoice);
     renderSegments(nextManifest);
     $("#canvas-voice").textContent = actualVoice;
     $("#metric-voice").textContent = `Kokoro · ${actualVoice}`;
@@ -312,11 +327,13 @@ function startRenderer() {
   return new Promise((resolve) => {
     const ready = async () => {
       try {
-        avatarRenderer = new NarratorAvatarRenderer(previewCanvas);
+        avatarRenderer = new NarratorAvatarRenderer(previewCanvas, { characterId: "santa" });
         await avatarRenderer.load();
         sceneRenderer = new NarratorSceneRenderer(previewCanvas, avatarRenderer, {
           sceneImage,
           amplitudeAt: () => player?.amplitude() || 0,
+          narratorName: "Santa V5",
+          voiceId: "pm_santa",
         });
         resolve(true);
       } catch (error) {
@@ -349,7 +366,7 @@ async function init() {
   await loadNarration(selectedNarration);
   renderRoute(location.hash.slice(1) || "dashboard");
   window.__FABULOOM_STUDIO__ = Object.freeze({
-    getState: () => Object.freeze({ route: activeRoute, voiceId: manifestVoiceId(manifest), playerState: player?.state || "stopped", durationMs: manifest?.duration_ms || 0 }),
+    getState: () => Object.freeze({ route: activeRoute, characterId: activeNarrator?.id || "santa", voiceId: manifestVoiceId(manifest), playerState: player?.state || "stopped", durationMs: manifest?.duration_ms || 0 }),
     navigate: renderRoute,
     loadNarration,
   });

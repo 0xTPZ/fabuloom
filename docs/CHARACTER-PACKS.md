@@ -116,6 +116,15 @@ available for compatibility checks. Their local vector layers are designed to
 move independently in the existing Canvas renderer, rather than using a full
 portrait as the transform root.
 
+Mission 023 connects Dora and Alex V2 to the Narrator Mode facial path through
+`createOfficialNarratorAvatarPack()` and `NarratorAvatarRenderer.setPack()`. The
+Studio changes the visual pack and the measured Kokoro manifest together:
+`dora → pf_dora`, `santa → pm_santa`, and `alex → pm_alex`, all in `pt-BR`.
+Santa V5 remains the production visual reference. Dora and Alex are explicitly
+marked `awaiting-art-approval`; their V2 SVGs prove the identity/voice/rig
+contract but are not presented as final cinematic art. See
+`docs/OFFICIAL-NARRATORS-V1.md` and `frontend/official-narrators-board.html`.
+
 The export bridge is intentionally separate from the provider and player.
 `frontend/src/layered-character.ts` exposes `frameSchedule`,
 `LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. A future

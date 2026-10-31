@@ -22,9 +22,9 @@ export const DEV_LINKS = Object.freeze([
 ]);
 
 export const OFFICIAL_NARRATORS = Object.freeze([
-  Object.freeze({ id: "santa", name: "Santa V5", voiceId: "pm_santa", role: "Referência principal", tone: "Sábio · solene", status: "production" }),
-  Object.freeze({ id: "dora", name: "Dora", voiceId: "pf_dora", role: "Narradora oficial", tone: "Acolhedora · serena", status: "production" }),
-  Object.freeze({ id: "alex", name: "Alex", voiceId: "pm_alex", role: "Narrador oficial", tone: "Confiante · amigável", status: "production" }),
+  Object.freeze({ id: "santa", name: "Santa V5", voiceId: "pm_santa", role: "Referência principal", tone: "Sábio · solene", status: "production", visualPack: "topazio-narrator-santa-v5" }),
+  Object.freeze({ id: "dora", name: "Dora", voiceId: "pf_dora", role: "Narradora oficial", tone: "Acolhedora · serena", status: "awaiting-art-approval", visualPack: "topazio-narrator-dora-v2" }),
+  Object.freeze({ id: "alex", name: "Alex", voiceId: "pm_alex", role: "Narrador oficial", tone: "Confiante · amigável", status: "awaiting-art-approval", visualPack: "topazio-narrator-alex-v2" }),
 ]);
 
 export const PRODUCTION_PROFILES = Object.freeze([
