@@ -203,6 +203,21 @@ The first reference export is a 1080x1920 H.264/AAC MP4. Its captions are
 segment-level captions based on measured audio boundaries; they are not word
 alignment.
 
+## Vertical Cinematic Story V1
+
+Mission 019 adds four dependency-free profile tests:
+
+```powershell
+node --test .\frontend\tests\test_vertical_story_profile.mjs
+```
+
+The real export command and the generic captured-frame Visual Inspector report
+are documented in `docs/VERTICAL-CINEMATIC-STORY.md`. The reference path uses
+1080x1920 PNG frames, measured WAV segment timing, the shared Narrator Mode
+V1.4 renderer, a local-only procedural music bed and FFmpeg H.264/AAC output.
+The Visual Inspector is evidence only; human visual and audio review remain
+required.
+
 ## Visual Inspector V1
 
 The Inspector unit tests are dependency-free and include frame-schema
