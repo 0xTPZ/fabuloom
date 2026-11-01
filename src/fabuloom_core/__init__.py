@@ -40,6 +40,13 @@ from .narration import (
     segment_text,
     synthesize_narration,
 )
+from .character_registry import (
+    APPROVAL_STATES,
+    CharacterIdentity,
+    CharacterNotFound,
+    CharacterRegistry,
+    CharacterRegistryError,
+)
 from .tts import (
     SimulatedTTSProvider,
     SynthesisParameters,
@@ -91,4 +98,9 @@ __all__ = [
     "compose_narration_manifest",
     "synthesize_narration",
     "validate_timeline",
+    "APPROVAL_STATES",
+    "CharacterIdentity",
+    "CharacterNotFound",
+    "CharacterRegistry",
+    "CharacterRegistryError",
 ]
