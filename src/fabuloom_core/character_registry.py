@@ -127,6 +127,17 @@ class CharacterRegistry:
     def approved_ids(self) -> tuple[str, ...]:
         return tuple(sorted(identity.id for identity in self._identities.values() if identity.approval_status == "APPROVED"))
 
+    def require_approved(self, character_id: str) -> CharacterIdentity:
+        """Return an identity only when it is explicitly approved for production."""
+
+        identity = self.get(character_id)
+        if identity.approval_status != "APPROVED":
+            raise CharacterRegistryError(
+                f"character identity is not approved for production: {character_id} "
+                f"(status={identity.approval_status})"
+            )
+        return identity
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
