@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="alexPolishClosed" x1="627" y1="612" x2="627" y2="670" gradientUnits="userSpaceOnUse"><stop stop-color="#D1847D"/><stop offset="1" stop-color="#AE625F"/></linearGradient></defs>
+  <g transform="translate(0 -44)"><path d="M556 663C577 651 602 648 627 654C652 648 677 651 698 663C678 676 654 682 627 682C600 682 576 676 556 663Z" fill="url(#alexPolishClosed)" stroke="#845451" stroke-width="3.5" stroke-linejoin="round" opacity=".92"/>
+  <path d="M572 665C590 669 609 670 627 667C645 670 664 669 682 665" stroke="#EDABA1" stroke-width="3.5" stroke-linecap="round" opacity=".56"/></g>
+</svg>

@@ -114,8 +114,8 @@ test("official Dora and Alex use cartoon consistency sources while Santa keeps V
   assert.match(alex.art_status, /character-art-consistency-v1-experimental-awaiting-art-approval/);
   assert.match(dora.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-cartoon-v1\/dora\/head-clean\.png$/);
   assert.match(alex.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-cartoon-v1\/alex\/head-clean\.png$/);
-  assert.match(dora.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-cartoon-v1\/dora\/mouth-closed\.svg$/);
-  assert.match(alex.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-cartoon-v1\/alex\/mouth-closed\.svg$/);
+  assert.match(dora.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-cartoon-v1\/dora\/mouth-polish-closed\.svg$/);
+  assert.match(alex.layers.find((layer) => layer.id === "mouth").asset, /topazio-narrators-cartoon-v1\/alex\/mouth-polish-closed\.svg$/);
   assert.deepEqual(dora.layers.map((layer) => layer.id), ["head", "eyelids", "mouth"]);
   assert.deepEqual(alex.layers.map((layer) => layer.id), ["head", "eyelids", "mouth"]);
   assert.match(santa.layers.find((layer) => layer.id === "head").asset, /topazio-narrators-v5\/santa\/head-clean\.png$/);

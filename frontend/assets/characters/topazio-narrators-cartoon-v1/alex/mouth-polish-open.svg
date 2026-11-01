@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="alexPolishOpen" x1="627" y1="606" x2="627" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#302630"/><stop offset="1" stop-color="#58333E"/></linearGradient></defs>
+  <g transform="translate(0 -44)"><path d="M548 661C571 641 598 646 627 656C656 646 683 641 706 661C688 708 659 723 627 723C595 723 566 708 548 661Z" fill="url(#alexPolishOpen)" stroke="#754B50" stroke-width="4" stroke-linejoin="round" opacity=".97"/>
+  <path d="M563 667C583 673 605 675 627 673C649 675 671 673 691 667C677 683 655 687 627 687C599 687 577 683 563 667Z" fill="#FFF3E6" opacity=".82"/>
+  <path d="M572 702C589 714 607 718 627 718C647 718 665 714 682 702C668 721 649 727 627 727C605 727 586 721 572 702Z" fill="#C56D68" opacity=".87"/>
+  <path d="M563 663C584 669 606 671 627 669C648 671 670 669 691 663" stroke="#EFAEA3" stroke-width="3" stroke-linecap="round" opacity=".5"/></g>
+</svg>

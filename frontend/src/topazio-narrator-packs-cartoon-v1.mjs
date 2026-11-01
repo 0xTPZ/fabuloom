@@ -1,5 +1,6 @@
 /**
- * Mission 023.4: original cartoon facial bases for Dora and Alex.
+ * Mission 023.4/023.4.2: original cartoon facial bases and polished mouth
+ * states for Dora and Alex.
  *
  * Each pack uses one generated mouthless identity canvas plus compact,
  * same-canvas mouth/eyelid states.  The state art stays small and follows the
@@ -14,6 +15,7 @@ export const TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1 = Object.freeze({
   orientation: "frontal-bust",
   base_composition: "single-original-mouthless-cartoon-identity-canvas",
   mouth_strategy: "compact-same-canvas-painted-states",
+  mouth_polish: "small-soft-outline-progressive-states-v1",
   expression_states: Object.freeze(["closed", "slight", "moderate", "open", "blink"]),
   timing_source: "measured_wav_segments",
   mouth_source: "pcm16_rms_envelope",
@@ -90,11 +92,11 @@ function asset(character, name) { return `${ROOT}/${character}/${name}`; }
 function createPack({ id, name, character, voice_id }) {
   const frame = validateCartoonFrameProfile(TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES[character]);
   const states = Object.freeze({
-    closed: asset(character, "mouth-closed.svg"),
-    slight: asset(character, "mouth-slight.svg"),
-    moderate: asset(character, "mouth-moderate.svg"),
-    open: asset(character, "mouth-open.svg"),
-    smile: asset(character, "mouth-closed.svg"),
+    closed: asset(character, "mouth-polish-closed.svg"),
+    slight: asset(character, "mouth-polish-slight.svg"),
+    moderate: asset(character, "mouth-polish-moderate.svg"),
+    open: asset(character, "mouth-polish-open.svg"),
+    smile: asset(character, "mouth-polish-closed.svg"),
   });
   const base = asset(character, "head-clean.png");
   const eyelids = asset(character, "eyelids-closed.svg");
@@ -107,13 +109,15 @@ function createPack({ id, name, character, voice_id }) {
     voice_id,
     language: "pt-BR",
     art_status: "character-art-consistency-v1-experimental-awaiting-art-approval",
-    art_notes: "Original cartoon identity canvas with compact mouth states; generated bases are preserved as versioned experimental assets. Approval remains pending.",
+    art_notes: "Original cartoon identity canvas with compact polished mouth states; previous mouth assets remain preserved as versioned experimental assets. Approval remains pending.",
+    mouth_polish_status: "v1.1-experimental-awaiting-art-approval",
     visual_contract: TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1.format,
     face_reference: Object.freeze({
       source_size: point(SOURCE_SIZE),
       head_pivot: point([0.5, 0.5]),
       mouth_center: point([0.5, character === "dora" ? 0.52 : 0.53]),
       mouth_scale: point(frame.mouth_scale),
+      mouth_polish: "small-soft-outline-progressive-states-v1",
     }),
     framing: Object.freeze({
       format: "fabuloom.narrator-cartoon-framing/0.1",

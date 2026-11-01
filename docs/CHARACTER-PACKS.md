@@ -332,3 +332,17 @@ O laboratório DEV é `frontend/facial-framing-lab.html` e a prancha reproduzív
 `workspace/exports/videos/facial-framing-v1/`; vídeos e áudios não são
 versionados. Santa V5 continua sendo referência preservada. Consulte
 `docs/FACIAL-FRAMING-023.4.1.md` para os valores, diagnóstico e limitações.
+
+## MISSÃO 023.4.2 — mouth polish Dora/Alex
+
+Os packs cartoon mantêm a cabeça, o framing e o renderer da 023.4.1, mas usam
+estados de boca experimentais `mouth-polish-closed.svg`,
+`mouth-polish-slight.svg`, `mouth-polish-moderate.svg` e
+`mouth-polish-open.svg`. A variante reduz a largura, suaviza o contorno e
+mantém a geometria central estável entre os estados. A seleção continua sendo
+`closed/slight/moderate/open` por amplitude RMS; não há timing fonético.
+
+Os estados antigos continuam preservados no mesmo pack para comparação e
+rollback. Santa V5 não participa da alteração. Consulte
+`docs/MOUTH-POLISH-023.4.2.md` e os artefatos workspace-only em
+`workspace/exports/videos/facial-mouth-polish-v1/`.
