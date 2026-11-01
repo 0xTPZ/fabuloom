@@ -30,7 +30,7 @@ PASS AUTOMÁTICO:
 
 PARTIAL:
 
-- Project creation is prepared through the existing local project endpoint because the current Character Stage shell does not expose the project-creation form used by the Studio workflow.
+- The Character Stage shell does not expose the project-creation form used by the production Studio; Mission 048 adds a separate real-Studio project-flow harness.
 - The current UI/backend path confirms managed-pack recovery, but the harness does not yet assert the selected expression from a restored project manifest end-to-end.
 
 NOT TESTED:
