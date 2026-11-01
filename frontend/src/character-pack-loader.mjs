@@ -64,3 +64,23 @@ export async function discoverLocalPacks(directoryHandle) {
   }
   return Object.freeze(discovered);
 }
+
+/** Build a pack from a directory input without exposing the selected files to a server. */
+export async function loadLocalPackFiles(files, { maxFiles = 128, maxBytes = 25 * 1024 * 1024 } = {}) {
+  const list = [...(files || [])];
+  if (!list.length) throw new Error("Nenhum arquivo foi selecionado");
+  if (list.length > maxFiles) throw new Error(`Pack excede o limite de ${maxFiles} arquivos`);
+  if (list.reduce((sum, file) => sum + (file.size || 0), 0) > maxBytes) throw new Error("Pack excede o limite de 25 MB");
+  const manifestFile = list.find((file) => file.name === "manifest.json" || file.webkitRelativePath?.endsWith("/manifest.json"));
+  if (!manifestFile) throw new Error("O diretório precisa conter manifest.json");
+  const manifest = JSON.parse(await manifestFile.text());
+  const prefix = manifestFile.webkitRelativePath ? manifestFile.webkitRelativePath.split("/").slice(0, -1).join("/") : "";
+  const byPath = new Map(list.map((file) => [file.webkitRelativePath ? file.webkitRelativePath.split("/").slice(prefix ? prefix.split("/").length : 0).join("/") : file.name, file]));
+  const pack = validateLocalPackManifest(manifest, "");
+  const assetUrls = Object.fromEntries(pack.resolvedAssets.map(({ path }) => {
+    const file = byPath.get(path);
+    if (!file) throw new Error(`Asset ausente no pack: ${path}`);
+    return [path, URL.createObjectURL(file)];
+  }));
+  return Object.freeze({ pack, assetUrls });
+}

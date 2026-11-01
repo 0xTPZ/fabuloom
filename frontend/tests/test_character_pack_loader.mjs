@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { loadLocalPackManifest, validateLocalPackManifest } from "../src/character-pack-loader.mjs";
+import { COMMUNITY_DEMO_PACK } from "../src/community-demo-pack.mjs";
 
 const manifest = JSON.parse(await readFile(new URL("../assets/characters/community-demo-v1/manifest.json", import.meta.url), "utf8"));
 
@@ -37,4 +38,11 @@ test("keeps Santa compatibility data untouched", async () => {
   const santa = await import("../src/santa-v5-pack.mjs");
   assert.equal(santa.SANTA_V5_PACK.id, "topazio-narrator-santa-v5");
   assert.ok(santa.SANTA_V5_PACK.layers.length > 0);
+});
+
+test("neutral community pack is renderer-compatible and declares independent licensing", () => {
+  const pack = validateLocalPackManifest({ ...COMMUNITY_DEMO_PACK, pack: COMMUNITY_DEMO_PACK }, "community-demo-v1");
+  assert.equal(pack.license, "MIT");
+  assert.equal(pack.voice.id, "");
+  assert.deepEqual(pack.expressions.map((item) => item.id), ["neutral", "smile"]);
 });

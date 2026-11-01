@@ -3,6 +3,8 @@ import { CanvasCharacterRenderer, CharacterRig } from "./character.ts";
 import { FANTASY_NARRATOR_PACK } from "./fantasy-narrator-pack.mjs";
 import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
 import { validateCharacterPack } from "./character-pack.mjs";
+import { loadLocalPackFiles } from "./character-pack-loader.mjs";
+import { COMMUNITY_DEMO_PACK } from "./community-demo-pack.mjs";
 import { SantaV3Rig, SantaV3SceneRenderer } from "./santa-v3-engine.ts";
 import { SANTA_V3_PACK } from "./santa-v3-pack.mjs";
 import { SantaV4Rig, SantaV4SceneRenderer } from "./santa-v4-engine.ts";
@@ -47,6 +49,10 @@ const sidebar = document.querySelector("#sidebar");
 const sidebarToggle = document.querySelector("#sidebar-toggle");
 const sidebarClose = document.querySelector("#sidebar-close");
 const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
+const packInput = document.querySelector("#character-pack-input");
+const importPackButton = document.querySelector("#import-character-pack");
+const libraryList = document.querySelector("#character-library-list");
+const libraryStatus = document.querySelector("#character-library-status");
 
 const geometricRig = new CharacterRig();
 const layeredRig = new LayeredCharacterRig();
@@ -65,6 +71,10 @@ const narratorRenderers = Object.fromEntries(narratorKeys.map((key) => [
   new LayeredCharacterRenderer(canvas, narratorRigs[key], TOPAZIO_NARRATOR_PACKS[key]),
 ]));
 const narratorReady = Object.fromEntries(narratorKeys.map((key) => [key, false]));
+const communityRig = new LayeredCharacterRig();
+const communityRenderer = new LayeredCharacterRenderer(canvas, communityRig, COMMUNITY_DEMO_PACK, { assetRoot: new URL("./assets/characters/community-demo-v1/", document.baseURI).href });
+let communityReady = false;
+let localPack = null;
 let santaV3Ready = false;
 let santaV4Ready = false;
 let santaV5Ready = false;
@@ -85,6 +95,8 @@ const characterMeta = {
   "santa-v3": { name: "Santa V3", kind: "Narrador oficial · Rig completo", presence: "Voz sábia · pm_santa", motion: "Corpo, braços, mãos, pernas, xícara e livro" },
   "santa-v4": { name: "Santa V4", kind: "Narrador oficial · Cartoon 2.5D", presence: "Voz sábia · pm_santa", motion: "Cabeça, braços, mãos, pernas, barba, olhos e respiração" },
   "santa-v5": { name: "Santa V5", kind: "Narrador oficial · Rig final", presence: "Voz sábia · pm_santa", motion: "Cabeça, olhos, boca, braços, mãos, pernas e respiração" },
+  "community-demo": { name: "Ponto", kind: "Pack comunitário · licença MIT", presence: "Sem voz incluída", motion: "Cabeça, olhos, boca e respiração" },
+  "local-pack": { name: "Pack local", kind: "Pack instalado pelo usuário", presence: "Voz não declarada", motion: "Recursos declarados no manifesto" },
 };
 
 for (const narration of NARRATIONS) {
@@ -136,12 +148,21 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
     characterSelect.value = "santa";
     return Promise.resolve(false);
   }
+  if (characterId === "community-demo" && !communityReady) { characterSelect.value = "geometric"; return Promise.resolve(false); }
+  if (characterId === "local-pack" && !localPack) { characterSelect.value = "geometric"; return Promise.resolve(false); }
   if (narratorKeys.includes(characterId) && !narratorReady[characterId]) {
     characterSelect.value = layeredReady ? "fantasy" : "geometric";
     return Promise.resolve(false);
   }
   activeCharacterId = characterId;
-  if (characterId === "fantasy") {
+  try { localStorage.setItem("fabuloom.selectedCharacterPack", characterId); } catch (_error) { /* storage is optional */ }
+  if (characterId === "community-demo") {
+    activeRig = communityRig; activeRenderer = communityRenderer;
+  } else if (characterId === "local-pack" && localPack) {
+    activeRig = new LayeredCharacterRig();
+    activeRenderer = new LayeredCharacterRenderer(canvas, activeRig, localPack.pack, { assetUrlResolver: (asset) => localPack?.assetUrls[asset] });
+    void activeRenderer.load();
+  } else if (characterId === "fantasy") {
     activeRig = layeredRig;
     activeRenderer = layeredRenderer;
   } else if (narratorKeys.includes(characterId)) {
@@ -160,7 +181,7 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
     activeRig = geometricRig;
     activeRenderer = geometricRenderer;
   }
-  if (characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
+  if (characterId === "community-demo" || characterId === "local-pack" || characterId === "fantasy" || narratorKeys.includes(characterId)) activeRenderer.setExpression(expressionSelect.value);
   else if (characterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
   else if (characterId === "santa-v4") santaV4Renderer.characterRenderer.setExpression(expressionSelect.value);
   else if (characterId === "santa-v5") santaV5Renderer.characterRenderer.setExpression(expressionSelect.value);
@@ -174,6 +195,13 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
 }
 
 async function prepareLayeredCharacters() {
+  try {
+    validateCharacterPack(COMMUNITY_DEMO_PACK);
+    await communityRenderer.load();
+    communityReady = true;
+    const option = characterSelect.querySelector('option[value="community-demo"]');
+    if (option) { option.disabled = false; option.textContent = "Ponto · pack comunitário MIT"; }
+  } catch (_error) { communityReady = false; }
   const fantasyOption = characterSelect.querySelector('option[value="fantasy"]');
   try {
     validateCharacterPack(FANTASY_NARRATOR_PACK);
@@ -235,6 +263,36 @@ async function prepareLayeredCharacters() {
   if (narratorReady.dora) await selectCharacter("dora");
   else if (layeredReady) await selectCharacter("fantasy", { loadVoice: false });
   else await selectCharacter("geometric", { loadVoice: false });
+}
+
+function renderPackLibrary() {
+  if (!libraryList) return;
+  libraryList.replaceChildren();
+  const packs = [
+    { id: "santa-v5", name: "Santa V5", detail: "Referência existente · licença artística não declarada" },
+    { id: "community-demo", name: COMMUNITY_DEMO_PACK.name, detail: `${COMMUNITY_DEMO_PACK.author} · ${COMMUNITY_DEMO_PACK.license}` },
+  ];
+  if (localPack) packs.push({ id: "local-pack", name: localPack.pack.name, detail: `${localPack.pack.author || "autor não informado"} · ${localPack.pack.license || "licença não declarada"}` });
+  for (const item of packs) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "library-card";
+    const name = document.createElement("strong"); name.textContent = item.name;
+    const detail = document.createElement("small"); detail.textContent = item.detail;
+    button.append(name, detail); button.addEventListener("click", () => { characterSelect.value = item.id; void selectCharacter(item.id); }); libraryList.appendChild(button);
+  }
+}
+
+async function importLocalPack(files) {
+  if (!files) return;
+  try {
+    localPack = await loadLocalPackFiles(files);
+    validateCharacterPack(localPack.pack);
+    const option = characterSelect.querySelector('option[value="local-pack"]');
+    if (option) { option.hidden = false; option.textContent = `${localPack.pack.name} · pack local`; }
+    renderPackLibrary();
+    if (libraryStatus) libraryStatus.textContent = `Pack ${localPack.pack.name} carregado nesta sessão. O acesso aos arquivos não é salvo como permissão permanente.`;
+    characterSelect.value = "local-pack";
+    await selectCharacter("local-pack", { loadVoice: false });
+  } catch (error) { if (libraryStatus) libraryStatus.textContent = `Importação bloqueada: ${error.message}`; }
 }
 
 function formatTime(milliseconds) {
@@ -443,12 +501,15 @@ narrationSelect.addEventListener("change", () => {
 });
 characterSelect.addEventListener("change", () => { void selectCharacter(characterSelect.value); });
 expressionSelect.addEventListener("change", () => {
-  if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
+  if (activeCharacterId === "community-demo" || activeCharacterId === "local-pack") activeRenderer.setExpression(expressionSelect.value);
+  else if (activeCharacterId === "fantasy") layeredRenderer.setExpression(expressionSelect.value);
   else if (narratorKeys.includes(activeCharacterId)) narratorRenderers[activeCharacterId].setExpression(expressionSelect.value);
   else if (activeCharacterId === "santa-v3") santaV3Renderer.characterRenderer.setExpression(expressionSelect.value);
   else if (activeCharacterId === "santa-v4") santaV4Renderer.characterRenderer.setExpression(expressionSelect.value);
   else if (activeCharacterId === "santa-v5") santaV5Renderer.characterRenderer.setExpression(expressionSelect.value);
 });
+importPackButton?.addEventListener("click", () => packInput?.click());
+packInput?.addEventListener("change", () => void importLocalPack(packInput.files));
 sidebarToggle?.addEventListener("click", () => setSidebarOpen(true));
 sidebarClose?.addEventListener("click", () => setSidebarOpen(false));
 sidebarBackdrop?.addEventListener("click", () => setSidebarOpen(false));
@@ -481,9 +542,14 @@ function frame(timeMs) {
 }
 
 async function initializeStage() {
+  const communityOption = document.createElement("option"); communityOption.value = "community-demo"; communityOption.textContent = "Ponto · pack comunitário MIT"; communityOption.disabled = true; characterSelect.appendChild(communityOption);
+  const localOption = document.createElement("option"); localOption.value = "local-pack"; localOption.textContent = "Pack local"; localOption.hidden = true; characterSelect.appendChild(localOption);
   updateCharacterMeta();
   setVoiceInfo({ language: "pt-BR", state: "waiting" });
   await prepareLayeredCharacters();
+  renderPackLibrary();
+  const remembered = localStorage.getItem("fabuloom.selectedCharacterPack");
+  if (remembered === "community-demo" && communityReady) { characterSelect.value = remembered; await selectCharacter(remembered, { loadVoice: false }); }
 }
 
 void initializeStage();

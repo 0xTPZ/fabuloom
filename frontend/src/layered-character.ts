@@ -242,6 +242,7 @@ export class LayeredCharacterRenderer {
     this.loaded = false;
     this.expression = "neutral";
     this.assetResolver = options.assetResolver || null;
+    this.assetUrlResolver = options.assetUrlResolver || null;
     this.layerVisibility = options.layerVisibility || null;
   }
 
@@ -287,7 +288,7 @@ export class LayeredCharacterRenderer {
       record.image = image;
       image.onload = () => { record.size = [image.naturalWidth || image.width, image.naturalHeight || image.height]; resolve(image); };
       image.onerror = () => reject(new Error(`could not load character asset: ${asset}`));
-      image.src = new URL(asset, this.assetRoot).href;
+      image.src = this.assetUrlResolver?.(asset) || new URL(asset, this.assetRoot).href;
     });
     record.promise = promise;
     return promise;
