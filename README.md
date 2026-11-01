@@ -8,6 +8,8 @@ The project has moved beyond the planning stage. The functional Alpha is being p
 >
 > The features below describe the development branch. They are not claimed to be available on `main` until the work is reviewed and merged.
 
+[Leia em português (Brasil)](README.pt-BR.md)
+
 ## What the Alpha can do
 
 The current development build supports:
