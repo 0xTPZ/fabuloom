@@ -130,6 +130,25 @@ def _validate_scenes(scenes: object) -> None:
             raise ValueError("scene image path must be workspace-relative")
 
 
+def _reconcile_scenes(existing: list[dict], segments: object) -> list[dict]:
+    """Map measured narration segments onto stable project scene identities."""
+    reconciled = []
+    for index, segment in enumerate(segments):
+        previous = existing[index] if index < len(existing) else {}
+        scene_id = str(previous.get("id") or f"scene-{index + 1:03d}")
+        reconciled.append({
+            "id": scene_id,
+            "title": previous.get("title") or f"Cena {index + 1}",
+            "text": segment.text,
+            "image": previous.get("image"),
+            "duration_ms": int(previous.get("duration_ms") or (segment.end_ms - segment.start_ms)),
+            "camera": previous.get("camera", "static"),
+            "transition": previous.get("transition", "cut"),
+        })
+    _validate_scenes(reconciled)
+    return reconciled
+
+
 def _environment_health() -> dict:
     python_ok = sys.version_info >= (3, 11)
     ffmpeg_path = shutil.which("ffmpeg")
@@ -507,7 +526,7 @@ class StageHandler(BaseHTTPRequestHandler):
         project["audio"]["voice"] = "pm_santa"
         project["audio"]["duration_ms"] = run.manifest.duration_ms
         project["audio"]["wav_files"] = [str(path.relative_to(_project_dir(project["id"]))).replace("\\", "/") for path in sorted(output_dir.glob("*.wav"))]
-        project["scenes"] = [{"id": segment.id, "title": f"Cena {index + 1}", "text": segment.text, "image": next((s.get("image") for s in project.get("scenes", []) if s.get("id") == segment.id), None), "duration_ms": segment.end_ms - segment.start_ms, "camera": "static", "transition": "cut"} for index, segment in enumerate(run.manifest.segments)]
+        project["scenes"] = _reconcile_scenes(project.get("scenes", []), run.manifest.segments)
         _save_project(project)
         self._send_json({"project": project, "manifest": json.loads(manifest_path.read_text(encoding="utf-8"))}, status=201)
 

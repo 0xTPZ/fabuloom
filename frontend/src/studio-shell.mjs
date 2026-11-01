@@ -187,7 +187,7 @@ async function saveProject() {
   if (!currentProject) { renderRoute("projects"); setStatus("Crie um projeto antes de salvar"); return; }
   const text = $("#script-text").value.trim(); if (!text) { setStatus("Escreva um roteiro antes de salvar"); return; }
   const sentences = text.split(/(?<=[.!?…])\s+|\n+/).map((item) => item.trim()).filter(Boolean);
-  const scenes = sentences.map((item, index) => ({ id: `scene-${String(index + 1).padStart(3, "0")}`, title: `Cena ${index + 1}`, text: item, image: currentProject.scenes?.[index]?.image || null, duration_ms: 3000, camera: "static", transition: "cut" }));
+  const scenes = sentences.map((item, index) => { const previous = currentProject.scenes?.[index] || {}; return { id: previous.id || `scene-${String(index + 1).padStart(3, "0")}`, title: previous.title || `Cena ${index + 1}`, text: item, image: previous.image || null, duration_ms: previous.duration_ms || 3000, camera: previous.camera || "static", transition: previous.transition || "cut" }; });
   try { currentProject = await api(projectApiPath("/save"), { method: "POST", body: JSON.stringify({ title: $("#script-title").value.trim() || currentProject.title, script: text, scenes }) }); renderProjectState(); setStatus("Roteiro e cenas salvos"); } catch (error) { setStatus(`Falha ao salvar: ${error.message}`); }
 }
 
