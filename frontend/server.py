@@ -104,6 +104,39 @@ def _load_project(project_id: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _build_timeline_audio(project_dir: Path, wav_files: list[Path], manifest: dict, output: Path) -> int:
+    """Materialize measured segment timestamps as PCM, including intentional gaps."""
+    segments = manifest.get("segments") or []
+    if len(segments) != len(wav_files) or not segments:
+        raise ValueError("audio manifest and WAV segment count differ")
+    with wave.open(str(wav_files[0]), "rb") as first:
+        params = first.getparams()
+        sample_rate, channels, sample_width = params.framerate, params.nchannels, params.sampwidth
+    if channels != 1 or sample_width != 2:
+        raise ValueError("timeline audio requires mono PCM-16 WAV segments")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    cursor_ms = 0
+    with wave.open(str(output), "wb") as target:
+        target.setnchannels(channels); target.setsampwidth(sample_width); target.setframerate(sample_rate)
+        for wav_path, segment in zip(wav_files, segments):
+            start_ms = int(segment.get("start_ms") or 0); end_ms = int(segment.get("end_ms") or start_ms)
+            if start_ms < cursor_ms or end_ms < start_ms:
+                raise ValueError("audio manifest segments are not ordered")
+            gap_frames = round((start_ms - cursor_ms) * sample_rate / 1000)
+            if gap_frames: target.writeframes(b"\x00" * gap_frames * channels * sample_width)
+            with wave.open(str(wav_path), "rb") as source:
+                if (source.getframerate(), source.getnchannels(), source.getsampwidth()) != (sample_rate, channels, sample_width):
+                    raise ValueError("audio WAV segments have incompatible PCM formats")
+                target.writeframes(source.readframes(source.getnframes()))
+            cursor_ms = end_ms
+        total_ms = int(manifest.get("duration_ms") or cursor_ms)
+        if total_ms < cursor_ms:
+            raise ValueError("audio manifest duration is shorter than its segments")
+        tail_frames = round((total_ms - cursor_ms) * sample_rate / 1000)
+        if tail_frames: target.writeframes(b"\x00" * tail_frames * channels * sample_width)
+    return total_ms
+
+
 def _project_summary(data: dict) -> dict:
     return {key: data.get(key) for key in ("id", "title", "description", "format", "created_at", "updated_at", "scenes", "narrator", "audio", "exports")}
 
@@ -608,13 +641,12 @@ class StageHandler(BaseHTTPRequestHandler):
         list_path.write_text("\n".join(f"file '{path.as_posix()}'" for path in scene_paths) + "\n", encoding="utf-8")
         video_path = output_dir / "video-only.mp4"
         subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", str(video_path)], check=True, capture_output=True, text=True)
-        voice_list = output_dir / "voice.txt"
-        voice_list.write_text("\n".join(f"file '{path.as_posix()}'" for path in wav_files) + "\n", encoding="utf-8")
         voice_path = output_dir / "voice.wav"
-        if len(wav_files) == 1:
-            shutil.copyfile(wav_files[0], voice_path)
-        else:
-            subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(voice_list), "-c", "copy", str(voice_path)], check=True, capture_output=True, text=True)
+        manifest_path = _project_dir(project["id"]) / str(audio.get("manifest") or "")
+        if not manifest_path.is_file():
+            raise ValueError("audio manifest is missing")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        _build_timeline_audio(_project_dir(project["id"]), wav_files, manifest, voice_path)
         output = output_dir / f"{project['id']}-1080p.mp4"
         command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
         music = project.get("audio", {}).get("music", {}).get("path")
@@ -622,7 +654,8 @@ class StageHandler(BaseHTTPRequestHandler):
             command += ["-stream_loop", "-1", "-i", str((_project_dir(project["id"]) / music).resolve()), "-filter_complex", "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice_main][voice_side];[2:a]loudnorm=I=-26:TP=-2:LRA=12[bed];[bed][voice_side]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400[ducked];[ducked]volume=0.35[music];[voice_main][music]amix=inputs=2:duration=first:dropout_transition=2,alimiter=limit=0.95[aout]", "-map", "0:v", "-map", "[aout]"]
         else:
             command += ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95"]
-        command += ["-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(output)]
+        target_duration = float(manifest.get("duration_ms") or 0) / 1000
+        command += ["-t", f"{target_duration:.3f}", "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "1", "-shortest", str(output)]
         with JOBS_LOCK: job["progress"] = 85; job["message"] = "Finalizando MP4"
         subprocess.run(command, check=True, capture_output=True, text=True)
         export = {"path": str(output.relative_to(WORKSPACE_ROOT)).replace("\\", "/"), "format": "1920x1080 H.264/AAC MP4", "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}

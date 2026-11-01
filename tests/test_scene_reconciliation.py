@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
+import wave
 
 SERVER_PATH = Path(__file__).resolve().parents[1] / "frontend" / "server.py"
 SPEC = importlib.util.spec_from_file_location("fabuloom_server_reconcile", SERVER_PATH)
@@ -48,6 +50,26 @@ class SceneReconciliationTests(unittest.TestCase):
         self.assertEqual([scene["id"] for scene in result], ["scene-001", "scene-002"])
         self.assertEqual([scene["image"] for scene in result], [None, None])
         self.assertEqual([scene["camera"] for scene in result], ["static", "static"])
+
+    def test_timeline_audio_preserves_manifest_gap_and_tail(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            wav_files = []
+            for index in range(2):
+                path = root / f"{index}.wav"
+                with wave.open(str(path), "wb") as wav:
+                    wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(24000)
+                    wav.writeframes((b"\x01\x00" if index == 0 else b"\x02\x00") * 2400)
+                wav_files.append(path)
+            output = root / "timeline.wav"
+            duration = SERVER._build_timeline_audio(root, wav_files, {"duration_ms": 300, "segments": [
+                {"start_ms": 0, "end_ms": 100}, {"start_ms": 200, "end_ms": 300}
+            ]}, output)
+            with wave.open(str(output), "rb") as wav:
+                self.assertEqual(duration, 300)
+                self.assertEqual(wav.getnframes(), 7200)
+                wav.readframes(2400)
+                self.assertEqual(wav.readframes(2400), b"\x00" * 4800)
 
 
 if __name__ == "__main__":
