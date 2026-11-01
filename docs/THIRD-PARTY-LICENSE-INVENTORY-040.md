@@ -3,18 +3,28 @@
 Audit date: 2026-11-01  
 Scope: components used by the local Studio and the real `pm_santa` validation. No third-party weights, voices, caches or media are committed.
 
+## Distribution modalities
+
+### Alpha 0.1.0 source-only (the only modality evaluated here)
+
+Published material is the Fabuloom source tree, documentation and original repository assets under the project MIT license. The Alpha does **not** include Python environments, Kokoro, PyTorch, model weights, voice files, FFmpeg, fonts, caches, WAVs, MP4s or private production files. Testers install optional dependencies from their official sources and are responsible for accepting their terms. This is the scope for which the source repository can be offered to invited testers.
+
+### Future packaged distribution
+
+An installer or bundle containing runtimes, FFmpeg, Kokoro, model weights or voices is **not** covered by this audit. It requires a new notice bundle, exact dependency lock, binary build provenance and explicit verification of voice/eSpeak-ng redistribution terms. No permission to redistribute those components is implied below.
+
 | Component | Version observed | Official origin | License / obligation | Included in public Git? | Gate |
 |---|---:|---|---|---|---|
 | Fabuloom original code | 0.1.0 | this repository | MIT; retain notice | Yes | PASS |
-| Kokoro Python package | 0.9.4 | `github.com/hexgrad/kokoro` / PyPI | Apache-2.0 according to package metadata; retain notices | No, optional install | PASS conditioned on notice bundle |
-| Kokoro-82M model | public model revision in HF cache | `huggingface.co/hexgrad/Kokoro-82M` | Apache-2.0 shown by official model card; do not bundle without attribution/terms | No | PASS for local download; redistribution requires record |
+| Kokoro Python package | 0.9.4 | `github.com/hexgrad/kokoro` / PyPI | Apache-2.0 according to package metadata; optional user install only | No | N/A for source-only; future bundle requires notices |
+| Kokoro-82M model | public model revision in HF cache | `huggingface.co/hexgrad/Kokoro-82M` | Apache-2.0 shown by official model card; user downloads separately | No | N/A for source-only; future redistribution requires record |
 | Kokoro voices (`pm_santa`, `pf_dora`, `pm_alex`) | shipped through Kokoro model/package | Kokoro package/model distribution | voice provenance is coupled to Kokoro terms; no separate voice notice was found in this checkout | No | BLOCKED for bundling until provenance is recorded |
-| PyTorch | 2.15.0 observed in audit venv | `pytorch.org` / PyPI | BSD-style license and notices | No, installed dependency | PARTIAL — exact notice bundle not committed |
+| PyTorch | 2.15.0 observed in audit venv | `pytorch.org` / PyPI | BSD-style license and notices; user-installed | No | N/A for source-only; future bundle requires notices |
 | NumPy | 2.5.4 | `numpy.org` / PyPI | BSD-3-Clause | No | PASS conditioned on dependency notices |
 | SoundFile | 0.14.0 | `github.com/bastibe/python-soundfile` / PyPI | BSD-3-Clause | No | PASS conditioned on dependency notices |
 | Misaki | 0.9.4 | Kokoro dependency metadata | verify transitive notices before bundling | No | PARTIAL |
-| espeakng-loader / phonemizer-fork | 0.2.4 / 3.3.2 observed | PyPI projects | dependency-specific licenses must be preserved; eSpeak-ng commonly carries GPL-3.0-or-later obligations | No | BLOCKED for a bundled redistributable runtime until exact notices are captured |
-| FFmpeg | 9.0.1 host runtime | `ffmpeg.org` / build vendor | build-specific LGPL/GPL configuration and notices; this branch does not bundle the binary | No | PARTIAL — publish exact build provenance if distributing binary |
+| espeakng-loader / phonemizer-fork | 0.2.4 / 3.3.2 observed | PyPI projects | dependency-specific licenses must be preserved; eSpeak-ng commonly carries GPL-3.0-or-later obligations | No | N/A for source-only; BLOCKED for future bundled runtime until exact notices |
+| FFmpeg | 9.0.1 host runtime | `ffmpeg.org` / build vendor | build-specific LGPL/GPL configuration and notices; user supplies binary | No | N/A for source-only; future bundle requires exact build provenance |
 | Segoe UI / system fonts | Windows host | Microsoft system font | not redistributed by Fabuloom; local FFmpeg examples reference installed font path | No | PASS if not bundled; do not package font |
 | Fabuloom SVG/PNG test assets | mission-local originals | generated for audit / repository assets | original or repository-owned; retain project MIT boundary | Some repository assets | PASS for test use |
 | Music/SFX in Studio Alpha core | none in the final 037/038 Studio export | n/a | no demonstrative third-party track is distributed | No | PASS |
