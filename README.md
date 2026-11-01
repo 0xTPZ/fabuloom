@@ -227,3 +227,14 @@ V5 medallion. Draft character identities remain blocked by policy. The MP4,
 environment plates and reports remain outside Git under
 `workspace\exports\topazio-book1-capitulo4-cronicas`; see
 `docs/CRONICAS-DE-TOPAZIO-029.md`.
+
+Mission 030 produces CB-001, `O Quarto Eco`, the first vertical pilot of
+`Lendas e Segredos de Topázio`. It uses the exact proposed editorial text,
+real Kokoro `pm_santa` timing, Santa V5 through `NarratorAvatarRenderer`,
+environment-only cave/crystal plates, the original provided music with voice
+ducking and a short fourth-echo reduction, measured captions, and a
+deterministic 1080x1920 FFmpeg export. The story remains proposed folklore,
+Draft characters are blocked, Suno commercial rights remain pending, and the
+MP4/evidence stay outside Git under
+`workspace\exports\cronicas-breves\cb-001-o-quarto-eco`; see
+`docs/CRONICAS-BREVES-CB001.md`.
