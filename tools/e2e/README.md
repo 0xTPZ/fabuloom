@@ -7,6 +7,9 @@ Run from this directory:
 ```powershell
 npm install
 npm test
+npm run test:e2e:export
 ```
+
+`test:e2e:export` runs the heavier real-audio/MP4 gate separately; it is not part of the quick interface regression.
 
 The harness is intentionally honest about current limits: project creation is still prepared through the existing local API because the Character Stage page does not expose the project-creation shell, and native Windows file-dialog behavior is not the same as Playwright `setInputFiles()`.

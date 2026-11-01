@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,6 +24,22 @@ function startServer() {
 startServer();
 async function waitForServer() { for (let i = 0; i < 50; i += 1) { try { const response = await fetch(`http://127.0.0.1:${port}/api/health`); if (response.ok) return; } catch {} await new Promise((resolve) => setTimeout(resolve, 100)); } throw new Error("test server did not start"); }
 const result = { classification: "FAIL", evidence, flows: [], logs };
+const exportMode = process.argv.includes("--export");
+
+async function findFiles(root, suffix) {
+  const found = [];
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) found.push(...await findFiles(full, suffix));
+    else if (!suffix || entry.name.toLowerCase().endsWith(suffix)) found.push(full);
+  }
+  return found;
+}
+
+function runTool(command, args) {
+  const processResult = spawnSync(command, args, { encoding: "utf8", windowsHide: true });
+  return { status: processResult.status, stdout: processResult.stdout || "", stderr: processResult.stderr || "" };
+}
 let browser;
 try {
   await waitForServer();
@@ -83,8 +100,35 @@ try {
   const projectData = (await project.json()).projects.find((item) => item.title === "E2E-Ponto");
   result.debug = { restoredExpression, restoredPack, projectData };
   result.flows.push({ name: "Backend project_pack reference", status: projectData?.character_pack?.expression === "smile" ? "PASS" : "FAIL" });
+  if (exportMode) {
+    await reopened.locator('[data-route="audio"]').first().click();
+    await reopened.locator("#generate-narration-button").click();
+    let audioStatus = "";
+    for (let attempt = 0; attempt < 180; attempt += 1) { audioStatus = await reopened.locator("#audio-voice-state").innerText(); if (/concluída|indisponível|bloqueada/i.test(audioStatus)) break; await new Promise((resolve) => setTimeout(resolve, 1000)); }
+    if (!/concluída/i.test(audioStatus)) {
+      result.flows.push({ name: "Real narration through Studio button", status: "BLOCKED", note: audioStatus || "Kokoro did not complete" });
+      result.classification = "BLOCKED";
+    } else {
+      result.flows.push({ name: "Real narration through Studio button", status: "PASS" });
+      await reopened.locator('[data-route="export"]').first().click();
+      await reopened.locator("#export-project-button").click();
+      let exportStatus = "";
+      for (let attempt = 0; attempt < 180; attempt += 1) { exportStatus = await reopened.locator("#export-status").innerText(); if (/concluído|bloqueada|falha/i.test(exportStatus)) break; await new Promise((resolve) => setTimeout(resolve, 1000)); }
+      const mp4Files = await findFiles(workspace, ".mp4");
+      if (!/concluído/i.test(exportStatus) || !mp4Files.length) {
+        result.flows.push({ name: "MP4 export through Studio button", status: "FAIL", note: exportStatus, files: mp4Files });
+      } else {
+        const mp4 = mp4Files.at(-1); const probe = runTool("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", mp4]); const decode = runTool("ffmpeg", ["-v", "error", "-i", mp4, "-f", "null", "-"]); let metadata = null; try { metadata = JSON.parse(probe.stdout); } catch {}
+        const video = metadata?.streams?.find((stream) => stream.codec_type === "video"); const audio = metadata?.streams?.find((stream) => stream.codec_type === "audio");
+        result.export = { path: mp4, status: exportStatus, ffprobe: probe, decode, video, audio };
+        const valid = probe.status === 0 && decode.status === 0 && video?.codec_name === "h264" && audio?.codec_name === "aac";
+        result.flows.push({ name: "MP4/FFprobe/FFmpeg validation", status: valid ? "PASS" : "FAIL", path: mp4 });
+        result.classification = valid ? "PARTIAL" : "FAIL";
+      }
+    }
+  }
   await reopened.screenshot({ path: path.join(evidence, "reopened.png"), fullPage: true });
-  result.classification = restoredProject ? "PARTIAL" : "FAIL";
+  if (!exportMode) result.classification = restoredProject ? "PARTIAL" : "FAIL";
   result.notes = "The real Studio project and Ponto character-pack flow are automated. Native Windows dialog, MP4/FFprobe, and Canvas×FFmpeg remain outside this run.";
   await fresh.close();
 } catch (error) { result.error = String(error.stack || error); }

@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node run.mjs"
+    "test": "node run.mjs",
+    "test:e2e:export": "node run.mjs --export"
   },
   "dependencies": {
     "playwright": "^1.52.0"
