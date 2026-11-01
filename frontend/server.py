@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib.util
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import mimetypes
@@ -57,6 +58,8 @@ MAX_JSON_BYTES = 8 * 1024 * 1024
 MAX_ASSET_BYTES = 25 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 ALLOWED_AUDIO_TYPES = {"audio/wav": ".wav", "audio/x-wav": ".wav", "audio/mpeg": ".mp3", "audio/ogg": ".ogg"}
+ALLOWED_CAMERAS = {"static", "zoom", "pan-horizontal", "pan-vertical"}
+ALLOWED_TRANSITIONS = {"cut"}
 
 
 def _project_dir(project_id: str) -> Path:
@@ -103,6 +106,28 @@ def _load_project(project_id: str) -> dict:
 
 def _project_summary(data: dict) -> dict:
     return {key: data.get(key) for key in ("id", "title", "description", "format", "created_at", "updated_at", "scenes", "narrator", "audio", "exports")}
+
+
+def _validate_scenes(scenes: object) -> None:
+    if not isinstance(scenes, list):
+        raise ValueError("scenes must be a list")
+    ids: set[str] = set()
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            raise ValueError("each scene must be an object")
+        scene_id = str(scene.get("id") or "")
+        if not scene_id or scene_id in ids or any(part in {".", ".."} for part in Path(scene_id).parts):
+            raise ValueError("scene ids must be unique and safe")
+        ids.add(scene_id)
+        if int(scene.get("duration_ms") or 0) <= 0:
+            raise ValueError("scene duration must be positive")
+        if scene.get("camera", "static") not in ALLOWED_CAMERAS:
+            raise ValueError("unsupported camera movement")
+        if scene.get("transition", "cut") not in ALLOWED_TRANSITIONS:
+            raise ValueError("unsupported scene transition")
+        image = scene.get("image")
+        if image is not None and (not isinstance(image, str) or Path(image).is_absolute() or any(part in {".", ".."} for part in Path(image).parts)):
+            raise ValueError("scene image path must be workspace-relative")
 
 
 class StageHandler(BaseHTTPRequestHandler):
@@ -230,6 +255,8 @@ class StageHandler(BaseHTTPRequestHandler):
                     project = _load_project(parts[0])
                     body = _read_json_body(self, MAX_ASSET_BYTES if parts[1] == "assets" else MAX_JSON_BYTES)
                     if parts[1] == "save":
+                        if "scenes" in body:
+                            _validate_scenes(body["scenes"])
                         for field in ("title", "description", "format", "script", "scenes", "narrator", "audio"):
                             if field in body:
                                 project[field] = body[field]
@@ -396,11 +423,7 @@ class StageHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _kokoro_available() -> bool:
-        try:
-            import kokoro  # noqa: F401
-            return True
-        except ImportError:
-            return False
+        return importlib.util.find_spec("kokoro") is not None
 
     def _handle_asset_upload(self, project: dict, body: dict) -> None:
         kind = str(body.get("kind") or "image")

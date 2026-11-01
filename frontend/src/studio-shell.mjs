@@ -33,9 +33,11 @@ let selectedNarration = narrationForCharacter("santa");
 let activeNarrator = officialNarratorById("santa");
 let loadToken = 0;
 let currentProject = null;
+let selectedSceneId = null;
+let exportInProgress = false;
 
 async function api(path, options = {}) {
-  const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+  const response = await fetch(path, { cache: "no-store", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
@@ -60,8 +62,9 @@ function renderProjectExports() {
 function renderProjectScenes() {
   const list = $("#scene-list"); if (!list) return;
   list.replaceChildren();
+  if (currentProject?.scenes?.length && !currentProject.scenes.some((scene) => scene.id === selectedSceneId)) selectedSceneId = currentProject.scenes[0].id;
   (currentProject?.scenes || []).forEach((scene, index) => {
-    const row = document.createElement("div"); row.className = "scene-editor-row";
+    const row = document.createElement("div"); row.className = "scene-editor-row"; row.classList.toggle("is-selected", scene.id === selectedSceneId);
     const number = document.createElement("strong"); number.textContent = String(index + 1).padStart(2, "0");
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = scene.title || `Cena ${index + 1}`;
     const text = document.createElement("small"); text.textContent = `${scene.text} · ${formatTime(scene.duration_ms || 0)}`; copy.append(title, text);
@@ -69,15 +72,49 @@ function renderProjectScenes() {
     if (scene.image) { const image = document.createElement("img"); image.src = projectApiPath(`/asset/${encodeURIComponent(scene.image)}`); image.alt = "Imagem da cena"; controls.appendChild(image); }
     const input = document.createElement("input"); input.type = "file"; input.accept = "image/png,image/jpeg,image/webp";
     input.addEventListener("change", () => { if (input.files[0]) void uploadAsset(input.files[0], "image", scene.id); }); controls.appendChild(input);
+    row.addEventListener("click", (event) => { if (event.target?.tagName !== "INPUT") { selectedSceneId = scene.id; renderProjectScenes(); } });
     row.append(number, copy, controls); list.appendChild(row);
   });
   if (!currentProject?.scenes?.length) list.innerHTML = '<div class="loading-row">Salve um roteiro para criar a primeira cena.</div>';
+  renderSceneEditor();
+}
+
+function renderSceneEditor() {
+  const editor = $("#scene-editor");
+  if (!editor) return;
+  const scene = currentProject?.scenes?.find((item) => item.id === selectedSceneId);
+  if (!scene) { editor.hidden = true; return; }
+  editor.hidden = false;
+  $("#scene-editor-title").textContent = scene.title || "Cena selecionada";
+  $("#scene-editor-text").value = scene.text || "";
+  $("#scene-editor-duration").value = String(scene.duration_ms || 1000);
+  $("#scene-editor-camera").value = scene.camera || "static";
+  $("#scene-editor-transition").value = scene.transition || "cut";
+  $("#scene-editor-status").textContent = scene.image ? "imagem pronta" : "adicione uma imagem";
+}
+
+async function saveSceneEdits() {
+  const index = currentProject?.scenes?.findIndex((item) => item.id === selectedSceneId);
+  if (index == null || index < 0) return;
+  const scenes = currentProject.scenes.map((scene, itemIndex) => itemIndex === index ? { ...scene, text: $("#scene-editor-text").value.trim(), duration_ms: Math.max(100, Number($("#scene-editor-duration").value) || scene.duration_ms || 1000), camera: $("#scene-editor-camera").value, transition: $("#scene-editor-transition").value } : scene);
+  currentProject = await api(projectApiPath("/save"), { method: "POST", body: JSON.stringify({ scenes }) });
+  renderProjectState(); setStatus("Cena salva");
+}
+
+async function moveSelectedScene(direction) {
+  const scenes = [...(currentProject?.scenes || [])];
+  const index = scenes.findIndex((scene) => scene.id === selectedSceneId);
+  const next = index + direction;
+  if (index < 0 || next < 0 || next >= scenes.length) return;
+  [scenes[index], scenes[next]] = [scenes[next], scenes[index]];
+  currentProject = await api(projectApiPath("/save"), { method: "POST", body: JSON.stringify({ scenes }) });
+  renderProjectState(); setStatus("Ordem das cenas salva");
 }
 
 function renderProjectState() {
   const title = currentProject?.title || "Nenhum projeto";
   $("#active-project-name").textContent = title;
-  $("#script-title").value = title;
+  $("#script-title").value = currentProject?.title || "";
   $("#script-text").value = currentProject?.script || "";
   $("#script-count").textContent = `${($("#script-text").value || "").length} caracteres`;
   $("#script-save-state").textContent = currentProject ? "Projeto carregado" : "Crie um projeto primeiro";
@@ -98,6 +135,16 @@ async function loadProjects() {
 async function createProject() {
   const title = $("#new-project-title").value.trim(); const description = $("#new-project-description").value.trim(); const format = $("#new-project-format").value;
   try { currentProject = await api("/api/projects", { method: "POST", body: JSON.stringify({ title, description, format }) }); $("#project-dialog").hidden = true; renderProjectState(); await loadProjects(); setStatus("Projeto criado e salvo"); renderRoute("script"); } catch (error) { $("#project-dialog-status").textContent = error.message; }
+}
+
+async function createExampleProject() {
+  try {
+    currentProject = await api("/api/projects", { method: "POST", body: JSON.stringify({ title: "A Jornada de uma Estrela", description: "Exemplo original para aprender o fluxo do Fabuloom.", format: "horizontal-1080p" }) });
+    const script = "Uma estrela pequena acordou sobre a cidade. Ela procurou um lugar para iluminar e encontrou uma janela aberta. Ao amanhecer, a estrela descobriu que uma boa história também pode ser uma luz.";
+    const sentences = script.split(/(?<=[.!?…])\s+/).filter(Boolean);
+    currentProject = await api(projectApiPath("/save"), { method: "POST", body: JSON.stringify({ script, scenes: sentences.map((text, index) => ({ id: `scene-${String(index + 1).padStart(3, "0")}`, title: `Cena ${index + 1}`, text, image: null, duration_ms: 3000, camera: "static", transition: "cut" })) }) });
+    renderProjectState(); setStatus("Exemplo aberto"); renderRoute("script");
+  } catch (error) { setStatus(`Não foi possível abrir o exemplo: ${error.message}`); }
 }
 
 async function saveProject() {
@@ -127,17 +174,21 @@ async function loadProjectNarration() {
 
 async function exportProject() {
   if (!currentProject) return setStatus("Crie um projeto antes de exportar");
+  if (exportInProgress) return setStatus("Uma exportação já está em andamento");
+  exportInProgress = true;
+  const exportButton = $("#export-project-button");
+  if (exportButton) { exportButton.disabled = true; exportButton.textContent = "Exportando…"; }
   try {
     const response = await api(projectApiPath("/export"), { method: "POST", body: JSON.stringify({ format: "horizontal-1080p" }) });
     const poll = async () => {
       const status = await api(projectApiPath("/export/status"));
       $("#export-status").textContent = `${status.message || status.state} · ${status.progress || 0}%`;
-      if (status.state === "completed") { currentProject = await api(`/api/projects/${encodeURIComponent(currentProject.id)}`); renderProjectState(); $("#export-status").textContent = "MP4 concluído. Abra o arquivo na lista acima."; return; }
-      if (status.state === "failed" || status.state === "cancelled") return;
+      if (status.state === "completed") { currentProject = await api(`/api/projects/${encodeURIComponent(currentProject.id)}`); renderProjectState(); $("#export-status").textContent = "MP4 concluído. Abra o arquivo na lista acima."; exportInProgress = false; if (exportButton) { exportButton.disabled = false; exportButton.textContent = "Exportar MP4"; } return; }
+      if (status.state === "failed" || status.state === "cancelled") { exportInProgress = false; if (exportButton) { exportButton.disabled = false; exportButton.textContent = "Exportar MP4"; } return; }
       window.setTimeout(() => void poll(), 700);
     };
     $("#export-status").textContent = `Exportação iniciada · ${response.job.job_id}`; void poll();
-  } catch (error) { $("#export-status").textContent = `Exportação bloqueada: ${error.message}`; }
+  } catch (error) { exportInProgress = false; if (exportButton) { exportButton.disabled = false; exportButton.textContent = "Exportar MP4"; } $("#export-status").textContent = `Exportação bloqueada: ${error.message}`; }
 }
 
 const ROUTE_COPY = Object.freeze({
@@ -149,6 +200,7 @@ const ROUTE_COPY = Object.freeze({
   audio: ["SOM", "Áudio", "Voz, música, efeitos e limites reais do pipeline local."],
   preview: ["COMPOSIÇÃO AO VIVO", "Prévia", "Veja a composição compartilhada com o Narrator Mode."],
   export: ["SAÍDA", "Exportação", "Arquivos produzidos e validados pelo pipeline existente."],
+  settings: ["AMBIENTE LOCAL", "Configurações", "Verifique o ambiente e as opções disponíveis neste computador."],
   dev: ["DESENVOLVIMENTO", "Área DEV", "Laboratórios e referências preservados fora do fluxo principal."],
 });
 
@@ -165,7 +217,7 @@ function setStatus(message) {
 }
 
 function renderRoute(route) {
-  if (!sectionById(route) && route !== "dev") return;
+  if (!ROUTE_COPY[route]) return;
   activeRoute = route;
   const [eyebrow, title, subtitle] = ROUTE_COPY[route] || ROUTE_COPY.dashboard;
   $("#page-eyebrow").textContent = eyebrow;
@@ -425,6 +477,23 @@ function bindScriptDraft() {
   $("#generate-narration-button")?.addEventListener("click", () => void generateNarration());
   $("#export-project-button")?.addEventListener("click", () => void exportProject());
   $("#music-file")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (file) void uploadAsset(file, "music"); });
+  $$('[data-action="new-project"]').forEach((button) => button.addEventListener("click", () => { renderRoute("projects"); $("#project-dialog").hidden = false; $("#new-project-title").focus(); }));
+  $$('[data-action="example"]').forEach((button) => button.addEventListener("click", () => void createExampleProject()));
+  $("#scene-save-button")?.addEventListener("click", () => void saveSceneEdits());
+  $("#scene-up-button")?.addEventListener("click", () => void moveSelectedScene(-1));
+  $("#scene-down-button")?.addEventListener("click", () => void moveSelectedScene(1));
+  $("#refresh-health-button")?.addEventListener("click", () => void loadHealth());
+}
+
+async function loadHealth() {
+  const target = $("#settings-health");
+  if (!target) return;
+  target.innerHTML = '<div class="loading-row">Verificando ambiente…</div>';
+  try {
+    const health = await api("/api/health");
+    const rows = [["Python", health.python, true], ["FFmpeg", health.ffmpeg ? "disponível" : "não encontrado", health.ffmpeg], ["Kokoro", health.kokoro ? "instalado" : "configure a narração", health.kokoro], ["Diretório", health.workspace, true]];
+    target.replaceChildren(...rows.map(([label, value, ok]) => { const row = document.createElement("div"); row.className = "capability-line"; row.innerHTML = `<span>${label}</span><b class="${ok ? "metric-ok" : "status-badge pending"}">${value}</b>`; return row; }));
+  } catch (error) { target.textContent = `Não foi possível verificar o ambiente: ${error.message}`; }
 }
 
 function startRenderer() {
@@ -467,6 +536,7 @@ async function init() {
   renderProfiles();
   renderExports();
   renderDevLinks();
+  await loadHealth();
   await startRenderer();
   if (!manifest) await loadNarration(selectedNarration);
   renderRoute(location.hash.slice(1) || "dashboard");

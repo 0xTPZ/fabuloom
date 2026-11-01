@@ -12,6 +12,17 @@ SPEC.loader.exec_module(SERVER)
 
 
 class ServerPathTests(unittest.TestCase):
+    def test_scene_validation_accepts_supported_camera_and_rejects_unknown(self):
+        SERVER._validate_scenes([{"id": "scene-001", "duration_ms": 1000, "camera": "zoom", "transition": "cut", "image": "assets/a.png"}])
+        with self.assertRaises(ValueError):
+            SERVER._validate_scenes([{"id": "scene-001", "duration_ms": 1000, "camera": "orbit", "transition": "cut"}])
+
+    def test_scene_validation_rejects_absolute_image_paths_and_duplicate_ids(self):
+        with self.assertRaises(ValueError):
+            SERVER._validate_scenes([{"id": "scene-001", "duration_ms": 1000, "image": "C:/private/image.png"}])
+        with self.assertRaises(ValueError):
+            SERVER._validate_scenes([{"id": "scene-001", "duration_ms": 1000}, {"id": "scene-001", "duration_ms": 1000}])
+
     def test_default_workspace_uses_checkout_when_no_umbrella_workspace_exists(self):
         with TemporaryDirectory() as directory:
             frontend_root = Path(directory) / "checkout" / "frontend"
