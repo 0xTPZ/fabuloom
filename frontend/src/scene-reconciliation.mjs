@@ -17,8 +17,13 @@ export function reconcileSceneDrafts(existing, texts, idFactory = (index) => `sc
     const candidates = (byText.get(normalizeSceneText(text)) || []).filter((item) => !used.has(item));
     if (candidates.length === 1) { matches.set(index, candidates[0]); used.add(candidates[0]); }
   });
-  if (drafts.length === previous.length) {
-    drafts.forEach((_, index) => { if (!matches.has(index) && !used.has(index)) { matches.set(index, index); used.add(index); } });
+  // A positional fallback is safe only for one remaining old scene and one
+  // remaining draft. More than one unresolved item is structural ambiguity:
+  // do not silently move an image or camera setting to another story beat.
+  const unresolvedDrafts = drafts.map((_, index) => index).filter((index) => !matches.has(index));
+  const unresolvedOld = previous.map((_, index) => index).filter((index) => !used.has(index));
+  if (unresolvedDrafts.length === 1 && unresolvedOld.length === 1) {
+    matches.set(unresolvedDrafts[0], unresolvedOld[0]); used.add(unresolvedOld[0]);
   }
   const scenes = drafts.map((text, index) => {
     const oldIndex = matches.get(index); const old = oldIndex == null ? null : previous[oldIndex];

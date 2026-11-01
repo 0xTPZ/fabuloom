@@ -138,11 +138,21 @@ def _reconcile_scenes(existing: list[dict], segments: object) -> list[dict]:
         if key:
             old_by_text.setdefault(key, []).append(scene)
     used: set[str] = set()
-    reconciled = []
+    exact_matches: dict[int, dict] = {}
+    unresolved = []
     for index, segment in enumerate(segments):
         key = " ".join(str(segment.text or "").split()).casefold()
         candidates = [scene for scene in old_by_text.get(key, []) if scene.get("id") not in used]
-        previous = candidates[0] if len(candidates) == 1 else (existing[index] if len(existing) == len(segments) and index < len(existing) else {})
+        if len(candidates) == 1:
+            exact_matches[index] = candidates[0]
+            used.add(str(candidates[0].get("id")))
+        else:
+            unresolved.append((index, segment))
+    unresolved_old = [scene for scene in existing if scene.get("id") not in used]
+    positional_match = unresolved_old[0] if len(unresolved) == 1 and len(unresolved_old) == 1 else None
+    reconciled = []
+    for index, segment in enumerate(segments):
+        previous = exact_matches.get(index) or positional_match or {}
         scene_id = str(previous.get("id") or f"scene-{index + 1:03d}")
         used.add(scene_id)
         reconciled.append({

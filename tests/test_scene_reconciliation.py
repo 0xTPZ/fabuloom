@@ -30,6 +30,25 @@ class SceneReconciliationTests(unittest.TestCase):
         result = SERVER._reconcile_scenes([], [Segment("um", 500), Segment("dois", 1000)])
         self.assertEqual([scene["id"] for scene in result], ["scene-001", "scene-002"])
 
+    def test_ambiguous_duplicate_texts_do_not_redistribute_assets(self):
+        existing = [
+            {"id": "scene-a", "text": "igual", "image": "assets/a.png"},
+            {"id": "scene-b", "text": "igual", "image": "assets/b.png"},
+        ]
+        result = SERVER._reconcile_scenes(existing, [Segment("novo A", 500), Segment("novo B", 500)])
+        self.assertEqual([scene["id"] for scene in result], ["scene-001", "scene-002"])
+        self.assertEqual([scene["image"] for scene in result], [None, None])
+
+    def test_full_replacement_does_not_inherit_manual_configuration(self):
+        existing = [
+            {"id": "scene-a", "text": "antigo A", "image": "assets/a.png", "camera": "zoom"},
+            {"id": "scene-b", "text": "antigo B", "image": "assets/b.png", "camera": "pan-horizontal"},
+        ]
+        result = SERVER._reconcile_scenes(existing, [Segment("novo A", 500), Segment("novo B", 500)])
+        self.assertEqual([scene["id"] for scene in result], ["scene-001", "scene-002"])
+        self.assertEqual([scene["image"] for scene in result], [None, None])
+        self.assertEqual([scene["camera"] for scene in result], ["static", "static"])
+
 
 if __name__ == "__main__":
     unittest.main()

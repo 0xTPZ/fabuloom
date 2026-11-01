@@ -35,3 +35,23 @@ test("split and join create safe new scenes when correspondence is ambiguous", (
   assert.equal(joined.scenes[0].image, null);
   assert.equal(joined.removed.length, 3);
 });
+
+test("duplicate texts never use position to redistribute assets", () => {
+  const duplicate = [{ id: "scene-001", text: "Refrão", image: "one.png" }, { id: "scene-002", text: "Refrão", image: "two.png" }];
+  const result = reconcileSceneDrafts(duplicate, ["Refrão", "Refrão"]);
+  assert.deepEqual(result.scenes.map((scene) => scene.image), [null, null]);
+  assert.equal(result.removed.length, 2);
+});
+
+test("one edited scene can use the remaining one-to-one match", () => {
+  const result = reconcileSceneDrafts(old, ["A editada", "B", "C"]);
+  assert.equal(result.scenes[0].id, "scene-001");
+  assert.equal(result.scenes[0].image, "a.png");
+  assert.equal(result.scenes[1].id, "scene-002");
+});
+
+test("full replacement does not inherit the old project's assets", () => {
+  const result = reconcileSceneDrafts(old, ["Nova 1", "Nova 2", "Nova 3"]);
+  assert.equal(result.scenes.every((scene) => scene.image === null), true);
+  assert.equal(result.removed.length, 3);
+});
