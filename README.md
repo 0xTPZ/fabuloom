@@ -238,3 +238,13 @@ Draft characters are blocked, Suno commercial rights remain pending, and the
 MP4/evidence stay outside Git under
 `workspace\exports\cronicas-breves\cb-001-o-quarto-eco`; see
 `docs/CRONICAS-BREVES-CB001.md`.
+
+Mission 031 adds independent pipelines for CB-002, `A Sombra que Olhava para
+o Sol`, and CB-003, `A Luz do Último Viajante`. Both use their exact proposed
+editorial text, Kokoro `pm_santa`, Santa V5, `NarratorAvatarRenderer`,
+environment-only plates, measured captions and the vertical 1080x1920 profile.
+CB-002 is intentionally blocked because its required owner-provided music is
+missing; no CB-001 music is substituted. CB-003 has a 52-second H.264/AAC
+export with the required music, voice ducking and deterministic Canvas capture.
+Both remain proposed and pending human artistic review and music-rights
+confirmation. See `docs/CRONICAS-BREVES-031.md`.
