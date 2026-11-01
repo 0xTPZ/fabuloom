@@ -3,6 +3,9 @@
 import { PlaybackClock, findSegmentAt, validateManifest } from "./timeline.ts";
 
 export function localAudioUrl(audioUri) {
+  if (String(audioUri).startsWith("/api/projects/")) {
+    return String(audioUri);
+  }
   const filename = String(audioUri).split(/[\\/]/).pop();
   if (!filename || filename.includes("..")) {
     throw new Error("audio URI does not contain a safe local filename");

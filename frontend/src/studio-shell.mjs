@@ -84,7 +84,7 @@ function renderProjectState() {
   renderProjectScenes(); renderProjectExports();
 }
 
-async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); }
+async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); await loadProjectNarration(); }
 
 async function loadProjects() {
   const grid = $("#project-grid"); if (!grid) return;
@@ -116,7 +116,13 @@ async function uploadAsset(file, kind, sceneId = "") {
 
 async function generateNarration() {
   if (!currentProject) return setStatus("Crie um projeto antes de gerar áudio");
-  try { setStatus("Kokoro está gerando a narração…"); currentProject = (await api(projectApiPath("/narration"), { method: "POST", body: JSON.stringify({ text: $("#script-text").value, voice_id: "pm_santa" }) })).project; renderProjectState(); setStatus("Narração Santa V5 concluída"); } catch (error) { setStatus(`Narração bloqueada: ${error.message}`); $("#audio-voice-state").textContent = "pm_santa · indisponível"; }
+  try { setStatus("Kokoro está gerando a narração…"); currentProject = (await api(projectApiPath("/narration"), { method: "POST", body: JSON.stringify({ text: $("#script-text").value, voice_id: "pm_santa" }) })).project; renderProjectState(); await loadProjectNarration(); setStatus("Narração Santa V5 concluída"); } catch (error) { setStatus(`Narração bloqueada: ${error.message}`); $("#audio-voice-state").textContent = "pm_santa · indisponível"; }
+}
+
+async function loadProjectNarration() {
+  if (!currentProject) return false;
+  const loaded = await loadNarration({ url: projectApiPath("/audio/manifest.json"), voiceId: currentProject.narrator?.voice_id || "pm_santa", characterId: "santa", characterName: "Santa V5" });
+  return loaded;
 }
 
 async function exportProject() {
@@ -462,7 +468,7 @@ async function init() {
   renderExports();
   renderDevLinks();
   await startRenderer();
-  await loadNarration(selectedNarration);
+  if (!manifest) await loadNarration(selectedNarration);
   renderRoute(location.hash.slice(1) || "dashboard");
   window.__FABULOOM_STUDIO__ = Object.freeze({
     getState: () => Object.freeze({ route: activeRoute, characterId: activeNarrator?.id || "santa", voiceId: manifestVoiceId(manifest), playerState: player?.state || "stopped", durationMs: manifest?.duration_ms || 0 }),

@@ -145,6 +145,31 @@ class StageHandler(BaseHTTPRequestHandler):
                 except (ValueError, FileNotFoundError):
                     self.send_error(404, "asset not found")
                 return
+            if len(project_id) >= 3 and project_id[1] == "audio":
+                try:
+                    root = _project_dir(project_id[0]).resolve()
+                    relative_audio_request = Path("/".join(project_id[2:]))
+                    if relative_audio_request.as_posix() == "manifest.json":
+                        relative_audio_request = Path("audio") / relative_audio_request
+                    candidate = (root / relative_audio_request).resolve()
+                    candidate.relative_to(root)
+                    if not candidate.is_file():
+                        raise FileNotFoundError
+                    payload = candidate.read_bytes()
+                    content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+                    if candidate.name == "manifest.json":
+                        manifest = json.loads(payload.decode("utf-8"))
+                        for segment in manifest.get("segments", []):
+                            audio_uri = str(segment.get("audio_uri") or "")
+                            audio_path = Path(audio_uri.replace("file:///", "").replace("file://", ""))
+                            relative_audio = audio_path.resolve().relative_to(root)
+                            segment["audio_uri"] = f"/api/projects/{project_id[0]}/audio/{relative_audio.as_posix()}"
+                        payload = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+                        content_type = "application/json"
+                    self.send_response(200); self.send_header("Content-Type", content_type); self.send_header("Content-Length", str(len(payload))); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(payload)
+                except (ValueError, FileNotFoundError, json.JSONDecodeError):
+                    self.send_error(404, "audio not found")
+                return
             if len(project_id) == 1 and project_id[0]:
                 try:
                     self._send_json(_load_project(project_id[0]))
