@@ -22,6 +22,8 @@ Santa V5 is the production reference. Dora and Alex remain explicitly gated as `
 
 Read [INSTALL.md](INSTALL.md), then [QUICKSTART.md](QUICKSTART.md). The full capability boundary is in [USER_GUIDE.md](USER_GUIDE.md), and known limitations are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+For invited Alpha testing, also read [ALPHA-TESTING-GUIDE.md](ALPHA-TESTING-GUIDE.md) and [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md). This source-only candidate is not published and does not grant redistribution rights for identity-bearing artwork.
+
 ## First production
 
 1. Install the project-local environment and run `scripts/diagnose.ps1`.
