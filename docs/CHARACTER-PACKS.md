@@ -346,3 +346,17 @@ Os estados antigos continuam preservados no mesmo pack para comparação e
 rollback. Santa V5 não participa da alteração. Consulte
 `docs/MOUTH-POLISH-023.4.2.md` e os artefatos workspace-only em
 `workspace/exports/videos/facial-mouth-polish-v1/`.
+
+## MISSÃO 023.4.3 — mouth anchor Dora/Alex
+
+O contrato `fabuloom.narrator-mouth-anchor/0.1` registra landmarks faciais e
+offsets específicos para Dora e Alex. A boca permanece filha de `head`, mas
+deixa de depender somente do centro geométrico do canvas transparente: Dora
+usa offset local `[0, 0.04]` e Alex `[0, 0.036]`. Escala, estados RMS, crop,
+renderer global e Santa V5 permanecem inalterados.
+
+O laboratório `frontend/mouth-anchor-calibration-lab.html` exibe os quatro
+estados com landmarks sobre o avatar real. A evidência fica em
+`workspace/exports/videos/mouth-anchor-recovery-v1/`; vídeos e áudios não são
+versionados. O resultado continua experimental e requer aprovação artística
+humana.

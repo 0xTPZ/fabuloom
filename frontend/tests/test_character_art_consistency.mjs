@@ -6,6 +6,8 @@ import {
   DORA_NARRATOR_PACK_CARTOON_V1,
   TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1,
   TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES,
+  TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1,
+  TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS,
   validateCartoonFrameProfile,
 } from "../src/topazio-narrator-packs-cartoon-v1.mjs";
 
@@ -61,7 +63,8 @@ test("cartoon framing profiles preserve square assets and keep facial states in 
     assert.deepEqual(head.size, profile.base_size);
     assert.deepEqual(head.position, profile.base_position);
     assert.equal(mouth.parent, "head");
-    assert.deepEqual(mouth.position, profile.mouth_position);
+    assert.deepEqual(mouth.anchor, profile.mouth_anchor);
+    assert.deepEqual(mouth.position, profile.mouth_position.map((value, index) => value + profile.mouth_offset[index]));
     assert.deepEqual(mouth.size, profile.mouth_scale);
     assert.deepEqual(eyelids.position, profile.eyelids_position);
     assert.deepEqual(eyelids.size, profile.eyelids_scale);
@@ -69,4 +72,25 @@ test("cartoon framing profiles preserve square assets and keep facial states in 
   assert.throws(() => validateCartoonFrameProfile({
     base_size: [1.2, 0.3], base_position: [0.5, 0.2], mouth_position: [0.5, 0.5], mouth_scale: [1, 1], eyelids_position: [0.5, 0.5], eyelids_scale: [1, 1],
   }), /cartoon base_size/);
+});
+
+test("mouth anchor calibration is versioned and character-specific", () => {
+  assert.equal(TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1.mouth_anchor_contract, TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1);
+  for (const [character, pack] of [["dora", DORA_NARRATOR_PACK_CARTOON_V1], ["alex", ALEX_NARRATOR_PACK_CARTOON_V1]]) {
+    const calibration = TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS[character];
+    const profile = TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES[character];
+    assert.deepEqual(pack.framing.mouth_anchor, calibration.mouth_anchor);
+    assert.deepEqual(pack.framing.mouth_offset, calibration.mouth_offset);
+    assert.deepEqual(pack.framing.mouth_landmarks, calibration.landmarks);
+    assert.deepEqual(pack.face_reference.landmarks, calibration.landmarks);
+    assert.deepEqual(pack.layers.find((layer) => layer.id === "mouth").position, [0.5, 0.5 + calibration.mouth_offset[1]]);
+    assert.ok(calibration.landmarks.mouth_center[1] > calibration.landmarks.nose_center[1]);
+    assert.ok(calibration.landmarks.mouth_center[1] < calibration.landmarks.chin_upper_limit[1]);
+    assert.equal(profile.mouth_scale[0], 1);
+    assert.equal(profile.mouth_scale[1], 1);
+  }
+  assert.notDeepEqual(
+    TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.mouth_offset,
+    TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.mouth_offset,
+  );
 });

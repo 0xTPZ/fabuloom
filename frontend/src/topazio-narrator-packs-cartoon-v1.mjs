@@ -11,6 +11,7 @@ import { ANIMATION_READY_PROFILE, CHARACTER_FORMAT, validateCharacterPack } from
 
 export const TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1 = Object.freeze({
   format: "fabuloom.narrator-cartoon/0.1",
+  mouth_anchor_contract: "fabuloom.narrator-mouth-anchor/0.1",
   source_size: Object.freeze([1254, 1254]),
   orientation: "frontal-bust",
   base_composition: "single-original-mouthless-cartoon-identity-canvas",
@@ -26,6 +27,41 @@ export const TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1 = Object.freeze({
 const ROOT = "assets/characters/topazio-narrators-cartoon-v1";
 const SOURCE_SIZE = Object.freeze([...TOPAZIO_NARRATOR_CARTOON_CONTRACT_V1.source_size]);
 export const TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS = Object.freeze([1080, 1920]);
+export const TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1 = "fabuloom.narrator-mouth-anchor/0.1";
+
+// Head-local calibration landmarks measured against each identity canvas.
+// The previous pack used only the geometric canvas centre for both narrators,
+// which placed the compact mouth art too close to the nose in the avatar.
+export const TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS = Object.freeze({
+  dora: Object.freeze({
+    mouth_anchor: Object.freeze([0.5, 0.5]),
+    mouth_position: Object.freeze([0.5, 0.5]),
+    mouth_offset: Object.freeze([0, 0.04]),
+    mouth_scale: Object.freeze([1, 1]),
+    landmarks: Object.freeze({
+      head_center: Object.freeze([627, 627]),
+      nose_center: Object.freeze([627, 565]),
+      mouth_center: Object.freeze([627, 665]),
+      mouth_left: Object.freeze([552, 665]),
+      mouth_right: Object.freeze([702, 665]),
+      chin_upper_limit: Object.freeze([627, 775]),
+    }),
+  }),
+  alex: Object.freeze({
+    mouth_anchor: Object.freeze([0.5, 0.5]),
+    mouth_position: Object.freeze([0.5, 0.5]),
+    mouth_offset: Object.freeze([0, 0.036]),
+    mouth_scale: Object.freeze([1, 1]),
+    landmarks: Object.freeze({
+      head_center: Object.freeze([627, 627]),
+      nose_center: Object.freeze([627, 580]),
+      mouth_center: Object.freeze([627, 666]),
+      mouth_left: Object.freeze([548, 666]),
+      mouth_right: Object.freeze([706, 666]),
+      chin_upper_limit: Object.freeze([627, 810]),
+    }),
+  }),
+});
 
 // The narrator source canvas is 1080x1920 while the cartoon head assets are
 // square.  A single normalized value for both axes stretched the face
@@ -36,16 +72,22 @@ export const TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES = Object.freeze({
   dora: Object.freeze({
     base_size: Object.freeze([0.68, 0.3825]),
     base_position: Object.freeze([0.5, 0.205]),
-    mouth_position: Object.freeze([0.5, 0.5]),
-    mouth_scale: Object.freeze([1, 1]),
+    mouth_anchor: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.mouth_anchor,
+    mouth_position: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.mouth_position,
+    mouth_offset: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.mouth_offset,
+    mouth_scale: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.mouth_scale,
+    mouth_landmarks: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.dora.landmarks,
     eyelids_position: Object.freeze([0.5, 0.5]),
     eyelids_scale: Object.freeze([1, 1]),
   }),
   alex: Object.freeze({
     base_size: Object.freeze([0.68, 0.3825]),
     base_position: Object.freeze([0.5, 0.205]),
-    mouth_position: Object.freeze([0.5, 0.5]),
-    mouth_scale: Object.freeze([1, 1]),
+    mouth_anchor: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.mouth_anchor,
+    mouth_position: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.mouth_position,
+    mouth_offset: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.mouth_offset,
+    mouth_scale: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.mouth_scale,
+    mouth_landmarks: TOPAZIO_NARRATOR_MOUTH_CALIBRATIONS.alex.landmarks,
     eyelids_position: Object.freeze([0.5, 0.5]),
     eyelids_scale: Object.freeze([1, 1]),
   }),
@@ -63,6 +105,38 @@ function normalizedPoint(value, label) {
   return Object.freeze([...value]);
 }
 
+function signedPoint(value, label) {
+  if (!Array.isArray(value) || value.length !== 2) throw new TypeError(`${label} must be a 2D offset`);
+  value.forEach((item) => {
+    if (typeof item !== "number" || !Number.isFinite(item) || item < -0.5 || item > 0.5) {
+      throw new TypeError(`${label} must contain finite offsets in [-0.5,0.5]`);
+    }
+  });
+  return Object.freeze([...value]);
+}
+
+function pixelPoint(value, label) {
+  if (!Array.isArray(value) || value.length !== 2) throw new TypeError(`${label} must be a 2D pixel point`);
+  value.forEach((item, index) => {
+    if (typeof item !== "number" || !Number.isFinite(item) || item < 0 || item > SOURCE_SIZE[index]) {
+      throw new RangeError(`${label} is outside source canvas`);
+    }
+  });
+  return Object.freeze([...value]);
+}
+
+function mouthLandmarks(value, label) {
+  if (!value || typeof value !== "object") throw new TypeError(`${label} must be an object`);
+  return Object.freeze(Object.fromEntries([
+    ["head_center", pixelPoint(value.head_center, `${label}.head_center`)],
+    ["nose_center", pixelPoint(value.nose_center, `${label}.nose_center`)],
+    ["mouth_center", pixelPoint(value.mouth_center, `${label}.mouth_center`)],
+    ["mouth_left", pixelPoint(value.mouth_left, `${label}.mouth_left`)],
+    ["mouth_right", pixelPoint(value.mouth_right, `${label}.mouth_right`)],
+    ["chin_upper_limit", pixelPoint(value.chin_upper_limit, `${label}.chin_upper_limit`)],
+  ]));
+}
+
 function positivePoint(value, label) {
   const result = normalizedPoint(value, label);
   if (result.some((item) => item <= 0)) throw new TypeError(`${label} must be positive`);
@@ -74,11 +148,22 @@ export function validateCartoonFrameProfile(profile) {
   const baseSize = positivePoint(profile.base_size, "cartoon base_size");
   const expectedHeight = baseSize[0] * TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS[0] / TOPAZIO_NARRATOR_CARTOON_SOURCE_CANVAS[1];
   if (Math.abs(expectedHeight - baseSize[1]) > 0.005) throw new RangeError("cartoon base_size must preserve the square asset aspect");
+  const mouthAnchor = normalizedPoint(profile.mouth_anchor || [0.5, 0.5], "cartoon mouth_anchor");
+  const mouthPosition = normalizedPoint(profile.mouth_position, "cartoon mouth_position");
+  const mouthOffset = signedPoint(profile.mouth_offset || [0, 0], "cartoon mouth_offset");
+  const effectiveMouthPosition = mouthPosition.map((value, index) => value + mouthOffset[index]);
+  if (effectiveMouthPosition.some((value) => value < 0 || value > 1)) throw new RangeError("cartoon mouth position plus offset must stay in [0,1]");
+  const landmarks = profile.mouth_landmarks === undefined
+    ? null
+    : mouthLandmarks(profile.mouth_landmarks, "cartoon mouth_landmarks");
   return Object.freeze({
     base_size: baseSize,
     base_position: normalizedPoint(profile.base_position, "cartoon base_position"),
-    mouth_position: normalizedPoint(profile.mouth_position, "cartoon mouth_position"),
+    mouth_anchor: mouthAnchor,
+    mouth_position: mouthPosition,
+    mouth_offset: mouthOffset,
     mouth_scale: positivePoint(profile.mouth_scale, "cartoon mouth_scale"),
+    mouth_landmarks: landmarks,
     eyelids_position: normalizedPoint(profile.eyelids_position, "cartoon eyelids_position"),
     eyelids_scale: positivePoint(profile.eyelids_scale, "cartoon eyelids_scale"),
   });
@@ -115,7 +200,12 @@ function createPack({ id, name, character, voice_id }) {
     face_reference: Object.freeze({
       source_size: point(SOURCE_SIZE),
       head_pivot: point([0.5, 0.5]),
-      mouth_center: point([0.5, character === "dora" ? 0.52 : 0.53]),
+      mouth_anchor_contract: TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1,
+      mouth_anchor: point(frame.mouth_anchor),
+      mouth_position: point(frame.mouth_position),
+      mouth_offset: point(frame.mouth_offset),
+      mouth_center: point([frame.mouth_landmarks.mouth_center[0] / SOURCE_SIZE[0], frame.mouth_landmarks.mouth_center[1] / SOURCE_SIZE[1]]),
+      landmarks: frame.mouth_landmarks,
       mouth_scale: point(frame.mouth_scale),
       mouth_polish: "small-soft-outline-progressive-states-v1",
     }),
@@ -126,8 +216,12 @@ function createPack({ id, name, character, voice_id }) {
       base_size: frame.base_size,
       base_position: frame.base_position,
       head_pivot: point([0.5, 0.5]),
+      mouth_anchor_contract: TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1,
+      mouth_anchor: frame.mouth_anchor,
       mouth_position: frame.mouth_position,
+      mouth_offset: frame.mouth_offset,
       mouth_scale: frame.mouth_scale,
+      mouth_landmarks: frame.mouth_landmarks,
       eyelids_position: frame.eyelids_position,
       eyelids_scale: frame.eyelids_scale,
       visible_frame: "NARRATOR_FACE_CROP",
@@ -161,8 +255,8 @@ function createPack({ id, name, character, voice_id }) {
         role: "mouth",
         asset: states.closed,
         parent: "head",
-        anchor: point([0.5, 0.5]),
-        position: frame.mouth_position,
+        anchor: point(frame.mouth_anchor),
+        position: point(frame.mouth_position.map((value, index) => value + frame.mouth_offset[index])),
         size: frame.mouth_scale,
         source_size: point(SOURCE_SIZE),
         mouth_motion: "subtle",
