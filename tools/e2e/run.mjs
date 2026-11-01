@@ -12,7 +12,10 @@ const evidence = await mkdtemp(path.join(os.tmpdir(), "fabuloom-e2e-047-"));
 const workspace = path.join(evidence, "workspace");
 await mkdir(workspace, { recursive: true });
 const port = 18765;
-const python = path.join(repo, ".venv", "Scripts", "python.exe");
+// Prefer the repository venv, but keep the source-only distribution runnable
+// with an independently prepared Python installation.
+const venvPython = path.join(repo, ".venv", "Scripts", "python.exe");
+const python = existsSync(venvPython) ? venvPython : "python";
 const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 let server;
 const logs = [];
@@ -61,7 +64,9 @@ try {
   await page.locator("#script-text").fill("Ponto atravessa a ponte e encontra uma luz.");
   await page.locator("#save-project-button").click();
   await page.locator('[data-route="scenes"]').click();
-  const sceneImage = path.join(repo, "frontend/assets/characters/fantasy-narrator/torso-core.png");
+  // Public E2E must not depend on a character fixture. Generate a tiny neutral
+  // PNG in memory so the test remains self-contained and redistributable.
+  const sceneImage = { name: "neutral-scene.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") };
   await page.locator('#scene-list input[type="file"]').first().setInputFiles(sceneImage);
   await page.locator('#scene-list img').first().waitFor({ timeout: 5000 });
   await page.locator("#scene-editor-camera").selectOption("zoom");
