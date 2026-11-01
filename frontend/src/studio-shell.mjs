@@ -278,6 +278,7 @@ if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
     await new Promise((resolve) => requestAnimationFrame(() => resolve()));
     return previewCanvas?.toDataURL("image/png") || null;
   };
+  window.__fabuloomVisualProject = () => currentProject;
 }
 
 async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); await loadProjectNarration(); }
