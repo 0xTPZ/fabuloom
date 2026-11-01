@@ -1,47 +1,66 @@
 # Fabuloom Studio
 
-Fabuloom Studio is an open-source, local-first storytelling studio for turning scripts into narrated videos with characters, camera motion, and FFmpeg export.
+Fabuloom Studio is a local-first, open-source application for turning written stories into narrated audiovisual productions.
 
-The project is real and functional beyond the planning stage, but the Alpha is still being prepared:
+The project has moved beyond the planning stage. The functional Alpha is being prepared on the [`release/fabuloom-alpha-preparation`](https://github.com/0xTPZ/fabuloom/tree/release/fabuloom-alpha-preparation) branch and tracked in [PR #33](https://github.com/0xTPZ/fabuloom/pull/33).
 
 > **Fabuloom Studio 0.1.0-alpha — in preparation, not officially released.**
-
-The active development is on [`release/fabuloom-alpha-preparation`](https://github.com/0xTPZ/fabuloom/tree/release/fabuloom-alpha-preparation), tracked in [PR #33](https://github.com/0xTPZ/fabuloom/pull/33). Features from that branch are not claimed to be available on `main` until reviewed and merged.
+>
+> The features below describe the development branch. They are not claimed to be available on `main` until the work is reviewed and merged.
 
 [Leia em português (Brasil)](README.pt-BR.md)
 
-## What the Alpha is building
+## What the Alpha can do
 
-The development branch supports the core local workflow:
+The current development build supports:
 
-- Project creation and persistence.
-- Script and scene editing.
-- Image import and camera movements.
-- Cinematic preview and MP4 export through FFmpeg.
-- Optional Kokoro narration.
-- A character library with independently installed packs.
-- The neutral `community-demo-v1` character pack, Ponto.
-- Python, Node, and Playwright tests for the public workflow.
+- Creating and persisting local projects.
+- Writing and editing scripts.
+- Organizing scenes and importing images.
+- Camera movements and cinematic preview.
+- Narration through an optional Kokoro setup.
+- A character library with locally installed character packs.
+- The independent `community-demo-v1` character pack, Ponto.
+- MP4 export through FFmpeg.
+- Automated Python, Node, and Playwright coverage for the public workflow.
 
-Fabuloom is intended for writers, content creators, artists, independent producers, and developers who want an editable path from story to audiovisual production. It is not presented as a replacement for Premiere, CapCut, or another professional editor.
+The application is designed for writers, independent creators, artists, producers, and developers who want an editable local workflow from story to narrated video. It is not presented as a replacement for Premiere, CapCut, or other professional editors.
 
-## Technology
+## Project model
 
-Python powers the local server and audio integration. The Studio uses browser technologies for the interface and preview, Kokoro is an optional narration provider, and FFmpeg is an external export dependency.
+- **Product:** Fabuloom Studio
+- **Development version:** 0.1.0-alpha
+- **Approach:** open source and local-first
+- **Proposal:** transform written stories into editable narrated audiovisual productions
+- **Code license:** MIT for original Fabuloom code
+- **Assets and dependencies:** governed by their own licenses and provenance
 
-## Follow the development
+The public source-only candidate does not bundle models, voices, FFmpeg, private environments, or uncleared Topazioverse artwork. Independent character packs can be installed separately when their licenses and provenance are documented.
 
-The Alpha is not a public release or download. When access is authorized, use the development branch and read:
+## Try the development branch
 
-- [Installation guide](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/INSTALL.md)
+The Alpha is not yet a public release. When access is authorized, start with the development branch and follow its installation guide:
+
+1. Check out [`release/fabuloom-alpha-preparation`](https://github.com/0xTPZ/fabuloom/tree/release/fabuloom-alpha-preparation).
+2. Read [`INSTALL.md`](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/INSTALL.md) and [`ALPHA-TESTING-GUIDE.md`](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/ALPHA-TESTING-GUIDE.md).
+3. Review [`KNOWN_LIMITATIONS.md`](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/KNOWN_LIMITATIONS.md) before running the Studio.
+
+The branch is still under owner review. Do not treat the local test ZIPs as public downloads.
+
+## Documentation
+
+- [Installation (Alpha branch)](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/INSTALL.md)
 - [Alpha testing guide](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/ALPHA-TESTING-GUIDE.md)
 - [Known limitations](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/KNOWN_LIMITATIONS.md)
-- [License boundary](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/LICENSES.md)
+- [License boundary and notices](https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/LICENSES.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
+- [Alpha development PR #33](https://github.com/0xTPZ/fabuloom/pull/33)
 
-No test ZIP, model, voice, private environment, manuscript, or uncleared Topazioverse artwork is offered as a public download here. Independent packs remain subject to their own licenses and provenance.
+## Scope and privacy
+
+Fabuloom is developed independently from TopazioReader and Card Game Studio. Those projects are not dependencies. Private production environments, manuscripts, personal audio, models, generated media, and private continuity context are not part of this public presentation.
 
 ## License
 
-Original Fabuloom code is MIT-licensed. Third-party code, models, voices, images, character packs, and media remain subject to their respective licenses and permissions.
+Original Fabuloom Studio code is available under the [MIT License](LICENSE). This applies only to original project code. Third-party code, models, voices, images, character packs, and media remain subject to their respective licenses and permissions.
