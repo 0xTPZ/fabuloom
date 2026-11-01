@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Fabuloom Studio is an open-source, local-first storytelling studio for turning scripts into narrated videos.">
+  <meta property="og:title" content="Fabuloom Studio">
+  <meta property="og:description" content="Turn stories into narrated audiovisual productions locally.">
+  <meta property="og:type" content="website">
+  <title>Fabuloom Studio — local-first storytelling</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav shell"><a class="brand" href="#top"><span class="mark">✦</span> Fabuloom <small>STUDIO</small></a><nav aria-label="Primary"><a href="#features">Features</a><a href="#flow">How it works</a><a href="#open-source">Open source</a><a href="https://github.com/0xTPZ/fabuloom">GitHub</a><button id="language" type="button" aria-label="Switch language">PT-BR</button></nav></header>
+  <main id="top">
+    <section class="hero shell"><div><p class="eyebrow">LOCAL-FIRST · OPEN SOURCE</p><h1>From written stories to narrated scenes.</h1><p class="lede">Fabuloom Studio is a local creative workspace for shaping scripts, scenes, characters, camera motion, narration and video export.</p><div class="actions"><a class="button" href="https://github.com/0xTPZ/fabuloom/tree/release/fabuloom-alpha-preparation">Explore the Alpha branch</a><a class="text-link" href="https://github.com/0xTPZ/fabuloom/pull/33">Follow PR #33 →</a></div><p class="notice">0.1.0-alpha · in preparation · not officially released</p></div><div class="hero-art" aria-label="Abstract Fabuloom Studio graphic"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="story-card"><span>STORY</span><strong>Scene<br>in motion</strong><i>✦</i></div></div></section>
+    <section id="features" class="shell section"><p class="eyebrow">REAL WORKFLOW</p><h2>A focused path from idea to video.</h2><div class="feature-grid"><article><b>01</b><h3>Projects & scripts</h3><p>Keep a local project, write the story and organize it into editable scenes.</p></article><article><b>02</b><h3>Characters & camera</h3><p>Use independent character packs, import images and shape camera movement.</p></article><article><b>03</b><h3>Voice & export</h3><p>Optionally generate narration with Kokoro and export an MP4 through FFmpeg.</p></article></div></section>
+    <section id="flow" class="flow section"><div class="shell"><p class="eyebrow">HOW IT WORKS</p><h2>One local timeline for the whole story.</h2><div class="flowline"><span>Story</span><i>→</i><span>Script</span><i>→</i><span>Scenes</span><i>→</i><span>Narration</span><i>→</i><span>Video</span></div></div></section>
+    <section id="open-source" class="shell section split"><div><p class="eyebrow">OPEN SOURCE BOUNDARY</p><h2>Transparent by design.</h2></div><div><p>Original Fabuloom code is MIT-licensed. Models, voices, images, character packs and other dependencies retain their own licenses and provenance.</p><p>The public source-only candidate does not bundle models, voices, FFmpeg or uncleared Topazioverse artwork. The neutral Ponto pack demonstrates independent character support.</p><a class="text-link" href="https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/LICENSES.md">Read the license boundary →</a></div></section>
+    <section class="cta shell"><p class="eyebrow">CURRENT STATUS</p><h2>Build with the project, not around it.</h2><p>Follow the development branch, read the limitations and help shape the first controlled Alpha tests.</p><a class="button" href="https://github.com/0xTPZ/fabuloom/blob/release/fabuloom-alpha-preparation/INSTALL.md">Read installation</a></section>
+  </main>
+  <footer class="shell footer"><span>Fabuloom Studio · local-first storytelling</span><span>MIT code · independent asset licenses</span></footer>
+  <script>const pt={title:'De histórias escritas a cenas narradas.',lede:'O Fabuloom Studio é um espaço criativo local para organizar roteiros, cenas, personagens, movimentos de câmera, narração e exportação de vídeo.',features:['Projetos e roteiros','Personagens e câmera','Voz e exportação'],status:'0.1.0-alpha · em preparação · ainda não lançado oficialmente'};document.querySelector('#language').addEventListener('click',()=>{document.documentElement.lang='pt-BR';document.querySelector('h1').textContent=pt.title;document.querySelector('.lede').textContent=pt.lede;document.querySelector('.notice').textContent=pt.status;document.querySelectorAll('.feature-grid h3').forEach((el,i)=>el.textContent=pt.features[i]);document.querySelector('#language').textContent='EN';});</script>
+</body>
+</html>
