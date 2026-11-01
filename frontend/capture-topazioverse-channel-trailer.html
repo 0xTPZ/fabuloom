@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8"/>
+    <title>TopazioVerse · trailer do canal</title>
+    <style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { NarratorAvatarRenderer, NARRATOR_FACE_CROP, createNarratorTimeline, validateNarratorManifest, segmentAt } from "./src/narrator-mode.mjs";
+      import { decodeMonoPcm16Wav, composePcmSegments, createRmsReader } from "./src/cinematic-audio.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const timelineUrl = params.get("timeline");
+      const fps = Number(params.get("fps") || 15);
+      const vertical = params.get("format") === "vertical";
+      const canvas = document.querySelector("#capture-canvas");
+      canvas.width = vertical ? 1080 : 1920;
+      canvas.height = vertical ? 1920 : 1080;
+      const context = canvas.getContext("2d");
+      const WIDTH = canvas.width;
+      const HEIGHT = canvas.height;
+      const status = document.querySelector("#status");
+      const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+        return decodeMonoPcm16Wav(await response.arrayBuffer());
+      }
+
+      function exportUrl(value) {
+        const normalized = decodeURIComponent(String(value)).replaceAll("\\", "/");
+        const marker = "/workspace/exports/";
+        const index = normalized.toLowerCase().indexOf(marker);
+        if (index < 0) throw new Error(`asset is outside workspace exports: ${value}`);
+        const relative = normalized.slice(index + marker.length).replace(/^\/+/, "");
+        const parts = relative.split("/");
+        if (!relative || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe export asset: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function relativeExport(value) {
+        const parts = String(value).split("/");
+        if (!value || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe asset path: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function sceneWeight(timeMs, scene, index, scenes, fadeMs = 650) {
+        if (timeMs < scene.start_ms - fadeMs / 2 || timeMs > scene.end_ms + fadeMs / 2) return 0;
+        let weight = 1;
+        if (index > 0 && timeMs < scene.start_ms + fadeMs / 2) weight = Math.min(weight, (timeMs - scene.start_ms + fadeMs / 2) / fadeMs);
+        if (index < scenes.length - 1 && timeMs > scene.end_ms - fadeMs / 2) weight = Math.min(weight, (scene.end_ms + fadeMs / 2 - timeMs) / fadeMs);
+        return clamp(weight);
+      }
+
+      function localProgress(timeMs, scene) { return clamp((timeMs - scene.start_ms) / Math.max(1, scene.end_ms - scene.start_ms)); }
+
+      function drawImageCover(image, timeMs, scene, alpha) {
+        const progress = localProgress(timeMs, scene);
+        const base = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+        const zoom = 1 + progress * (vertical ? 0.06 : 0.08);
+        const width = image.naturalWidth * base * zoom;
+        const height = image.naturalHeight * base * zoom;
+        const panX = Math.sin(progress * Math.PI) * (vertical ? 0.035 : 0.018);
+        const panY = Math.cos(progress * Math.PI) * 0.012;
+        const x = (WIDTH - width) / 2 + panX * Math.max(0, width - WIDTH);
+        const y = (HEIGHT - height) / 2 + panY * Math.max(0, height - HEIGHT);
+        context.save(); context.globalAlpha = alpha; context.drawImage(image, x, y, width, height); context.restore();
+      }
+
+      function drawParticles(timeMs, alpha = 1, amount = 34) {
+        context.save(); context.globalAlpha = alpha * 0.42; context.fillStyle = "#dcecff";
+        for (let index = 0; index < amount; index += 1) {
+          const x = (index * 137 + timeMs * (0.006 + (index % 4) * 0.002)) % WIDTH;
+          const y = (index * 79 + Math.sin(timeMs / 720 + index * 1.31) * 28 + 40) % HEIGHT;
+          context.beginPath(); context.arc(x, y, 1 + (index % 3) * 0.65, 0, Math.PI * 2); context.fill();
+        }
+        context.restore();
+      }
+
+      function drawHostBackdrop(timeMs, variant = 0) {
+        const gradient = context.createLinearGradient(0, 0, WIDTH, HEIGHT);
+        gradient.addColorStop(0, variant ? "#061225" : "#0b1e38"); gradient.addColorStop(0.62, "#102d4c"); gradient.addColorStop(1, "#030914");
+        context.fillStyle = gradient; context.fillRect(0, 0, WIDTH, HEIGHT);
+        const glow = context.createRadialGradient(vertical ? 520 : 1250, vertical ? 470 : 300, 20, vertical ? 520 : 1250, vertical ? 470 : 300, vertical ? 620 : 500);
+        glow.addColorStop(0, `rgba(247,210,122,${0.11 + Math.sin(timeMs / 900) * 0.025})`); glow.addColorStop(1, "rgba(247,210,122,0)");
+        context.fillStyle = glow; context.fillRect(0, 0, WIDTH, HEIGHT);
+        context.fillStyle = "rgba(5,15,30,.88)"; context.fillRect(0, vertical ? HEIGHT - 330 : HEIGHT - 260, WIDTH, vertical ? 330 : 260);
+        const shelfStart = vertical ? 180 : 120;
+        const shelfGap = vertical ? 235 : 158;
+        for (let shelf = 0; shelf < (vertical ? 6 : 4); shelf += 1) {
+          const y = shelfStart + shelf * shelfGap; context.fillStyle = "rgba(247,210,122,.14)"; context.fillRect(0, y, WIDTH, 7);
+          for (let book = 0; book < (vertical ? 9 : 18); book += 1) {
+            const x = vertical ? 34 + book * 122 : 42 + book * 112 + (shelf % 2) * 28;
+            const h = 70 + ((book * 17 + shelf * 11) % 52);
+            context.fillStyle = ["#183f67", "#72552c", "#254d53", "#3c2f57"][book % 4]; context.fillRect(x, y - h, vertical ? 76 : 68, h - 12);
+          }
+        }
+        drawParticles(timeMs, 0.7, vertical ? 28 : 38);
+      }
+
+      function drawCard(x, y, width, height, title, subtitle, accent = "#f7d27a") {
+        context.save(); context.fillStyle = "rgba(3,12,28,.83)"; context.fillRect(x, y, width, height); context.strokeStyle = accent; context.lineWidth = 2; context.strokeRect(x, y, width, height);
+        context.fillStyle = accent; context.font = `700 ${vertical ? 24 : 26}px Segoe UI`; context.textAlign = "left"; context.fillText(title, x + 28, y + 48);
+        context.fillStyle = "#fff7dc"; context.font = `700 ${vertical ? 30 : 36}px Segoe UI`; context.fillText(subtitle, x + 28, y + 98); context.restore();
+      }
+
+      function drawConceptBackdrop(timeMs, kind) {
+        const gradient = context.createLinearGradient(0, 0, WIDTH, HEIGHT);
+        gradient.addColorStop(0, "#071a32"); gradient.addColorStop(0.52, kind === "games" ? "#20234e" : "#0f3151"); gradient.addColorStop(1, "#030914");
+        context.fillStyle = gradient; context.fillRect(0, 0, WIDTH, HEIGHT);
+        context.strokeStyle = "rgba(105,190,255,.20)"; context.lineWidth = 2;
+        const gap = vertical ? 70 : 92;
+        for (let x = 0; x < WIDTH; x += gap) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, HEIGHT); context.stroke(); }
+        for (let y = 0; y < HEIGHT; y += gap) { context.beginPath(); context.moveTo(0, y); context.lineTo(WIDTH, y); context.stroke(); }
+        drawParticles(timeMs, 0.55, vertical ? 24 : 34);
+      }
+
+      function drawMusicConcept(timeMs) {
+        drawConceptBackdrop(timeMs, "music");
+        const centerY = vertical ? 670 : 410;
+        context.save(); context.strokeStyle = "#f7d27a"; context.lineWidth = 5; context.beginPath();
+        for (let x = 90; x < WIDTH - 90; x += 12) { const y = centerY + Math.sin(x / 48 + timeMs / 520) * (vertical ? 90 : 75) + Math.sin(x / 17) * 15; if (x === 90) context.moveTo(x, y); else context.lineTo(x, y); }
+        context.stroke(); context.restore();
+        drawCard(vertical ? 68 : 180, vertical ? 950 : 690, vertical ? 944 : 760, 170, "MÚSICA", "emoções que encontram ritmo");
+      }
+
+      function drawGamesConcept(timeMs) {
+        drawConceptBackdrop(timeMs, "games");
+        const x = vertical ? 130 : 300, y = vertical ? 360 : 230, size = vertical ? 820 : 650;
+        context.save(); context.fillStyle = "rgba(12,25,52,.88)"; context.fillRect(x, y, size, size * .62); context.strokeStyle = "#f7d27a"; context.lineWidth = 5; context.strokeRect(x, y, size, size * .62);
+        for (let row = 0; row < 4; row += 1) for (let col = 0; col < 7; col += 1) { context.fillStyle = ["#2d5a91", "#295a58", "#76562e", "#443969"][(row + col) % 4]; context.fillRect(x + 28 + col * (size / 8), y + 28 + row * 58, 40, 40); }
+        context.fillStyle = "#9edbff"; context.beginPath(); context.arc(x + size * .70, y + size * .35, 44 + Math.sin(timeMs / 500) * 6, 0, Math.PI * 2); context.fill(); context.restore();
+        drawCard(vertical ? 68 : 260, vertical ? 1110 : 730, vertical ? 944 : 720, 180, "JOGOS", "mundos para explorar");
+      }
+
+      function drawTechConcept(timeMs) {
+        drawConceptBackdrop(timeMs, "tech");
+        const nodes = vertical ? [[210,420],[540,300],[860,470],[320,720],[700,760]] : [[400,300],[760,220],[1120,340],[560,600],[990,620]];
+        context.save(); context.strokeStyle = "rgba(125,208,255,.72)"; context.lineWidth = 4;
+        nodes.forEach(([x, y], index) => nodes.slice(index + 1).forEach(([tx, ty]) => { if (Math.abs(x - tx) < 520) { context.beginPath(); context.moveTo(x, y); context.lineTo(tx, ty); context.stroke(); } }));
+        nodes.forEach(([x, y], index) => { context.fillStyle = index % 2 ? "#f7d27a" : "#8bd7ff"; context.beginPath(); context.arc(x, y, 18 + Math.sin(timeMs / 500 + index) * 4, 0, Math.PI * 2); context.fill(); }); context.restore();
+        drawCard(vertical ? 68 : 220, vertical ? 980 : 735, vertical ? 944 : 790, 185, "LABORATÓRIO", "IA, software e futuro");
+      }
+
+      function drawCommunityConcept(timeMs) {
+        drawConceptBackdrop(timeMs, "community");
+        const labels = ["HISTÓRIAS", "MÚSICA", "JOGOS", "LABORATÓRIO"];
+        const cols = vertical ? 2 : 4;
+        const cardW = vertical ? 390 : 310, cardH = vertical ? 230 : 190;
+        labels.forEach((label, index) => { const col = index % cols, row = Math.floor(index / cols); const x = vertical ? 110 + col * 430 : 220 + col * 360; const y = vertical ? 430 + row * 300 : 330; drawCard(x, y, cardW, cardH, String(index + 1).padStart(2, "0"), label, index % 2 ? "#8bd7ff" : "#f7d27a"); });
+        context.fillStyle = "#dcecff"; context.font = `600 ${vertical ? 28 : 30}px Segoe UI`; context.textAlign = "center"; context.fillText("uma comunidade de viajantes", WIDTH / 2, vertical ? 1180 : 620);
+      }
+
+      function drawPlaylistConcept(timeMs) {
+        drawHostBackdrop(timeMs, 1);
+        const count = vertical ? 3 : 4;
+        for (let index = 0; index < count; index += 1) {
+          const x = vertical ? 120 + (index % 2) * 450 : 180 + index * 410;
+          const y = vertical ? 410 + Math.floor(index / 2) * 350 : 360;
+          drawCard(x, y, vertical ? 380 : 330, vertical ? 250 : 230, `PLAYLIST ${index + 1}`, ["Aventuras", "Músicas", "Jogos", "Experimentos"][index]);
+        }
+      }
+
+      function drawChannelLockup(timeMs) {
+        const gradient = context.createRadialGradient(WIDTH / 2, HEIGHT * .38, 20, WIDTH / 2, HEIGHT * .38, Math.max(WIDTH, HEIGHT) * .6);
+        gradient.addColorStop(0, "#1a4c78"); gradient.addColorStop(1, "#030914"); context.fillStyle = gradient; context.fillRect(0, 0, WIDTH, HEIGHT); drawParticles(timeMs, 0.8, vertical ? 30 : 42);
+        context.textAlign = "center"; context.fillStyle = "#f7d27a"; context.font = `700 ${vertical ? 54 : 64}px Segoe UI`; context.fillText("TOPAZIOVERSE", WIDTH / 2, vertical ? 430 : 350);
+        context.fillStyle = "#fff7dc"; context.font = `600 ${vertical ? 34 : 42}px Segoe UI`; context.fillText("transformar ideias em projetos reais", WIDTH / 2, vertical ? 510 : 430);
+        context.fillStyle = "#8bd7ff"; context.font = `500 ${vertical ? 26 : 30}px Segoe UI`; context.fillText("histórias · música · jogos · tecnologia", WIDTH / 2, vertical ? 580 : 490);
+      }
+
+      function drawSceneBase(scene, image, timeMs, alpha) {
+        const visual = scene.visual;
+        if (visual === "image" || visual === "real_ui" || visual === "real_narrator" || visual === "crystal_stage") {
+          if (image) drawImageCover(image, timeMs, scene, alpha); else { context.save(); context.globalAlpha = alpha; context.fillStyle = "#071426"; context.fillRect(0, 0, WIDTH, HEIGHT); context.restore(); }
+          if (visual === "crystal_stage") { context.save(); context.globalAlpha = alpha * .36; const glow = context.createRadialGradient(WIDTH * .7, HEIGHT * .28, 20, WIDTH * .7, HEIGHT * .28, 560); glow.addColorStop(0, "rgba(91,191,255,.42)"); glow.addColorStop(1, "rgba(91,191,255,0)"); context.fillStyle = glow; context.fillRect(0, 0, WIDTH, HEIGHT); context.restore(); }
+        } else if (visual === "host_large") { context.save(); context.globalAlpha = alpha; drawHostBackdrop(timeMs); context.restore(); }
+        else if (visual === "music_concept") { context.save(); context.globalAlpha = alpha; drawMusicConcept(timeMs); context.restore(); }
+        else if (visual === "games_concept") { context.save(); context.globalAlpha = alpha; drawGamesConcept(timeMs); context.restore(); }
+        else if (visual === "tech_concept") { context.save(); context.globalAlpha = alpha; drawTechConcept(timeMs); context.restore(); }
+        else if (visual === "community_concept") { context.save(); context.globalAlpha = alpha; drawCommunityConcept(timeMs); context.restore(); }
+        else if (visual === "playlist_concept") { context.save(); context.globalAlpha = alpha; drawPlaylistConcept(timeMs); context.restore(); }
+        else if (visual === "channel_lockup") { context.save(); context.globalAlpha = alpha; drawChannelLockup(timeMs); context.restore(); }
+      }
+
+      function drawAvatar(avatar, timeMs, amplitude, large, alpha = 1) {
+        const values = large ? (vertical ? { x: 150, y: 230, size: 760 } : { x: 1110, y: 160, size: 650 }) : (vertical ? { x: 52, y: 1330, size: 300 } : { x: 56, y: 650, size: 300 });
+        context.save(); context.globalAlpha = alpha; context.fillStyle = "rgba(3,10,24,.78)"; context.beginPath(); context.arc(values.x + values.size / 2, values.y + values.size / 2, values.size / 2 + 20, 0, Math.PI * 2); context.fill(); context.strokeStyle = "rgba(247,210,122,.94)"; context.lineWidth = vertical ? 6 : 5; context.beginPath(); context.arc(values.x + values.size / 2, values.y + values.size / 2, values.size / 2 + 14, 0, Math.PI * 2); context.stroke(); context.restore();
+        avatar.renderTo(context, { x: values.x, y: values.y, size: values.size, timeMs, speechAmplitude: amplitude, isPlaying: true, crop: NARRATOR_FACE_CROP });
+      }
+
+      function drawLabel(scene) {
+        context.save(); context.fillStyle = "rgba(3,12,28,.82)"; context.fillRect(vertical ? 42 : 70, vertical ? 84 : 58, vertical ? WIDTH - 84 : 780, vertical ? 76 : 78); context.fillStyle = "#f7d27a"; context.font = `700 ${vertical ? 25 : 28}px Segoe UI`; context.textAlign = "left"; context.fillText(scene.label, vertical ? 72 : 102, vertical ? 133 : 108); context.restore();
+      }
+
+      function drawSubtitle(segment) {
+        if (!segment) return;
+        const width = vertical ? WIDTH - 100 : WIDTH - 380;
+        const x = WIDTH / 2;
+        const y = vertical ? 1665 : 895;
+        const fontSize = vertical ? 29 : 30;
+        context.font = `600 ${fontSize}px Segoe UI`;
+        const words = String(segment.text).split(/\s+/), lines = []; let line = "";
+        words.forEach((word) => { const candidate = line ? `${line} ${word}` : word; if (line && context.measureText(candidate).width > width - 62) { lines.push(line); line = word; } else line = candidate; }); if (line) lines.push(line);
+        const height = lines.length * (fontSize + 11) + 34;
+        context.save(); context.fillStyle = "rgba(3,12,28,.90)"; context.fillRect(x - width / 2, y - 24, width, height); context.strokeStyle = "rgba(247,210,122,.78)"; context.lineWidth = 2; context.strokeRect(x - width / 2, y - 24, width, height); context.fillStyle = "#fff7dc"; context.textAlign = "center"; context.textBaseline = "top"; lines.forEach((entry, index) => context.fillText(entry, x, y + index * (fontSize + 11))); context.restore();
+      }
+
+      function sendFrame(index, timeMs) {
+        return new Promise((resolve, reject) => canvas.toBlob(async (blob) => { if (!blob) { reject(new Error("JPEG encoding failed")); return; } try { const response = await fetch(`/capture/${encodeURIComponent(session)}/src-${String(index).padStart(6, "0")}.jpg`, { method: "POST", headers: { "Content-Type": "image/jpeg", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame upload failed: ${response.status}`); resolve(); } catch (error) { reject(error); } }, "image/jpeg", 0.88));
+      }
+
+      async function main() {
+        if (!session || !timelineUrl) fail("session and timeline are required");
+        const planResponse = await fetch(timelineUrl); if (!planResponse.ok) fail(`timeline request failed: ${planResponse.status}`);
+        const plan = await planResponse.json(); const manifestResponse = await fetch(`/exports/${plan.manifest}`); if (!manifestResponse.ok) fail(`manifest request failed: ${manifestResponse.status}`);
+        const manifest = await manifestResponse.json(); validateNarratorManifest(manifest);
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(exportUrl(segment.audio_uri))));
+        const sampleRate = wavs[0].sampleRate; const amplitudeAt = createRmsReader(composePcmSegments(manifest, wavs, sampleRate), sampleRate);
+        const images = {};
+        for (const scene of plan.scenes) if (scene.asset_path) { const image = document.createElement("img"); image.src = relativeExport(scene.asset_path); await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`image failed: ${scene.asset_path}`)); }); images[scene.id] = image; }
+        const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href }); await avatar.load();
+        const timeline = createNarratorTimeline(manifest); const frameCount = Math.ceil(manifest.duration_ms / 1000 * fps); const pending = new Set();
+        for (let index = 0; index < frameCount; index += 1) {
+          const timeMs = Math.round(index * 1000 / fps); context.clearRect(0, 0, WIDTH, HEIGHT); context.fillStyle = "#030914"; context.fillRect(0, 0, WIDTH, HEIGHT);
+          let active = null;
+          plan.scenes.forEach((scene, sceneIndex) => { const weight = sceneWeight(timeMs, scene, sceneIndex, plan.scenes); if (weight > 0) { drawSceneBase(scene, images[scene.id], timeMs, weight); if (!active || weight > active.weight) active = { scene, weight }; } });
+          if (active) { drawLabel(active.scene); const large = ["host_large", "channel_lockup", "playlist_concept"].includes(active.scene.visual); drawAvatar(avatar, timeMs, amplitudeAt(timeMs), large, 1); if (active.scene.visual === "real_ui" || active.scene.visual === "real_narrator") { context.save(); context.fillStyle = "rgba(3,12,28,.72)"; context.fillRect(vertical ? 42 : 70, vertical ? 180 : 152, vertical ? WIDTH - 84 : 600, 48); context.fillStyle = "#dcecff"; context.font = `600 ${vertical ? 21 : 22}px Segoe UI`; context.textAlign = "left"; context.fillText("material local preservado para demonstração", vertical ? 72 : 102, vertical ? 213 : 184); context.restore(); } }
+          drawSubtitle(segmentAt(timeline, timeMs));
+          const upload = sendFrame(index, timeMs); pending.add(upload); upload.then(() => pending.delete(upload), () => pending.delete(upload)); if (pending.size >= 12) await Promise.race(pending);
+        }
+        await Promise.all(pending);
+        const completion = { mode: "topazioverse-channel-trailer", format: vertical ? "vertical" : "horizontal", duration_ms: manifest.duration_ms, sample_rate: sampleRate, canvas: { width: WIDTH, height: HEIGHT }, fps, frame_count: frameCount, output_fps: 30, timing_source: "measured_kokoro_wav_segments", mouth_source: "pcm16_rms_envelope", captions: "measured_segment_ranges", narrator_visibility: "entire_program", word_phoneme_viseme_timing: "unavailable" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) }); if (!complete.ok) fail(`completion upload failed: ${complete.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>
