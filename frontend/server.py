@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import mimetypes
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import time
+import uuid
 from urllib.parse import unquote, urlsplit
+import wave
 
 
 FRONTEND_ROOT = Path(__file__).resolve().parent
@@ -43,6 +48,57 @@ EXPORT_ROOT = export_root_for(WORKSPACE_ROOT, os.environ.get("FABULOOM_EXPORT_RO
 CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
+PROJECTS_ROOT = WORKSPACE_ROOT / "workspace" / "projects"
+MAX_JSON_BYTES = 8 * 1024 * 1024
+MAX_ASSET_BYTES = 25 * 1024 * 1024
+ALLOWED_IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+ALLOWED_AUDIO_TYPES = {"audio/wav": ".wav", "audio/x-wav": ".wav", "audio/mpeg": ".mp3", "audio/ogg": ".ogg"}
+
+
+def _project_dir(project_id: str) -> Path:
+    if not project_id or any(part in {".", ".."} for part in Path(project_id).parts) or not project_id.replace("-", "").isalnum():
+        raise ValueError("invalid project id")
+    candidate = (PROJECTS_ROOT / project_id).resolve()
+    candidate.relative_to(PROJECTS_ROOT.resolve())
+    return candidate
+
+
+def _project_file(project_id: str) -> Path:
+    return _project_dir(project_id) / "project.json"
+
+
+def _read_json_body(handler: BaseHTTPRequestHandler, limit: int = MAX_JSON_BYTES) -> dict:
+    try:
+        length = int(handler.headers.get("Content-Length", "-1"))
+    except ValueError as exc:
+        raise ValueError("invalid Content-Length") from exc
+    if length < 0 or length > limit:
+        raise ValueError("request is missing or exceeds the local size limit")
+    payload = handler.rfile.read(length)
+    value = json.loads(payload.decode("utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("request body must be a JSON object")
+    return value
+
+
+def _save_project(data: dict) -> dict:
+    project_id = str(data.get("id") or "")
+    directory = _project_dir(project_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    (directory / "project.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
+
+
+def _load_project(project_id: str) -> dict:
+    path = _project_file(project_id)
+    if not path.is_file():
+        raise FileNotFoundError(project_id)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _project_summary(data: dict) -> dict:
+    return {key: data.get(key) for key in ("id", "title", "description", "format", "created_at", "updated_at", "scenes", "narrator", "audio", "exports")}
 
 
 class StageHandler(BaseHTTPRequestHandler):
@@ -50,6 +106,39 @@ class StageHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = unquote(urlsplit(self.path).path)
+        if path == "/api/health":
+            self._send_json({"python": sys.version.split()[0], "ffmpeg": shutil.which("ffmpeg") is not None, "kokoro": self._kokoro_available(), "workspace": str(WORKSPACE_ROOT)})
+            return
+        if path == "/api/projects":
+            PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
+            projects = []
+            for project_file in sorted(PROJECTS_ROOT.glob("*/project.json")):
+                try:
+                    projects.append(_project_summary(json.loads(project_file.read_text(encoding="utf-8"))))
+                except (OSError, json.JSONDecodeError):
+                    continue
+            self._send_json({"projects": projects})
+            return
+        if path.startswith("/api/projects/"):
+            project_id = path.removeprefix("/api/projects/").strip("/").split("/")
+            if len(project_id) >= 3 and project_id[1] == "asset":
+                try:
+                    root = _project_dir(project_id[0]).resolve()
+                    candidate = (root / Path("/".join(project_id[2:]))).resolve()
+                    candidate.relative_to(root)
+                    if not candidate.is_file():
+                        raise FileNotFoundError
+                    payload = candidate.read_bytes()
+                    self.send_response(200); self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"); self.send_header("Content-Length", str(len(payload))); self.end_headers(); self.wfile.write(payload)
+                except (ValueError, FileNotFoundError):
+                    self.send_error(404, "asset not found")
+                return
+            if len(project_id) == 1 and project_id[0]:
+                try:
+                    self._send_json(_load_project(project_id[0]))
+                except (ValueError, FileNotFoundError):
+                    self.send_error(404, "project not found")
+                return
         if path == "/narrator-mode/status":
             self._send_narrator_status()
             return
@@ -84,6 +173,47 @@ class StageHandler(BaseHTTPRequestHandler):
             self.send_error(403, "capture accepts loopback requests only")
             return
         path = unquote(urlsplit(self.path).path)
+        if path == "/api/projects":
+            try:
+                body = _read_json_body(self)
+                title = str(body.get("title") or "").strip()
+                if not title or len(title) > 120:
+                    raise ValueError("project title is required and must be 120 characters or fewer")
+                project_id = f"project-{uuid.uuid4().hex[:12]}"
+                now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                project = {"id": project_id, "title": title, "description": str(body.get("description") or "").strip(), "format": body.get("format") or "horizontal-1080p", "created_at": now, "updated_at": now, "narrator": {"id": "santa", "name": "Santa V5", "voice_id": "pm_santa", "language": "pt-BR"}, "scenes": [], "audio": {}, "exports": []}
+                self._send_json(_save_project(project), status=201)
+            except (ValueError, json.JSONDecodeError) as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
+        if path.startswith("/api/projects/"):
+            parts = path.removeprefix("/api/projects/").strip("/").split("/")
+            if len(parts) == 2 and parts[1] in {"save", "assets", "narration", "export"}:
+                try:
+                    project = _load_project(parts[0])
+                    body = _read_json_body(self, MAX_ASSET_BYTES if parts[1] == "assets" else MAX_JSON_BYTES)
+                    if parts[1] == "save":
+                        for field in ("title", "description", "format", "script", "scenes", "narrator", "audio"):
+                            if field in body:
+                                project[field] = body[field]
+                        self._send_json(_save_project(project))
+                        return
+                    if parts[1] == "assets":
+                        self._handle_asset_upload(project, body)
+                        return
+                    if parts[1] == "narration":
+                        self._handle_narration(project, body)
+                        return
+                    if parts[1] == "export":
+                        self._handle_export(project, body)
+                        return
+                except FileNotFoundError:
+                    self.send_error(404, "project not found")
+                except (ValueError, json.JSONDecodeError) as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                except Exception as exc:  # surfaced as a user-facing operation error
+                    self._send_json({"error": str(exc)}, status=500)
+                return
         if path == "/narrator-mode/generate":
             self._start_narrator_job()
             return
@@ -200,6 +330,123 @@ class StageHandler(BaseHTTPRequestHandler):
         finally:
             log_handle.close()
         self._send_json({"state": "running", "mode": "narrator-mode-v1"}, status=202)
+
+    def do_DELETE(self) -> None:  # noqa: N802 - stdlib handler API
+        path = unquote(urlsplit(self.path).path)
+        if not path.startswith("/api/projects/"):
+            self.send_error(404, "unknown DELETE endpoint")
+            return
+        project_id = path.removeprefix("/api/projects/").strip("/")
+        try:
+            directory = _project_dir(project_id)
+            if not directory.is_dir():
+                raise FileNotFoundError(project_id)
+            shutil.rmtree(directory)
+            self._send_json({"deleted": project_id})
+        except (ValueError, FileNotFoundError):
+            self.send_error(404, "project not found")
+
+    @staticmethod
+    def _kokoro_available() -> bool:
+        try:
+            import kokoro  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def _handle_asset_upload(self, project: dict, body: dict) -> None:
+        kind = str(body.get("kind") or "image")
+        mime = str(body.get("mime") or "")
+        extension = ALLOWED_IMAGE_TYPES.get(mime) if kind == "image" else ALLOWED_AUDIO_TYPES.get(mime)
+        if not extension:
+            raise ValueError("unsupported asset type; use PNG, JPEG, WebP, WAV, MP3 or OGG")
+        encoded = str(body.get("data") or "")
+        raw = base64.b64decode(encoded, validate=True)
+        if not raw or len(raw) > MAX_ASSET_BYTES:
+            raise ValueError("asset is empty or exceeds the 25 MB limit")
+        safe_name = Path(str(body.get("filename") or f"asset{extension}")).name
+        asset_id = f"asset-{uuid.uuid4().hex[:10]}"
+        relative = Path("assets") / f"{asset_id}{extension}"
+        target = _project_dir(project["id"]) / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        record = {"id": asset_id, "filename": safe_name, "kind": kind, "mime": mime, "path": str(relative).replace("\\", "/"), "size": len(raw)}
+        if kind == "image":
+            scene_id = str(body.get("scene_id") or "")
+            for scene in project.setdefault("scenes", []):
+                if scene.get("id") == scene_id:
+                    scene["image"] = record["path"]
+        else:
+            project.setdefault("audio", {})["music"] = record
+        _save_project(project)
+        self._send_json({"asset": record, "project": project}, status=201)
+
+    def _handle_narration(self, project: dict, body: dict) -> None:
+        text = str(body.get("text") or "").strip()
+        if not text:
+            raise ValueError("roteiro vazio: escreva um texto antes de gerar a narração")
+        if str(body.get("voice_id") or "pm_santa") != "pm_santa":
+            raise ValueError("esta Alpha suporta somente Santa V5 / pm_santa")
+        sys.path.insert(0, str(FRONTEND_ROOT.parent / "src"))
+        from fabuloom_core.kokoro import KokoroTTSProvider
+        from fabuloom_core.narration import synthesize_narration
+        from fabuloom_core.serialization import serialize_manifest
+        output_dir = _project_dir(project["id"]) / "audio"
+        provider = KokoroTTSProvider(output_dir=output_dir, allow_overwrite=True)
+        try:
+            run = synthesize_narration(provider, text, narration_id=f"{project['id']}-santa", voice_id="pm_santa", output_dir=output_dir)
+        finally:
+            provider.close()
+        manifest_path = output_dir / "manifest.json"
+        manifest_path.write_text(serialize_manifest(run.manifest), encoding="utf-8")
+        project["audio"]["manifest"] = str(manifest_path.relative_to(_project_dir(project["id"]))).replace("\\", "/")
+        project["audio"]["voice"] = "pm_santa"
+        project["audio"]["duration_ms"] = run.manifest.duration_ms
+        project["audio"]["wav_files"] = [str(path.relative_to(_project_dir(project["id"]))).replace("\\", "/") for path in sorted(output_dir.glob("*.wav"))]
+        project["scenes"] = [{"id": segment.id, "title": f"Cena {index + 1}", "text": segment.text, "image": next((s.get("image") for s in project.get("scenes", []) if s.get("id") == segment.id), None), "duration_ms": segment.end_ms - segment.start_ms, "camera": "static", "transition": "cut"} for index, segment in enumerate(run.manifest.segments)]
+        _save_project(project)
+        self._send_json({"project": project, "manifest": json.loads(manifest_path.read_text(encoding="utf-8"))}, status=201)
+
+    def _handle_export(self, project: dict, body: dict) -> None:
+        audio = project.get("audio", {})
+        wav_files = [(_project_dir(project["id"]) / item).resolve() for item in audio.get("wav_files", [])]
+        if not wav_files or not all(path.is_file() for path in wav_files):
+            raise ValueError("gere a narração Santa V5 antes de exportar o vídeo")
+        scenes = project.get("scenes", [])
+        if not scenes or not all(scene.get("image") and (_project_dir(project["id"]) / scene["image"]).is_file() for scene in scenes):
+            raise ValueError("adicione uma imagem válida a cada cena antes de exportar")
+        output_dir = (EXPORT_ROOT / "projects" / project["id"]).resolve()
+        output_dir.relative_to(EXPORT_ROOT.resolve())
+        output_dir.mkdir(parents=True, exist_ok=True)
+        list_path = output_dir / "images.txt"
+        with list_path.open("w", encoding="utf-8") as handle:
+            for scene in scenes:
+                image = (_project_dir(project["id"]) / scene["image"]).resolve()
+                image.relative_to(_project_dir(project["id"]).resolve())
+                handle.write(f"file '{image.as_posix().replace("'", "'\\''")}'\n")
+                handle.write(f"duration {max(0.1, float(scene.get('duration_ms', 1000)) / 1000):.3f}\n")
+            image = (_project_dir(project["id"]) / scenes[-1]["image"]).resolve()
+            handle.write(f"file '{image.as_posix().replace("'", "'\\''")}'\n")
+        voice_list = output_dir / "voice.txt"
+        voice_list.write_text("\n".join(f"file '{path.as_posix()}'" for path in wav_files) + "\n", encoding="utf-8")
+        voice_path = output_dir / "voice.wav"
+        if len(wav_files) == 1:
+            shutil.copyfile(wav_files[0], voice_path)
+        else:
+            subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(voice_list), "-c", "copy", str(voice_path)], check=True, capture_output=True, text=True)
+        output = output_dir / f"{project['id']}-1080p.mp4"
+        command = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-i", str(voice_path)]
+        music = project.get("audio", {}).get("music", {}).get("path")
+        if music and (_project_dir(project["id"]) / music).is_file():
+            command += ["-i", str((_project_dir(project["id"]) / music).resolve()), "-filter_complex", "[1:a]volume=1.0[voice];[2:a]volume=0.18[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v", "-map", "[aout]"]
+        else:
+            command += ["-map", "0:v", "-map", "1:a"]
+        command += ["-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2", "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(output)]
+        subprocess.run(command, check=True, capture_output=True, text=True)
+        export = {"path": str(output.relative_to(WORKSPACE_ROOT)).replace("\\", "/"), "format": "1920x1080 H.264/AAC MP4", "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        project.setdefault("exports", []).append(export)
+        _save_project(project)
+        self._send_json({"project": project, "export": export}, status=201)
 
     def log_message(self, format: str, *args: object) -> None:
         print(f"[stage] {self.address_string()} {format % args}")

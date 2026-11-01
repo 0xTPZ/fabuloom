@@ -32,6 +32,97 @@ let avatarRenderer = null;
 let selectedNarration = narrationForCharacter("santa");
 let activeNarrator = officialNarratorById("santa");
 let loadToken = 0;
+let currentProject = null;
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+  return payload;
+}
+
+function projectApiPath(suffix = "") {
+  return currentProject ? `/api/projects/${encodeURIComponent(currentProject.id)}${suffix}` : null;
+}
+
+function renderProjectExports() {
+  const list = $("#project-export-list");
+  if (!list) return;
+  list.replaceChildren();
+  (currentProject?.exports || []).forEach((item) => {
+    const row = document.createElement("div"); row.className = "export-row";
+    const relative = item.path.split("\\").join("/");
+    row.innerHTML = `<span><strong>Projeto atual · MP4</strong><small>${item.format} · ${item.created_at}</small></span><a href="/exports/${relative.replace(/^workspace[\\/]exports[\\/]/, "")}" target="_blank" rel="noreferrer">Abrir arquivo ↗</a>`;
+    list.appendChild(row);
+  });
+}
+
+function renderProjectScenes() {
+  const list = $("#scene-list"); if (!list) return;
+  list.replaceChildren();
+  (currentProject?.scenes || []).forEach((scene, index) => {
+    const row = document.createElement("div"); row.className = "scene-editor-row";
+    const number = document.createElement("strong"); number.textContent = String(index + 1).padStart(2, "0");
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = scene.title || `Cena ${index + 1}`;
+    const text = document.createElement("small"); text.textContent = `${scene.text} · ${formatTime(scene.duration_ms || 0)}`; copy.append(title, text);
+    const controls = document.createElement("div");
+    if (scene.image) { const image = document.createElement("img"); image.src = projectApiPath(`/asset/${encodeURIComponent(scene.image)}`); image.alt = "Imagem da cena"; controls.appendChild(image); }
+    const input = document.createElement("input"); input.type = "file"; input.accept = "image/png,image/jpeg,image/webp";
+    input.addEventListener("change", () => { if (input.files[0]) void uploadAsset(input.files[0], "image", scene.id); }); controls.appendChild(input);
+    row.append(number, copy, controls); list.appendChild(row);
+  });
+  if (!currentProject?.scenes?.length) list.innerHTML = '<div class="loading-row">Salve um roteiro para criar a primeira cena.</div>';
+}
+
+function renderProjectState() {
+  const title = currentProject?.title || "Nenhum projeto";
+  $("#active-project-name").textContent = title;
+  $("#script-title").value = title;
+  $("#script-text").value = currentProject?.script || "";
+  $("#script-count").textContent = `${($("#script-text").value || "").length} caracteres`;
+  $("#script-save-state").textContent = currentProject ? "Projeto carregado" : "Crie um projeto primeiro";
+  renderProjectScenes(); renderProjectExports();
+}
+
+async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); }
+
+async function loadProjects() {
+  const grid = $("#project-grid"); if (!grid) return;
+  const data = await api("/api/projects"); grid.replaceChildren();
+  if (!data.projects.length) { $("#project-empty").hidden = false; return; }
+  $("#project-empty").hidden = true;
+  data.projects.forEach((project) => { const card = document.createElement("article"); card.className = "project-card"; card.innerHTML = `<div class="project-cover cover-night"><span>✦</span></div><div class="project-copy"><div><span class="status-badge stable">local</span><small>${project.updated_at || ""}</small></div><h3></h3><p>${project.scenes?.length || 0} cenas · ${project.narrator?.voice_id || "pm_santa"}</p><button class="text-button" type="button">Abrir produção →</button></div>`; card.querySelector("h3").textContent = project.title; card.querySelector("button").addEventListener("click", () => { void loadProject(project.id).then(() => renderRoute("script")); }); grid.appendChild(card); });
+  if (!currentProject) await loadProject(data.projects[0].id);
+}
+
+async function createProject() {
+  const title = $("#new-project-title").value.trim(); const description = $("#new-project-description").value.trim(); const format = $("#new-project-format").value;
+  try { currentProject = await api("/api/projects", { method: "POST", body: JSON.stringify({ title, description, format }) }); $("#project-dialog").hidden = true; renderProjectState(); await loadProjects(); setStatus("Projeto criado e salvo"); renderRoute("script"); } catch (error) { $("#project-dialog-status").textContent = error.message; }
+}
+
+async function saveProject() {
+  if (!currentProject) { renderRoute("projects"); setStatus("Crie um projeto antes de salvar"); return; }
+  const text = $("#script-text").value.trim(); if (!text) { setStatus("Escreva um roteiro antes de salvar"); return; }
+  const sentences = text.split(/(?<=[.!?…])\s+|\n+/).map((item) => item.trim()).filter(Boolean);
+  const scenes = sentences.map((item, index) => ({ id: `scene-${String(index + 1).padStart(3, "0")}`, title: `Cena ${index + 1}`, text: item, image: currentProject.scenes?.[index]?.image || null, duration_ms: 3000, camera: "static", transition: "cut" }));
+  try { currentProject = await api(projectApiPath("/save"), { method: "POST", body: JSON.stringify({ title: $("#script-title").value.trim() || currentProject.title, script: text, scenes }) }); renderProjectState(); setStatus("Roteiro e cenas salvos"); } catch (error) { setStatus(`Falha ao salvar: ${error.message}`); }
+}
+
+async function uploadAsset(file, kind, sceneId = "") {
+  if (!currentProject) return setStatus("Crie um projeto antes de importar arquivos");
+  if (file.size > 25 * 1024 * 1024) return setStatus("Arquivo maior que o limite de 25 MB");
+  const reader = new FileReader(); reader.onload = async () => { try { currentProject = (await api(projectApiPath("/assets"), { method: "POST", body: JSON.stringify({ filename: file.name, mime: file.type, data: String(reader.result).split(",")[1], kind, scene_id: sceneId }) })).project; renderProjectState(); setStatus(`${file.name} importado`); } catch (error) { setStatus(`Importação falhou: ${error.message}`); } }; reader.readAsDataURL(file);
+}
+
+async function generateNarration() {
+  if (!currentProject) return setStatus("Crie um projeto antes de gerar áudio");
+  try { setStatus("Kokoro está gerando a narração…"); currentProject = (await api(projectApiPath("/narration"), { method: "POST", body: JSON.stringify({ text: $("#script-text").value, voice_id: "pm_santa" }) })).project; renderProjectState(); setStatus("Narração Santa V5 concluída"); } catch (error) { setStatus(`Narração bloqueada: ${error.message}`); $("#audio-voice-state").textContent = "pm_santa · indisponível"; }
+}
+
+async function exportProject() {
+  if (!currentProject) return setStatus("Crie um projeto antes de exportar");
+  try { $("#export-status").textContent = "Exportando MP4 com FFmpeg…"; currentProject = (await api(projectApiPath("/export"), { method: "POST", body: JSON.stringify({ format: "horizontal-1080p" }) })).project; renderProjectState(); $("#export-status").textContent = "MP4 concluído. Abra o arquivo na lista acima."; } catch (error) { $("#export-status").textContent = `Exportação bloqueada: ${error.message}`; }
+}
 
 const ROUTE_COPY = Object.freeze({
   dashboard: ["OVERVIEW · FABULOOM STUDIO", "Dê vida às suas histórias.", "Um espaço local para organizar roteiro, voz, cenas e renderização."],
@@ -308,19 +399,15 @@ function bindScriptDraft() {
   const title = $("#script-title");
   const text = $("#script-text");
   const count = $("#script-count");
-  const savedTitle = localStorage.getItem("fabuloom.studio.script.title");
-  const savedText = localStorage.getItem("fabuloom.studio.script.text");
-  if (savedTitle) title.value = savedTitle;
-  if (savedText) text.value = savedText;
-  const save = () => {
-    localStorage.setItem("fabuloom.studio.script.title", title.value);
-    localStorage.setItem("fabuloom.studio.script.text", text.value);
-    count.textContent = `${text.value.length} caracteres`;
-    setStatus("Roteiro salvo localmente");
-  };
-  title.addEventListener("input", save);
-  text.addEventListener("input", save);
-  save();
+  const updateCount = () => { count.textContent = `${text.value.length} caracteres`; };
+  title.addEventListener("input", updateCount); text.addEventListener("input", updateCount); updateCount();
+  $("#save-project-button")?.addEventListener("click", () => void saveProject());
+  $("#new-project-button")?.addEventListener("click", () => { $("#project-dialog").hidden = false; $("#new-project-title").focus(); });
+  $("#project-dialog-close")?.addEventListener("click", () => { $("#project-dialog").hidden = true; });
+  $("#project-dialog-submit")?.addEventListener("click", () => void createProject());
+  $("#generate-narration-button")?.addEventListener("click", () => void generateNarration());
+  $("#export-project-button")?.addEventListener("click", () => void exportProject());
+  $("#music-file")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (file) void uploadAsset(file, "music"); });
 }
 
 function startRenderer() {
@@ -359,6 +446,7 @@ async function init() {
   bindPlayback();
   bindNarratorControls();
   bindScriptDraft();
+  try { await loadProjects(); } catch (error) { setStatus(`Projetos indisponíveis: ${error.message}`); }
   renderProfiles();
   renderExports();
   renderDevLinks();
