@@ -48,6 +48,13 @@ class ServerPathTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 SERVER.export_root_for(workspace, str(Path(directory) / "outside"))
 
+    def test_environment_health_exposes_guided_states_without_importing_kokoro_runtime(self):
+        health = SERVER._environment_health()
+        for key in ("python_state", "ffmpeg_state", "ffprobe_state", "kokoro_state", "model_state", "voice", "writable_state", "workspace"):
+            self.assertIn(key, health)
+        self.assertIn(health["python_state"], {"PRONTO", "ERRO"})
+        self.assertIn(health["voice"], {"PRONTO", "CONFIGURAÇÃO NECESSÁRIA", "ERRO", "VERIFICAÇÃO NECESSÁRIA"})
+
 
 if __name__ == "__main__":
     unittest.main()

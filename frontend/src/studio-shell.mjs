@@ -37,6 +37,7 @@ let currentProject = null;
 let selectedSceneId = null;
 let exportInProgress = false;
 let previewMode = "cinematic";
+let voiceVerified = false;
 const cinematicImages = new Map();
 
 async function api(path, options = {}) {
@@ -346,7 +347,7 @@ function updatePlaybackUi() {
   $("#preview-seek").max = String(duration);
   $("#preview-seek").value = String(Math.min(position, duration));
   $("#preview-time").textContent = `${formatTime(position)} / ${formatTime(duration)}`;
-  $("#canvas-state").textContent = ({ playing: "REPRODUZINDO", paused: "PAUSADO", ended: "CONCLUÍDO", error: "ERRO" })[state] || "PRONTO";
+  $("#canvas-state").textContent = !voiceVerified ? "VERIFICAR" : (({ playing: "REPRODUZINDO", paused: "PAUSADO", ended: "CONCLUÍDO", error: "ERRO" })[state] || "PRONTO");
   updateSegmentHighlights(player?.activeSegment() || null);
 }
 
@@ -528,7 +529,12 @@ async function loadHealth() {
   target.innerHTML = '<div class="loading-row">Verificando ambiente…</div>';
   try {
     const health = await api("/api/health");
-    const rows = [["Python", health.python, true], ["FFmpeg", health.ffmpeg ? "disponível" : "não encontrado", health.ffmpeg], ["Kokoro", health.kokoro ? "instalado" : "configure a narração", health.kokoro], ["Diretório", health.workspace, true]];
+    const voiceReady = health.voice === "PRONTO";
+    voiceVerified = voiceReady;
+    $("#canvas-state").textContent = voiceReady ? "PRONTO" : "VERIFICAR";
+    $("#canvas-voice").textContent = voiceReady ? "pm_santa" : "pm_santa · configurar";
+    $("#kokoro-status")?.replaceChildren(Object.assign(document.createElement("span"), { textContent: voiceReady ? "Voz verificada para geração" : "Voz ainda precisa de verificação real" }));
+    const rows = [["Python", `${health.python} · ${health.python_state}`, health.python_state === "PRONTO"], ["FFmpeg", health.ffmpeg_state, health.ffmpeg], ["FFprobe", health.ffprobe_state, health.ffprobe], ["Kokoro", health.kokoro_state, health.kokoro], ["Modelo Kokoro-82M", health.model_state, health.model], ["Voz pm_santa", health.voice, health.voice === "PRONTO"], ["Projetos", health.writable_state, health.writable], ["Diretório", health.workspace, true], ["Porta local", String(health.port), true]];
     target.replaceChildren(...rows.map(([label, value, ok]) => { const row = document.createElement("div"); row.className = "capability-line"; row.innerHTML = `<span>${label}</span><b class="${ok ? "metric-ok" : "status-badge pending"}">${value}</b>`; return row; }));
   } catch (error) { target.textContent = `Não foi possível verificar o ambiente: ${error.message}`; }
 }

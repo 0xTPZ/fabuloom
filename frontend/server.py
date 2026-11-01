@@ -130,13 +130,41 @@ def _validate_scenes(scenes: object) -> None:
             raise ValueError("scene image path must be workspace-relative")
 
 
+def _environment_health() -> dict:
+    python_ok = sys.version_info >= (3, 11)
+    ffmpeg_path = shutil.which("ffmpeg")
+    ffprobe_path = shutil.which("ffprobe")
+    kokoro_package = importlib.util.find_spec("kokoro") is not None
+    model_cache = Path.home() / ".cache" / "huggingface" / "hub" / "models--hexgrad--Kokoro-82M"
+    model_ready = model_cache.exists()
+    writable = os.access(WORKSPACE_ROOT, os.W_OK)
+    return {
+        "python": sys.version.split()[0],
+        "python_state": "PRONTO" if python_ok else "ERRO",
+        "ffmpeg": bool(ffmpeg_path),
+        "ffmpeg_state": "PRONTO" if ffmpeg_path else "NÃO INSTALADO",
+        "ffprobe": bool(ffprobe_path),
+        "ffprobe_state": "PRONTO" if ffprobe_path else "NÃO INSTALADO",
+        "kokoro": kokoro_package,
+        "kokoro_state": "PRONTO" if kokoro_package else "NÃO INSTALADO",
+        "model": model_ready,
+        "model_state": "PRONTO" if model_ready else ("CONFIGURAÇÃO NECESSÁRIA" if kokoro_package else "AGUARDANDO KOKORO"),
+        "voice": "CONFIGURAÇÃO NECESSÁRIA" if not (kokoro_package and model_ready) else "VERIFICAÇÃO NECESSÁRIA",
+        "writable": writable,
+        "writable_state": "PRONTO" if writable else "ERRO",
+        "workspace": str(WORKSPACE_ROOT),
+    }
+
+
 class StageHandler(BaseHTTPRequestHandler):
     server_version = "FabuloomStudio/0.1"
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = unquote(urlsplit(self.path).path)
         if path == "/api/health":
-            self._send_json({"python": sys.version.split()[0], "ffmpeg": shutil.which("ffmpeg") is not None, "kokoro": self._kokoro_available(), "workspace": str(WORKSPACE_ROOT)})
+            health = _environment_health()
+            health["port"] = self.server.server_port
+            self._send_json(health)
             return
         if path == "/api/projects":
             PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
