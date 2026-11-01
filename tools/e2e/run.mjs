@@ -123,12 +123,13 @@ try {
       if (!/concluído/i.test(exportStatus) || !mp4Files.length) {
         result.flows.push({ name: "MP4 export through Studio button", status: "FAIL", note: exportStatus, files: mp4Files });
       } else {
-        const mp4 = mp4Files.at(-1); const probe = runTool("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", mp4]); const decode = runTool("ffmpeg", ["-v", "error", "-i", mp4, "-f", "null", "-"]); let metadata = null; try { metadata = JSON.parse(probe.stdout); } catch {}
+        const mp4 = mp4Files.find((file) => !path.basename(file).toLowerCase().startsWith("video-only")) || mp4Files.at(-1); const probe = runTool("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", mp4]); const decode = runTool("ffmpeg", ["-v", "error", "-i", mp4, "-f", "null", "-"]); let metadata = null; try { metadata = JSON.parse(probe.stdout); } catch {}
         const video = metadata?.streams?.find((stream) => stream.codec_type === "video"); const audio = metadata?.streams?.find((stream) => stream.codec_type === "audio");
-        result.export = { path: mp4, status: exportStatus, ffprobe: probe, decode, video, audio };
+        const framesDir = path.join(evidence, "frames"); await mkdir(framesDir, { recursive: true }); const duration = Number(metadata?.format?.duration || video?.duration || 0); const frameTimes = [0, Math.max(0, duration / 2), Math.max(0, duration - 1 / Math.max(1, Number(video?.r_frame_rate?.split("/")[0] || 30)))]; const frames = frameTimes.map((time, index) => runTool("ffmpeg", ["-y", "-ss", time.toFixed(3), "-i", mp4, "-frames:v", "1", "-q:v", "2", path.join(framesDir, `frame-${index}.png`)]));
+        result.export = { path: mp4, status: exportStatus, ffprobe: probe, decode, video, audio, frames: frames.map((item, index) => ({ index, status: item.status, path: path.join(framesDir, `frame-${index}.png`) })) };
         const valid = probe.status === 0 && decode.status === 0 && video?.codec_name === "h264" && audio?.codec_name === "aac";
         result.flows.push({ name: "MP4/FFprobe/FFmpeg validation", status: valid ? "PASS" : "FAIL", path: mp4 });
-        result.classification = valid ? "PARTIAL" : "FAIL";
+        result.classification = valid ? "PASS" : "FAIL";
       }
     }
   }

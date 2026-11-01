@@ -49,3 +49,17 @@ O teste direto do provider foi apenas diagnóstico; não substitui a evidência 
 ## Limitações
 
 O primeiro carregamento do pipeline levou aproximadamente 70 segundos e a síntese HTTP completa levou cerca de 110 segundos. O harness deve ser executado novamente após a última correção para produzir o MP4 e os resultados FFprobe/FFmpeg. Nenhum modelo, voz ou binário foi copiado para o repositório.
+
+## Reteste 051.1 — 2026-11-01
+
+O harness corrigido foi executado pelo botão real do Studio. Evidência: `C:\Users\User\AppData\Local\Temp\fabuloom-e2e-047-LkgIIY`.
+
+- Narração via UI: **PASS**, `pm_santa · pronta`.
+- Projeto, cena, imagem, movimento zoom, Ponto e expressão `smile`: **PASS**.
+- MP4 final: `C:\Users\User\AppData\Local\Temp\fabuloom-e2e-047-LkgIIY\workspace\workspace\exports\projects\project-a794d5763a82\project-a794d5763a82-1080p.mp4`.
+- Duração: 2.900 s; resolução 1920×1080; 30 fps; 87 frames.
+- Vídeo: H.264 High, decodificação integral FFmpeg **PASS**.
+- Áudio: AAC-LC, mono, 48 kHz, 2.900 s, não vazio; decodificação integral FFmpeg **PASS**.
+- Quadros inicial, médio e final foram extraídos em `frames/frame-0.png`, `frame-1.png` e `frame-2.png`.
+
+A primeira execução desta missão selecionou incorretamente o intermediário `video-only.mp4` e foi classificada FAIL por ausência de áudio. O harness foi corrigido para preferir o MP4 final registrado pelo projeto e extrair três quadros de evidência. O reteste final é **PASS** para o gate automatizado de exportação.
