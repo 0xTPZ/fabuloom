@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Topazioverse · piloto V2</title>
+    <style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="1920" height="1080"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import {
+        NarratorAvatarRenderer,
+        NARRATOR_FACE_CROP,
+        createNarratorTimeline,
+        validateNarratorManifest,
+        segmentAt
+      } from "./src/narrator-mode.mjs";
+      import { decodeMonoPcm16Wav, composePcmSegments, createRmsReader } from "./src/cinematic-audio.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const timelineUrl = params.get("timeline");
+      const fps = Number(params.get("fps") || 15);
+      const canvas = document.querySelector("#capture-canvas");
+      const context = canvas.getContext("2d");
+      const WIDTH = canvas.width;
+      const HEIGHT = canvas.height;
+      const status = document.querySelector("#status");
+      const fail = (message) => {
+        status.textContent = `error: ${message}`;
+        document.title = `error: ${message}`;
+        throw new Error(message);
+      };
+      const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+        return decodeMonoPcm16Wav(await response.arrayBuffer());
+      }
+
+      function exportUrl(value) {
+        const normalized = decodeURIComponent(String(value)).replaceAll("\\", "/");
+        const marker = "/workspace/exports/";
+        const index = normalized.toLowerCase().indexOf(marker);
+        if (index < 0) throw new Error(`asset is outside workspace exports: ${value}`);
+        const relative = normalized.slice(index + marker.length).replace(/^\/+/, "");
+        const parts = relative.split("/");
+        if (!relative || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe export asset: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function sceneWeight(timeMs, scene, index, scenes, fadeMs) {
+        if (timeMs < scene.start_ms - fadeMs / 2 || timeMs > scene.end_ms + fadeMs / 2) return 0;
+        let value = 1;
+        if (index > 0 && timeMs < scene.start_ms + fadeMs / 2) value = Math.min(value, (timeMs - scene.start_ms + fadeMs / 2) / fadeMs);
+        if (index < scenes.length - 1 && timeMs > scene.end_ms - fadeMs / 2) value = Math.min(value, (scene.end_ms + fadeMs / 2 - timeMs) / fadeMs);
+        return clamp(value);
+      }
+
+      function coverImage(image, timeMs, scene, alpha) {
+        const progress = clamp((timeMs - scene.start_ms) / Math.max(1, scene.end_ms - scene.start_ms));
+        const base = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+        let zoom = 1;
+        let panX = 0;
+        let panY = 0;
+        if (scene.camera === "stillness_zoom") { zoom = 1 + progress * 0.065; panX = progress * 0.012; }
+        else if (scene.camera === "crystal_approach") { zoom = 1 + progress * 0.105; panY = progress * 0.012; }
+        else if (scene.camera === "thaurion_push") { zoom = 1 + progress * 0.075; panX = progress * 0.022; }
+        else if (scene.camera === "wind_lateral") { zoom = 1.035; panX = -0.075 + progress * 0.15; panY = progress * 0.012; }
+        else if (scene.camera === "snow_breath") { zoom = 1 + progress * 0.055; panX = -progress * 0.018; }
+        const scale = base * zoom;
+        const width = image.naturalWidth * scale;
+        const height = image.naturalHeight * scale;
+        const x = (WIDTH - width) / 2 + panX * Math.max(0, width - WIDTH);
+        const y = (HEIGHT - height) / 2 + panY * Math.max(0, height - HEIGHT);
+        context.save();
+        context.globalAlpha = alpha;
+        context.drawImage(image, x, y, width, height);
+        const pulse = (Math.sin(progress * Math.PI * 6) + 1) / 2;
+        if (scene.camera === "crystal_approach") {
+          const glow = context.createRadialGradient(WIDTH * .52, HEIGHT * .38, 20, WIDTH * .52, HEIGHT * .38, 560);
+          glow.addColorStop(0, `rgba(86,170,255,${0.07 + pulse * 0.12})`);
+          glow.addColorStop(1, "rgba(86,170,255,0)");
+          context.fillStyle = glow;
+          context.fillRect(0, 0, WIDTH, HEIGHT);
+        }
+        if (scene.camera === "snow_breath") {
+          context.fillStyle = `rgba(210,236,255,${0.04 + pulse * 0.035})`;
+          context.fillRect(0, 0, WIDTH, HEIGHT);
+        }
+        context.restore();
+      }
+
+      function drawParticles(scene, timeMs) {
+        if (!["thaurion_push", "snow_breath"].includes(scene.camera)) return;
+        context.save();
+        context.globalAlpha = scene.camera === "snow_breath" ? 0.36 : 0.22;
+        context.fillStyle = "#dcecff";
+        for (let index = 0; index < 26; index += 1) {
+          const phase = index * 1.731;
+          const x = (index * 137 + timeMs * (0.008 + (index % 3) * 0.002)) % WIDTH;
+          const y = (index * 73 + Math.sin(timeMs / 800 + phase) * 22 + 90) % (HEIGHT - 150);
+          context.beginPath();
+          context.arc(x, y, 1 + (index % 3) * 0.6, 0, Math.PI * 2);
+          context.fill();
+        }
+        context.restore();
+      }
+
+      function wrap(text, maxWidth) {
+        const words = String(text).split(/\s+/);
+        const lines = [];
+        let line = "";
+        context.font = "600 30px Segoe UI";
+        for (const word of words) {
+          const candidate = line ? `${line} ${word}` : word;
+          if (line && context.measureText(candidate).width > maxWidth) { lines.push(line); line = word; }
+          else line = candidate;
+        }
+        if (line) lines.push(line);
+        return lines;
+      }
+
+      function drawNarrator(avatar, timeMs, amplitude) {
+        const x = 56;
+        const y = 658;
+        const size = 332;
+        context.save();
+        context.fillStyle = "rgba(3,10,24,.70)";
+        context.beginPath();
+        context.arc(x + size / 2, y + size / 2, size / 2 + 20, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = "rgba(247,210,122,.9)";
+        context.lineWidth = 5;
+        context.beginPath();
+        context.arc(x + size / 2, y + size / 2, size / 2 + 14, 0, Math.PI * 2);
+        context.stroke();
+        context.restore();
+        avatar.renderTo(context, { x, y, size, timeMs, speechAmplitude: amplitude, isPlaying: true, crop: NARRATOR_FACE_CROP });
+      }
+
+      function drawSubtitle(segment) {
+        if (!segment) return;
+        const x = 1270;
+        const width = 1180;
+        const y = 842;
+        const lines = wrap(segment.text, width - 70);
+        const height = lines.length * 42 + 38;
+        context.save();
+        context.fillStyle = "rgba(3,12,28,.86)";
+        context.fillRect(x - width / 2, y - 22, width, height);
+        context.strokeStyle = "rgba(247,210,122,.72)";
+        context.lineWidth = 2;
+        context.strokeRect(x - width / 2, y - 22, width, height);
+        context.fillStyle = "#fff7dc";
+        context.textAlign = "center";
+        context.textBaseline = "top";
+        lines.forEach((line, index) => context.fillText(line, x, y + index * 42));
+        context.restore();
+      }
+
+      function drawOpening(timeMs) {
+        const alpha = clamp(Math.min((5200 - timeMs) / 1100, 1));
+        if (alpha <= 0) return;
+        context.save();
+        context.globalAlpha = alpha;
+        context.fillStyle = "rgba(3,10,24,.62)";
+        context.fillRect(82, 76, 1050, 188);
+        context.textAlign = "left";
+        context.fillStyle = "#f7d27a";
+        context.font = "700 36px Segoe UI";
+        context.fillText("TOPAZIOVERSE", 122, 126);
+        context.fillStyle = "#fff7dc";
+        context.font = "700 48px Segoe UI";
+        context.fillText("O DESPERTAR DOS CRISTAIS", 122, 184);
+        context.fillStyle = "#dcecff";
+        context.font = "24px Segoe UI";
+        context.fillText("CAPÍTULO 1 — A NOITE EM QUE TOPÁZIO PAROU", 122, 228);
+        context.restore();
+      }
+
+      function drawEnding(timeMs, durationMs) {
+        const start = Math.max(0, durationMs - 5600);
+        if (timeMs < start) return;
+        const alpha = clamp((timeMs - start) / 900);
+        context.save();
+        context.globalAlpha = alpha;
+        context.fillStyle = "rgba(3,10,24,.68)";
+        context.fillRect(1140, 74, 690, 130);
+        context.textAlign = "right";
+        context.fillStyle = "#f7d27a";
+        context.font = "700 30px Segoe UI";
+        context.fillText("O DESPERTAR DOS CRISTAIS", 1785, 126);
+        context.fillStyle = "#dcecff";
+        context.font = "22px Segoe UI";
+        context.fillText("PILOTO · TRILHA ORIGINAL DO DESPERTAR", 1785, 166);
+        context.restore();
+      }
+
+      function sendFrame(index, timeMs) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(async (blob) => {
+            if (!blob) { reject(new Error("JPEG encoding failed")); return; }
+            try {
+              const response = await fetch(`/capture/${encodeURIComponent(session)}/src-${String(index).padStart(6, "0")}.jpg`, {
+                method: "POST",
+                headers: { "Content-Type": "image/jpeg", "X-Frame-Time-Ms": String(timeMs) },
+                body: blob
+              });
+              if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`);
+              resolve();
+            } catch (error) { reject(error); }
+          }, "image/jpeg", 0.88);
+        });
+      }
+
+      async function main() {
+        if (!session || !timelineUrl) fail("session and timeline are required");
+        if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps");
+        const planResponse = await fetch(timelineUrl);
+        if (!planResponse.ok) fail(`timeline request failed with HTTP ${planResponse.status}`);
+        const plan = await planResponse.json();
+        const manifestResponse = await fetch(`/exports/${plan.manifest}`);
+        if (!manifestResponse.ok) fail(`manifest request failed with HTTP ${manifestResponse.status}`);
+        const manifest = await manifestResponse.json();
+        validateNarratorManifest(manifest);
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(exportUrl(segment.audio_uri))));
+        const sampleRate = wavs[0].sampleRate;
+        const amplitudeAt = createRmsReader(composePcmSegments(manifest, wavs, sampleRate), sampleRate);
+        const images = {};
+        for (const scene of plan.scenes) {
+          const image = document.createElement("img");
+          image.src = `/exports/${scene.image}`;
+          await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`scene image failed: ${scene.image}`)); });
+          images[scene.id] = image;
+        }
+        const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href });
+        await avatar.load();
+        const timeline = createNarratorTimeline(manifest);
+        const frameCount = Math.ceil(manifest.duration_ms / 1000 * fps);
+        const pendingUploads = new Set();
+        for (let index = 0; index < frameCount; index += 1) {
+          const timeMs = Math.round(index * 1000 / fps);
+          context.clearRect(0, 0, WIDTH, HEIGHT);
+          context.fillStyle = "#030914";
+          context.fillRect(0, 0, WIDTH, HEIGHT);
+          let activeScene = null;
+          plan.scenes.forEach((scene, sceneIndex) => {
+            const weight = sceneWeight(timeMs, scene, sceneIndex, plan.scenes, plan.transition_ms);
+            if (weight > 0) {
+              coverImage(images[scene.id], timeMs, scene, weight);
+              if (!activeScene || weight > activeScene.weight) activeScene = { scene, weight };
+            }
+          });
+          if (activeScene) drawParticles(activeScene.scene, timeMs);
+          drawOpening(timeMs);
+          drawNarrator(avatar, timeMs, amplitudeAt(timeMs));
+          drawSubtitle(segmentAt(timeline, timeMs));
+          drawEnding(timeMs, manifest.duration_ms);
+          const upload = sendFrame(index, timeMs);
+          pendingUploads.add(upload);
+          upload.then(() => pendingUploads.delete(upload), () => pendingUploads.delete(upload));
+          if (pendingUploads.size >= 12) await Promise.race(pendingUploads);
+        }
+        await Promise.all(pendingUploads);
+        const completion = {
+          mode: "topazioverse-book1-episode1-pilot-v2",
+          duration_ms: manifest.duration_ms,
+          sample_rate: sampleRate,
+          canvas: { width: WIDTH, height: HEIGHT },
+          fps,
+          frame_count: frameCount,
+          output_fps: 30,
+          timing_source: "measured_wav_segments",
+          mouth_source: "pcm16_rms_envelope",
+          captions: "measured_segment_ranges",
+          narrator_visibility: "entire_narrative",
+          word_phoneme_viseme_timing: "unavailable"
+        };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion)
+        });
+        if (!complete.ok) fail(`completion upload failed with HTTP ${complete.status}`);
+        status.textContent = JSON.stringify(completion);
+        document.title = "completed";
+      }
+
+      main().catch((error) => {
+        console.error(error);
+        status.textContent = `error: ${error.message}`;
+        document.title = `error: ${error.message}`;
+        if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") })
+        }).catch(() => {});
+      });
+    </script>
+  </body>
+</html>
