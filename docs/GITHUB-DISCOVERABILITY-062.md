@@ -11,7 +11,7 @@ Reviewed on 2026-11-01. Repository: `https://github.com/0xTPZ/fabuloom`.
 - Previous description: empty.
 - Previous homepage: empty.
 - Previous topics: none returned by GitHub.
-- `main` was still using the old planning-only README at commit `bc23932`; the functional Alpha remains on `release/fabuloom-alpha-preparation`.
+- Before reconciliation, the documentation branch was based on `bc23932`; current `main` had already advanced to `1b39481` with the Alpha presentation from PR #45. The functional Alpha remains on `release/fabuloom-alpha-preparation`.
 - No official homepage exists, so no homepage URL was invented.
 
 ## Metadata applied
@@ -56,8 +56,8 @@ The documentation diff contains no assets, credentials, models, voices, private 
 ## Delivery
 
 - Documentation branch: `docs/github-discoverability-062`
-- Base: `main` at `bc23932`
-- Pending commit: to be recorded after validation
+- Base reconciled: `main` at `1b39481`
+- Reconciliation commit: `c2532c3`
 - Proposed PR: documentation-only, independent from PR #33
 - PR #33 remains untouched and Draft.
 
