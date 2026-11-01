@@ -217,3 +217,13 @@ remain `DRAFT` and are blocked by the runtime policy. The MP4, plates and
 reports remain outside Git under
 `workspace\exports\topazio-book1-capitulo3-cronicas`; see
 `docs/CRONICAS-DE-TOPAZIO-028.md`.
+
+Mission 029 produces the Chapter 4 cinematic episode from the exact DOCX
+boundary `Capítulo 4 — O círculo dos ausentes` (title paragraph 107; narrative
+paragraphs 108–178; separator 179; next chapter heading 180). It uses 153
+measured Kokoro `pm_santa` segments, 20 environment-only story plans, the
+official `santa-library-topazioverse-v1` scene registry and the approved Santa
+V5 medallion. Draft character identities remain blocked by policy. The MP4,
+environment plates and reports remain outside Git under
+`workspace\exports\topazio-book1-capitulo4-cronicas`; see
+`docs/CRONICAS-DE-TOPAZIO-029.md`.
