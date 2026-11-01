@@ -132,10 +132,19 @@ def _validate_scenes(scenes: object) -> None:
 
 def _reconcile_scenes(existing: list[dict], segments: object) -> list[dict]:
     """Map measured narration segments onto stable project scene identities."""
+    old_by_text: dict[str, list[dict]] = {}
+    for scene in existing:
+        key = " ".join(str(scene.get("text") or "").split()).casefold()
+        if key:
+            old_by_text.setdefault(key, []).append(scene)
+    used: set[str] = set()
     reconciled = []
     for index, segment in enumerate(segments):
-        previous = existing[index] if index < len(existing) else {}
+        key = " ".join(str(segment.text or "").split()).casefold()
+        candidates = [scene for scene in old_by_text.get(key, []) if scene.get("id") not in used]
+        previous = candidates[0] if len(candidates) == 1 else (existing[index] if len(existing) == len(segments) and index < len(existing) else {})
         scene_id = str(previous.get("id") or f"scene-{index + 1:03d}")
+        used.add(scene_id)
         reconciled.append({
             "id": scene_id,
             "title": previous.get("title") or f"Cena {index + 1}",
