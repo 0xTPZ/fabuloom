@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node run.mjs",
-    "test:e2e:export": "node run.mjs --export"
+    "test:e2e:export": "node run.mjs --export",
+    "test:e2e:visual": "node visual.mjs"
   },
   "dependencies": {
     "playwright": "^1.52.0"

@@ -265,6 +265,21 @@ function renderCinematicFrame(timeMs = 0) {
   context.drawImage(image, offsetX, offsetY, image.naturalWidth * scale, image.naturalHeight * scale);
 }
 
+// Local-only deterministic capture hook used by the visual parity harness.
+// It is intentionally unavailable on non-loopback deployments and does not
+// change the production preview controls.
+if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+  window.__fabuloomVisualCapture = async (timeMs) => {
+    previewMode = "cinematic";
+    const active = projectSceneAt(Number(timeMs) || 0);
+    const image = active && cinematicImage(active.scene);
+    if (image && !image.complete) await image.decode().catch(() => {});
+    renderCinematicFrame(Number(timeMs) || 0);
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    return previewCanvas?.toDataURL("image/png") || null;
+  };
+}
+
 async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); await loadProjectNarration(); }
 
 async function loadProjects() {
