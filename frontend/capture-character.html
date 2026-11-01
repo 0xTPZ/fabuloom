@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom deterministic character capture</title>
+    <style>
+      html, body { margin: 0; background: transparent; overflow: hidden; }
+      canvas { display: block; }
+      #status { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="capture-canvas" width="640" height="800"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { captureLayeredFrames, LayeredCharacterRenderer, LayeredCharacterRig } from "./src/layered-character.ts";
+      import { TOPAZIO_NARRATOR_PACKS } from "./src/topazio-narrator-packs.mjs";
+      import { validateCharacterPack } from "./src/character-pack.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const characterId = params.get("character") || "santa";
+      const manifestUrl = params.get("manifest");
+      const fps = Number(params.get("fps") || 30);
+      const canvasWidth = Number(params.get("canvasWidth") || 640);
+      const canvasHeight = Number(params.get("canvasHeight") || 800);
+      const status = document.querySelector("#status");
+
+      function fail(message) {
+        status.textContent = `error: ${message}`;
+        document.title = `error: ${message}`;
+        throw new Error(message);
+      }
+
+      function safeAudioUrl(audioUri) {
+        const filename = String(audioUri).split(/[\\/]/).pop();
+        if (!filename || filename.includes("..")) throw new Error(`unsafe audio URI: ${audioUri}`);
+        return `/exports/${encodeURIComponent(filename)}`;
+      }
+
+      function readAscii(view, offset, length) {
+        return String.fromCharCode(...new Uint8Array(view.buffer, view.byteOffset + offset, length));
+      }
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        const view = new DataView(buffer);
+        if (view.byteLength < 44 || readAscii(view, 0, 4) !== "RIFF" || readAscii(view, 8, 4) !== "WAVE") {
+          throw new Error(`invalid WAV header for ${url}`);
+        }
+        let offset = 12;
+        let sampleRate = 0;
+        let channels = 0;
+        let bits = 0;
+        let dataOffset = -1;
+        let dataLength = 0;
+        while (offset + 8 <= view.byteLength) {
+          const chunkId = readAscii(view, offset, 4);
+          const chunkLength = view.getUint32(offset + 4, true);
+          const chunkStart = offset + 8;
+          if (chunkId === "fmt " && chunkLength >= 16) {
+            if (view.getUint16(chunkStart, true) !== 1) throw new Error("only PCM WAV is supported for capture");
+            channels = view.getUint16(chunkStart + 2, true);
+            sampleRate = view.getUint32(chunkStart + 4, true);
+            bits = view.getUint16(chunkStart + 14, true);
+          } else if (chunkId === "data") {
+            dataOffset = chunkStart;
+            dataLength = Math.min(chunkLength, view.byteLength - chunkStart);
+          }
+          offset = chunkStart + chunkLength + (chunkLength % 2);
+        }
+        if (sampleRate <= 0 || channels !== 1 || bits !== 16 || dataOffset < 0) {
+          throw new Error(`capture requires mono PCM-16 WAV: ${url}`);
+        }
+        const samples = new Float32Array(Math.floor(dataLength / 2));
+        for (let index = 0; index < samples.length; index += 1) {
+          samples[index] = view.getInt16(dataOffset + index * 2, true) / 32768;
+        }
+        return { sampleRate, samples };
+      }
+
+      function composeSamples(manifest, wavs, sampleRate) {
+        const totalSamples = Math.max(1, Math.round(manifest.duration_ms * sampleRate / 1000));
+        const samples = new Float32Array(totalSamples);
+        for (const [index, segment] of manifest.segments.entries()) {
+          const wav = wavs[index];
+          const start = Math.max(0, Math.round(segment.start_ms * sampleRate / 1000));
+          if (start < totalSamples) {
+            samples.set(wav.samples.subarray(0, totalSamples - start), start);
+          }
+        }
+        return samples;
+      }
+
+      function makeRmsReader(samples, sampleRate) {
+        const halfWindow = Math.max(1, Math.round(sampleRate * 0.018));
+        return (timeMs) => {
+          const center = Math.round(timeMs / 1000 * sampleRate);
+          const start = Math.max(0, center - halfWindow);
+          const end = Math.min(samples.length, center + halfWindow);
+          if (end <= start) return 0;
+          let sum = 0;
+          for (let index = start; index < end; index += 1) sum += samples[index] * samples[index];
+          const rms = Math.sqrt(sum / (end - start));
+          return Math.max(0, Math.min(1, (rms - 0.012) * 7));
+        };
+      }
+
+      async function sendFrame({ sessionId, index, timeMs, blob }) {
+        const response = await fetch(`/capture/${encodeURIComponent(sessionId)}/${String(index).padStart(6, "0")}.png`, {
+          method: "POST",
+          headers: { "Content-Type": "image/png", "X-Frame-Time-Ms": String(timeMs) },
+          body: blob,
+        });
+        if (!response.ok) throw new Error(`frame ${index} upload failed with HTTP ${response.status}`);
+      }
+
+      async function main() {
+        if (!session || !manifestUrl) fail("session and manifest are required");
+        if (!Number.isInteger(fps) || fps <= 0 || fps > 60) fail("invalid fps");
+        const pack = TOPAZIO_NARRATOR_PACKS[characterId];
+        if (!pack) fail(`unknown character: ${characterId}`);
+        validateCharacterPack(pack);
+        const manifestResponse = await fetch(manifestUrl);
+        if (!manifestResponse.ok) fail(`manifest request failed with HTTP ${manifestResponse.status}`);
+        const manifest = await manifestResponse.json();
+        if (!Number.isInteger(manifest.duration_ms) || manifest.duration_ms <= 0 || !Array.isArray(manifest.segments) || !manifest.segments.length) {
+          fail("manifest has no valid measured duration or segments");
+        }
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(safeAudioUrl(segment.audio_uri))));
+        const sampleRate = wavs[0].sampleRate;
+        if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
+        const samples = composeSamples(manifest, wavs, sampleRate);
+        const amplitudeAt = makeRmsReader(samples, sampleRate);
+        const canvas = document.querySelector("#capture-canvas");
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const renderer = new LayeredCharacterRenderer(
+          canvas,
+          new LayeredCharacterRig(),
+          pack,
+          { assetRoot: new URL("./", location.href).href, renderBackground: false },
+        );
+        await renderer.load();
+        const result = await captureLayeredFrames(renderer, {
+          durationMs: manifest.duration_ms,
+          fps,
+          isPlaying: true,
+          amplitudeAt,
+          onFrame: (frame) => sendFrame({ sessionId: session, ...frame }),
+        });
+        const completion = {
+          character: characterId,
+          voice_id: manifest.metadata?.voice_id || manifest.segments[0]?.voice_id || null,
+          duration_ms: manifest.duration_ms,
+          sample_rate: sampleRate,
+          canvas: { width: canvas.width, height: canvas.height },
+          fps,
+          frame_count: result.frameCount,
+          timing_source: "measured_wav_segments",
+          mouth_source: "pcm16_rms_envelope",
+          word_phoneme_viseme_timing: "unavailable",
+        };
+        const completeResponse = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(completion),
+        });
+        if (!completeResponse.ok) fail(`completion upload failed with HTTP ${completeResponse.status}`);
+        status.textContent = JSON.stringify(completion);
+        document.title = "completed";
+      }
+
+      main().catch((error) => {
+        console.error(error);
+        status.textContent = `error: ${error.message}`;
+        document.title = `error: ${error.message}`;
+        if (session) {
+          fetch(`/capture/${encodeURIComponent(session)}/error.json`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }),
+          }).catch(() => {});
+        }
+      });
+    </script>
+  </body>
+</html>

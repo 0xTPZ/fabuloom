@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fabuloom Narrator Mode V1</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, system-ui, sans-serif; }
+      body { margin: 0; background: #050d1c; color: #f6f1df; }
+      main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+      .grid { display: grid; grid-template-columns: 1fr 360px; gap: 22px; }
+      .panel { background: #0a1a32; border: 1px solid #28466c; border-radius: 16px; padding: 18px; }
+      canvas { width: 100%; max-height: 640px; background: #061329; border-radius: 12px; border: 1px solid #b78336; }
+      label { display: block; margin: 12px 0 6px; color: #f7d27a; font-size: 13px; }
+      textarea, select, button { width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #3f638e; padding: 10px; background: #07172e; color: #fff; }
+      textarea { min-height: 132px; resize: vertical; }
+      button { cursor: pointer; margin-top: 8px; border-color: #b78336; }
+      button:hover { background: #112d55; }
+      .buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .status { color: #c9d7ec; font-size: 13px; white-space: pre-wrap; }
+      h1 { color: #f7d27a; font-size: 28px; margin-top: 0; }
+      .note { color: #a9bdd8; font-size: 13px; line-height: 1.45; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fabuloom Narrator Mode V1</h1>
+      <div class="grid">
+        <section class="panel"><canvas id="preview" width="1920" height="1080"></canvas><p class="status" id="status">Carregando a demonstração medida…</p></section>
+        <section class="panel">
+          <label for="text">Texto do roteiro</label>
+          <textarea id="text">Olá, viajante! Seja bem-vindo ao Topazioverse. Hoje, vamos conhecer uma cidade esquecida, onde antigas histórias ainda ecoam entre as montanhas. Dizem que, quando a última estrela desaparecer, os segredos de Arenhast finalmente despertarão.</textarea>
+          <label for="voice">Narrador / voz</label><select id="voice"><option value="pm_santa">Santa · pm_santa · pt-BR</option></select>
+          <label for="scene">Cenário</label><select id="scene"><option value="topazio-storyteller-office">Arquivo do Narrador · Arenhast</option></select>
+          <div class="buttons"><button id="play">Play</button><button id="pause">Pause</button><button id="stop">Stop</button></div>
+          <button id="generate">Gerar vídeo MP4 determinístico</button>
+          <p class="note">A prévia utiliza o mesmo avatar facial, RMS e timeline do exportador. A geração completa é executada pelo comando local documentado no relatório, mantendo áudio, frames e MP4 dentro de <code>E:\Fabuloom\workspace\exports</code>.</p>
+          <p class="status" id="details"></p>
+        </section>
+      </div>
+    </main>
+    <script type="module">
+      import { NarratorAvatarRenderer, NarratorSceneRenderer, createNarratorTimeline } from "./src/narrator-mode.mjs";
+      import { TOPAZIO_STORYTELLER_OFFICE_SCENE } from "./src/narrator-scenes.mjs";
+      const $ = (id) => document.querySelector(id); const canvas = $("#preview"); const status = $("#status"); const details = $("#details");
+      const manifestUrl = "/exports/fabuloom-narrator-mode-v1.json"; let manifest; let renderer; let audio; let audioContext; let analyser; let analyserData; let playing = false; let pausedAt = 0; let raf = 0;
+      function rmsAmplitude() { if (!analyser || !analyserData) return 0; analyser.getByteTimeDomainData(analyserData); let sum = 0; for (const value of analyserData) { const sample = (value - 128) / 128; sum += sample * sample; } return Math.max(0, Math.min(1, (Math.sqrt(sum / analyserData.length) - .012) * 7)); }
+      async function load() { const response = await fetch(manifestUrl); if (!response.ok) throw new Error("manifesto ainda não existe; execute examples/narrator_mode_demo.py"); manifest = await response.json(); const timeline = createNarratorTimeline(manifest); const image = new Image(); image.src = new URL(TOPAZIO_STORYTELLER_OFFICE_SCENE.asset, document.baseURI).href; await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; }); const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href }); await avatar.load(); audio = new Audio("/exports/videos/fabuloom-narrator-mode-v1.wav"); if (window.AudioContext) { audioContext = new AudioContext(); analyser = audioContext.createAnalyser(); analyser.fftSize = 1024; analyserData = new Uint8Array(analyser.fftSize); const source = audioContext.createMediaElementSource(audio); source.connect(analyser); analyser.connect(audioContext.destination); } renderer = new NarratorSceneRenderer(canvas, avatar, { sceneImage: image, timeline, amplitudeAt: rmsAmplitude }); renderer.renderFrame({ timeMs: 0, isPlaying: false }); status.textContent = `Manifesto carregado · ${manifest.duration_ms} ms · ${manifest.segments.length} segmentos · voz ${manifest.metadata?.voice_id || "pm_santa"}`; details.textContent = "Tempo: 0.000 s · estado: parado"; }
+      function draw() { if (!renderer || !audio) return; const time = Math.min(audio.currentTime * 1000, manifest.duration_ms); renderer.renderFrame({ timeMs: time, isPlaying: playing }); details.textContent = `Tempo: ${(time / 1000).toFixed(3)} s · estado: ${playing ? "reproduzindo" : "pausado"}`; if (playing && !audio.paused && time < manifest.duration_ms) raf = requestAnimationFrame(draw); else { playing = false; pausedAt = time; } }
+      $("#play").onclick = async () => { if (!manifest || !audio) return; if (audioContext?.state === "suspended") await audioContext.resume(); audio.currentTime = Math.min(pausedAt / 1000, manifest.duration_ms / 1000); await audio.play(); playing = true; draw(); };
+      $("#pause").onclick = () => { if (!audio) return; audio.pause(); pausedAt = audio.currentTime * 1000; playing = false; cancelAnimationFrame(raf); draw(); };
+      $("#stop").onclick = () => { if (!audio) return; audio.pause(); audio.currentTime = 0; pausedAt = 0; playing = false; cancelAnimationFrame(raf); draw(); };
+      $("#generate").onclick = async () => { details.textContent = "Solicitando exportação local…"; const response = await fetch("/narrator-mode/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice: $("#voice").value, scene: $("#scene").value, text: $("#text").value }) }); if (!response.ok && response.status !== 409) { details.textContent = `Falha ao iniciar exportação: HTTP ${response.status}`; return; } details.textContent = "Exportação iniciada; o servidor loopback está executando Kokoro, captura e FFmpeg. Consulte o status nesta página."; const poll = async () => { const state = await (await fetch("/narrator-mode/status")).json(); if (state.state === "running") { setTimeout(poll, 1500); return; } details.textContent = state.state === "completed" ? "MP4 concluído: /exports/videos/fabuloom-narrator-mode-v1.mp4" : `Exportação ${state.state}; consulte /exports/videos/narrator-mode-ui.log`; }; poll(); };
+      load().catch((error) => { status.textContent = `Prévia indisponível: ${error.message}`; });
+    </script>
+  </body>
+</html>
+

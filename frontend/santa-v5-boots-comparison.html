@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Santa V5 · comparação experimental das botas</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #061225; color: #f7d27a; }
+      body { margin: 0; padding: 22px; background: #061225; }
+      h1 { margin: 0 0 6px; font-size: 24px; }
+      p { color: #b8c7dc; margin: 0 0 18px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(320px, 720px)); gap: 18px; max-width: 1440px; }
+      figure { margin: 0; border: 1px solid #2b4364; border-radius: 12px; overflow: hidden; background: #102543; }
+      canvas { display: block; width: 100%; height: auto; }
+      figcaption { padding: 10px 12px 12px; font-size: 14px; color: #dce7f7; }
+      @media (max-width: 800px) { body { padding: 12px; } .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>Santa V5 · botas em escala equivalente</h1>
+    <p>Comparação isolada: o pack oficial preserva a escala aprovada; o experimental testa apenas a redução das botas.</p>
+    <div class="grid">
+      <figure><canvas id="official" width="720" height="390"></canvas><figcaption>Rig atual · foot size 0.86 × 0.30</figcaption></figure>
+      <figure><canvas id="experimental" width="720" height="390"></canvas><figcaption>Variante anatômica · foot size 0.74 × 0.26</figcaption></figure>
+    </div>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { SANTA_V5_ANATOMY_EXPERIMENTAL_PACK } from "./src/santa-v5-anatomy-experimental-pack.mjs";
+
+      const drawCrop = async (canvas, pack) => {
+        const full = document.createElement("canvas"); full.width = 1080; full.height = 1920;
+        const rig = new SantaV5Rig(); rig.update(0, false);
+        const renderer = new LayeredCharacterRenderer(full, rig, pack, { assetRoot: new URL("./", location.href).href, renderBackground: false });
+        await renderer.load();
+        renderer.renderFrame({ timeMs: 0, speechAmplitude: 0, isPlaying: false });
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#15243b"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(247,210,122,.12)"; ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+        // The feet sit near the bottom of the 1080x1920 stage.  Crop only the
+        // same lower-body window so the visual comparison is honest.
+        ctx.drawImage(full, 0, 1430, 1080, 490, 0, 0, canvas.width, canvas.height);
+      };
+      Promise.all([
+        drawCrop(document.querySelector("#official"), SANTA_V5_PACK),
+        drawCrop(document.querySelector("#experimental"), SANTA_V5_ANATOMY_EXPERIMENTAL_PACK),
+      ]).then(() => { document.title = "completed"; }).catch((error) => { document.title = `error: ${error.message}`; console.error(error); });
+    </script>
+  </body>
+</html>

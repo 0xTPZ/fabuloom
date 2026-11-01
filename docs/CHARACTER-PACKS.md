@@ -1,0 +1,362 @@
+# Layered Character Packs (V0.1)
+
+Status: contract and optional Canvas renderer refined on Mission 010.1 / PR #6.
+
+## Purpose
+
+Fabuloom characters must be independent of Kokoro, the audio clock, the Canvas backend, and the private Animus/Card Game Studio. A character pack is **data**, not executable code. The existing geometric demo rig remains intact as the compatibility baseline.
+
+## Format
+
+`format: "fabuloom.character/0.1"` identifies the schema family. The v0.1 descriptor contains:
+
+- `id`, `name`: stable identity and display name.
+- `layers`: ordered sprite nodes with stable IDs, local asset paths, parent IDs or `null`, normalized `anchor` and `position` pairs, and integer `z` order.
+- `expressions`: named replacement sprite assets for specific layers.
+- `bindings`: semantic animation channels pointing to layer IDs.
+
+All locations and pivots use normalized coordinates in [0, 1]. The renderer
+uses each asset's intrinsic pixel frame as the reference for its children:
+`position` selects a point in the parent frame, `anchor` selects the asset
+point placed there, `size` (when supplied) scales relative to that frame, and
+`z` controls stable back-to-front order. A missing `size` uses a deterministic
+renderer default. This keeps the data contract independent of Canvas.
+
+The current list of animation channels is `head_rotation`, `eye_open`, `mouth_open`, `breathing`, `left_arm`, `right_arm`, `hair_sway`, `brow_raise`, `expression`, plus the additive V3 joint channels `torso_rotation`, `torso_y`, `pelvis_y`, `left_arm_rotation`, `right_arm_rotation`, `left_forearm_rotation`, `right_forearm_rotation`, `left_hand_rotation`, `right_hand_rotation`, `left_thigh_rotation`, `right_thigh_rotation`, `left_shin_rotation`, `right_shin_rotation`, and `left_foot_rotation` / `right_foot_rotation`.
+
+### Animation-ready profile
+
+The optional `rig_profile: "animation-ready/0.1"` profile keeps the public
+`fabuloom.character/0.1` format compatible while making the intended anatomy
+explicit. Animation-ready layers carry a `role` and use the following minimum
+set: `torso`, `neck`, `head`, `hair_back`, `hair_front`, `eyes`, `eyelids`,
+`brows`, `mouth`, two `upper_arm` nodes, two `forearm` nodes, two `hand` nodes,
+and an optional `accessory`. Every node has a local pivot (`anchor`), a base
+position, a stable `z` draw order, and a semantic role. The parent graph is the
+rig: head rotation targets `head` and does not rotate `torso`; facial children
+inherit the head transform; breathing targets `torso`; arm motion targets the
+upper-arm chains.
+
+This profile is deliberately additive. Legacy portrait packs remain valid and
+are retained as V1 references. The official V2 packs use local SVG parts under
+`frontend/assets/characters/topazio-narrators-v2/`, share a small uniform
+library, and use character-specific head, hair, brow and mouth artwork. They
+are technical animation assets, not final cinematic art.
+
+The channel target is a layer ID, not a global character transform. For example,
+`head_rotation` targets `head`, so the torso remains fixed while child facial
+layers inherit the head pivot. `left_arm` and `right_arm` target the upper-arm
+nodes; forearms and hands inherit those transforms through the parent chain.
+
+### Minimal illustrative descriptor
+
+```json
+{
+  "format": "fabuloom.character/0.1",
+  "id": "narrator-one",
+  "name": "Narrator",
+  "layers": [
+    { "id": "body", "asset": "assets/body.webp", "parent": null, "anchor": [0.5, 0.5], "position": [0.5, 0.75], "z": 0 },
+    { "id": "head", "asset": "assets/head.webp", "parent": "body", "anchor": [0.5, 0.8], "position": [0.5, 0.25], "z": 1 },
+    { "id": "mouth", "asset": "assets/mouth.png", "parent": "head", "anchor": [0.5, 0.5], "position": [0.5, 0.7], "z": 2 }
+  ],
+  "expressions": [
+    { "id": "neutral", "overrides": {} },
+    { "id": "smile", "overrides": { "mouth": "assets/mouth-smile.png" } }
+  ],
+  "bindings": { "breathing": "body", "head_rotation": "head", "mouth_open": "mouth" }
+}
+```
+
+## Character Stage integration
+
+`frontend/src/layered-character.ts` provides the optional
+`LayeredCharacterRenderer` and `LayeredCharacterRig`. It loads only validated
+same-origin local assets, resolves parent transforms, pivots and draw order,
+and maps the existing stage signals to head rotation, eye openness, mouth
+openness, breathing, hair sway, and expression overrides. The geometric
+`CharacterRig` remains available and is selectable beside the layered pack.
+
+The original demo pack is `frontend/src/fantasy-narrator-pack.mjs`. Its
+illustrated torso and head assets plus local vector layer assets live under
+`frontend/assets/characters/fantasy-narrator/`. The pack is intentionally
+provider-independent: it does not import Kokoro, Animus, or the audio player.
+
+Mission 007A.2 adds an explicit anatomical hierarchy: torso, neck, head,
+back/front hair, eyes, eyelids, brows, mouth, upper arms, forearms, hands and
+an accessory. Ari's torso and head are separate original generated assets;
+the arm sleeves are isolated local crops of the same original costume source,
+while facial accents, hair motion and hands are independent SVG layers. This
+is a functional runtime rig and an asset-authoring bridge, not a claim that
+every painted pixel is production-ready for a final long-form character pack.
+
+### Official narrator trio
+
+Mission 009 adds three intentionally simple official demonstrators:
+
+| Pack | Kokoro voice metadata | Role |
+| --- | --- | --- |
+| Dora | `pf_dora` | welcoming, serene narrator |
+| Santa | `pm_santa` | mature, wise narrator |
+| Alex | `pm_alex` | young, confident narrator |
+
+The packs live in `frontend/src/topazio-narrator-packs.mjs` and reuse the
+provider-neutral v0.1 contract. Their original transparent portraits are in
+`frontend/assets/characters/topazio-narrators/`; they share a navy, pale-blue,
+and gold uniform language with a subtle gem ornament. The three character
+choices are the primary stage demonstrators, while Ari and Lia remain
+references for the richer and geometric rigs.
+
+These assets are a maintainable visual foundation, not final production art.
+The editor and external character-pack import remain outside this mission.
+
+Mission 010.1 adds V2 animation-ready Dora, Santa and Alex packs. The Stage
+now selects the V2 packs by default while `TOPAZIO_NARRATOR_PACKS_V1` remains
+available for compatibility checks. Their local vector layers are designed to
+move independently in the existing Canvas renderer, rather than using a full
+portrait as the transform root.
+
+Mission 023 connects Dora and Alex V2 to the Narrator Mode facial path through
+`createOfficialNarratorAvatarPack()` and `NarratorAvatarRenderer.setPack()`. The
+Studio changes the visual pack and the measured Kokoro manifest together:
+`dora → pf_dora`, `santa → pm_santa`, and `alex → pm_alex`, all in `pt-BR`.
+Santa V5 remains the production visual reference. Dora and Alex are explicitly
+marked `awaiting-art-approval`; their V2 SVGs prove the identity/voice/rig
+contract but are not presented as final cinematic art. See
+`docs/OFFICIAL-NARRATORS-V1.md` and `frontend/official-narrators-board.html`.
+
+Mission 023.2 adds the V4 art-reforge packs for the Narrator Mode path. Dora
+and Alex now use frontal stylized storybook bases with a common visual contract,
+mouthless head plates and explicit transparent mouth/eyelid state assets. The
+official mapping remains `dora → pf_dora`, `santa → pm_santa`, and
+`alex → pm_alex`; Santa V5 is not modified. The V4 packs are experimental and
+remain behind `AWAITING_ART_APPROVAL`. Details are in
+`docs/NARRATORS-ANIMATION-REFORGE-V4.md`.
+
+The export bridge is intentionally separate from the provider and player.
+`frontend/src/layered-character.ts` exposes `frameSchedule`,
+`LayeredCharacterRenderer.renderFrame`, and `captureLayeredFrames`. A future
+local exporter can stream each Canvas PNG frame to FFmpeg while using the same
+rig pose, measured audio clock and RMS amplitude as the Stage. The current
+Mission 010 exporter remains the reference portrait exporter until that frame
+stream is connected to the final MP4 pipeline.
+
+### Santa V3 scene rig
+
+Mission 011 adds `frontend/src/santa-v3-pack.mjs` and
+`frontend/src/santa-v3-engine.ts`. Santa V3 keeps the public character/0.1
+descriptor but adds pelvis, upper-leg, lower-leg and foot roles and binds each
+major arm and leg joint independently. `SantaV3Rig.poseAt()` is clock-pure and
+`SantaV3SceneRenderer` composes the same layered renderer with a deterministic
+table, chair, book and cup scene. The scene director contains continuous
+walk, sit, reach, drink, return, read and explain phases; props are driven by
+the same absolute-time plan, not by a separate FFmpeg animation.
+
+The V3 capture page streams 1080x1920 PNG frames from the browser renderer to
+the loopback-only capture endpoint. Kokoro supplies only measured PCM RMS for
+the mouth; phoneme and viseme timestamps remain unavailable. The assets are
+original lightweight SVG technical layers and reuse only the already-approved
+Santa facial artwork. This is an animation-ready demonstrator, not final
+cinematic illustration or a character editor.
+
+### Santa V4 cartoon refinement
+
+Mission 011.1 adds `frontend/src/santa-v4-pack.mjs` and original local SVG
+layers under `frontend/assets/characters/topazio-narrators-v4/santa/`. The
+pack keeps the `fabuloom.character/0.1` descriptor and the V3 hierarchy while
+using a softer cartoon treatment: a larger expressive head, gray side hair,
+discreet glasses, short beard, rounded shoulders, articulated sleeves and
+visible hands, with the navy/black/gold Topazio uniform and chest gem.
+
+Santa V4 is intentionally independent from Santa V3. `SantaV4Rig` and
+`SantaV4SceneRenderer` reuse the same deterministic scene and capture code;
+only the pack and stage title change. The concept reference generated during
+the art pass is a design reference, not a runtime layer or a published model.
+
+### Santa V5 production rig
+
+Mission 012.1 promotes the original transparent PNG direction to the first
+fine-grained V5 rig pass. `frontend/src/santa-v5-pack.mjs` keeps the
+`fabuloom.character/0.1` contract and exposes separate neck, head, hair,
+facial overlays, upper arms, forearms, hands, thighs, shins and feet. Pivots
+and parent transforms are explicit; `SantaV5Rig` reuses the proven V3
+animation catalogue and adds only deterministic mouth, wrist and foot polish.
+
+The pack is selectable in Character Stage as `Santa V5 · pm_santa`. The
+offline exporter `examples/santa_v5_video_demo.py` loads the same
+`SantaV5SceneRenderer` used by the Stage, so the MP4 does not contain a second
+animation implementation. The scene renderer exposes the resolved layer plan
+and anchors the cup to `right_hand` when that layer exists. The RMS mouth
+signal remains an amplitude approximation; word, phoneme and viseme times are
+not fabricated.
+
+The pack is a first production rig pass, not a claim of finished cinematic art.
+Generated PNGs are original Fabuloom assets made for this pass; model weights,
+private media and concept references remain outside the public repository.
+
+### Presenter pointing expression
+
+Mission 012.7 adds the optional `point` and `point-left` expressions to the
+Santa V5 pack. They preserve the neutral and wave hands and swap only the
+selected hand asset for an index-pointing original. The expression is selected
+by `SantaV5SceneRenderer` from the resolved `PresentationTarget`; it is not a
+second animation system. A pack that does not provide a pointing-hand asset
+can still consume the provider-independent clip, but should report that its
+visual hand cannot communicate the final finger direction.
+
+## Validation and security
+
+`frontend/src/character-pack.mjs` exports `validateCharacterPack`. It validates a maximum of 128 layers, node uniqueness, acyclic parent references, animation targets, expression overrides, finite normalized coordinates and local sprite paths. External URLs, drive-absolute paths, traversal, backslashes and colon-qualified paths are rejected. SVG assets remain allowed by the descriptor but renderers must apply separate SVG sanitization before loading untrusted packs, or disable SVG imports.
+
+The validator is only a first defense. A future secure importer must enforce archive size/file-count limits, MIME and magic-byte checks, allowed project-local filesystem roots, CSP, asset integrity, image decoding limits, and renderer-specific isolation. Do not assume validation authorizes fetching or executing arbitrary pack content.
+
+## Next implementation steps
+
+1. Replace the arm crop bridge and vector facial accents with independently authored painted layers when the art pipeline is ready.
+2. Add explicit loading progress and asset integrity metadata.
+3. Add stronger image decoding limits and a sandboxed importer for untrusted packs.
+4. Test playback, seek, reduced motion, mobile screens, loading errors and no-regression.
+5. Plan a dedicated character pack editor in Mission 007B.
+
+No private Topazioverse art, proprietary Animus code, model weights or personal data should be included by default. The open format should allow contributors to author their own characters.
+
+### V5 calibration metadata
+
+Santa V5 keeps the `fabuloom.character/0.1` pack format. Its normalized
+`position`, `size` and `anchor` values are the authoritative rig parameters;
+`frontend/src/santa-v5-calibration.mjs` contains measured alpha bounds only for
+diagnostics. Alpha bounds do not change the source PNGs.
+
+The calibration tool exposes the same hierarchy consumed by
+`LayeredCharacterRenderer`, including parent transforms, draw order and
+transformed pivots. A V5 adapter constrains only action amplitudes that exceed
+the painted overlap zones. This preserves the V3/V4 formats and keeps the
+runtime provider-independent.
+
+### Anatomical landmarks
+
+`frontend/src/character-landmarks.mjs` is a small reusable diagnostic layer,
+not a new character format. A landmark stores a layer ID, normalized local
+coordinates, confidence and an explanatory note. The renderer's resolved
+matrix converts it into stage coordinates; this avoids treating the center of
+an image box as an anatomical joint. Additional V5 channels (`pelvis_x`,
+`pelvis_rotation` and foot offsets) remain additive to `fabuloom.character/0.1`
+and are validated like the existing animation bindings.
+
+### V5 wave expression and arm IK
+
+The Santa V5 pack includes a `wave` expression that overrides only
+`right_hand` with the palm-facing `hand-right-wave.png` asset; the original
+`hand-right.png` remains the neutral asset. `WAVE_HELLO` controls a normalized
+hand target through the independent `two-bone-ik.mjs` module. The runtime
+calibrates the right-arm layer pivots to the shoulder, elbow and wrist
+landmarks, then refines the analytic solution against the pack's non-uniform
+render scales. This is a compatible pose/asset extension, not a new character
+format or a second skeleton.
+
+### Visual integrity and facial layering
+
+The V5 production draw plan uses `head-clean.png` as the head base. The
+previous `head.png` remains in the asset folder as a preserved reference, but
+must not be used together with the independent facial overlays because it is a
+complete painted head. The pack's face order is:
+
+```text
+head-clean → eyes → eyelids → brows → glasses → beard → mouth
+```
+
+`eyelids` is a closed-state overlay: `eye_open = 1` makes it transparent and
+`eye_open = 0` makes it fully visible. This prevents the neutral pose from
+looking permanently blinked. `frontend/tests/test_santa_v5_visual_integrity.mjs`
+also checks deterministic seek sampling, wrist-chain joins and grounded foot
+pivots without decoding model files.
+
+### Mission 015 — anatomy-first experimental pack
+
+`frontend/src/santa-v5-anatomy-experimental-pack.mjs` is a reversible DEV
+variant of the approved Santa V5 pack. It keeps the same `fabuloom.character/0.1`
+format and the same `SantaV5Rig`, but derives masked anatomical bands from the
+approved upper-arm and forearm PNGs, adds independent cuff nodes, enlarges the
+hand draw size, and tests a smaller experimental foot scale. The production
+pack and its source PNGs are not modified.
+
+The experimental parent chain is `torso → upper_arm → forearm`, with cuff and
+hand as independent children of the forearm so the wrist can be tuned without
+introducing a visual gap.
+The masked bands are a diagnostic reconstruction, not final painted art. They
+are rendered by the existing `LayeredCharacterRenderer`, so the comparison is
+against the same transforms and timing used by the Stage. The gallery and arm
+comparison pages are DEV evidence only; the experimental pack is not selected
+by the default Character Stage.
+
+Mission 015 records the actual alpha bounds of the source and derived PNGs in
+`workspace/exports/visual-qa/mission-015/`. Godot `Skeleton2D`, `Polygon2D`,
+Inochi2D and Blender were checked for local executables; none was available,
+so no mesh-deformation proof was executed and no tool was installed.
+## MISSÃO 023.3 — recuperação do sistema facial
+
+O renderer agora pré-carrega assets declarados em mapas `facial_states`, evitando
+que uma troca de boca por RMS selecione uma imagem ainda ausente e deixe a camada
+invisível. Dora e Alex recebem packs experimentais `facial-system-recovery-v1`
+com bocas SVG vetoriais no mesmo canvas facial. V2, V3 e V4 continuam preservados;
+Santa V5 permanece a referência e o gate segue `AWAITING_ART_APPROVAL`.
+
+## MISSÃO 023.4 — consistência artística dos narradores
+
+Mission 023.4 adds the experimental `fabuloom.narrator-cartoon/0.1` packs in
+`topazio-narrators-cartoon-v1` for Dora and Alex. Each narrator has one original
+transparent mouthless identity canvas, a compact independent eyelid overlay,
+and small same-canvas mouth states (`closed`, `slight`, `moderate`, `open`).
+The states keep the mouth proportional to the face and avoid the full-width
+purple vector strips rejected in the 023.3 close-ups.
+
+The official mapping now uses `pf_dora` and `pm_alex` with these experimental
+packs; Santa V5 and all previous V2/V3/V4/recovery packs remain available.
+`NarratorAvatarRenderer` and `LayeredCharacterRenderer` remain the only render
+path. The art gate is still `AWAITING_ART_APPROVAL`; RMS is an intensity-based
+mouth approximation, not phoneme or viseme alignment. See
+`docs/CHARACTER-ART-CONSISTENCY-023.4.md` for evidence and output paths.
+
+## MISSÃO 023.4.1 — framing facial por pack
+
+Os assets cartoon quadrados de Dora e Alex são renderizados no canvas-fonte
+1080×1920 com perfis explícitos em
+`TOPAZIO_NARRATOR_CARTOON_FRAME_PROFILES`. O campo `base_size` preserva a
+proporção física (`[0.68, 0.3825]`) e `base_position` mantém cabelo, queixo,
+gola e ombros dentro do `NARRATOR_FACE_CROP`. Boca e pálpebras continuam filhas
+da cabeça e recebem escala/posição do mesmo perfil; isso evita que uma
+calibração local quebre a sincronização de rotação, respiração, piscada ou RMS.
+
+O laboratório DEV é `frontend/facial-framing-lab.html` e a prancha reproduzível
+é `frontend/facial-framing-state-board.html`. A evidência da missão fica em
+`workspace/exports/videos/facial-framing-v1/`; vídeos e áudios não são
+versionados. Santa V5 continua sendo referência preservada. Consulte
+`docs/FACIAL-FRAMING-023.4.1.md` para os valores, diagnóstico e limitações.
+
+## MISSÃO 023.4.2 — mouth polish Dora/Alex
+
+Os packs cartoon mantêm a cabeça, o framing e o renderer da 023.4.1, mas usam
+estados de boca experimentais `mouth-polish-closed.svg`,
+`mouth-polish-slight.svg`, `mouth-polish-moderate.svg` e
+`mouth-polish-open.svg`. A variante reduz a largura, suaviza o contorno e
+mantém a geometria central estável entre os estados. A seleção continua sendo
+`closed/slight/moderate/open` por amplitude RMS; não há timing fonético.
+
+Os estados antigos continuam preservados no mesmo pack para comparação e
+rollback. Santa V5 não participa da alteração. Consulte
+`docs/MOUTH-POLISH-023.4.2.md` e os artefatos workspace-only em
+`workspace/exports/videos/facial-mouth-polish-v1/`.
+
+## MISSÃO 023.4.3 — mouth anchor Dora/Alex
+
+O contrato `fabuloom.narrator-mouth-anchor/0.1` registra landmarks faciais e
+offsets específicos para Dora e Alex. A boca permanece filha de `head`, mas
+deixa de depender somente do centro geométrico do canvas transparente: Dora
+usa offset local `[0, 0.04]` e Alex `[0, 0.036]`. Escala, estados RMS, crop,
+renderer global e Santa V5 permanecem inalterados.
+
+O laboratório `frontend/mouth-anchor-calibration-lab.html` exibe os quatro
+estados com landmarks sobre o avatar real. A evidência fica em
+`workspace/exports/videos/mouth-anchor-recovery-v1/`; vídeos e áudios não são
+versionados. O resultado continua experimental e requer aprovação artística
+humana.

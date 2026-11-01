@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
 
@@ -39,3 +40,4 @@ logs/
 .vscode/
 .DS_Store
 Thumbs.db
+.godot/

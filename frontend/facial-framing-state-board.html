@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom · Facial Framing 023.4.1</title>
+    <style>html,body{margin:0;background:#061329}canvas{display:block}</style>
+  </head>
+  <body>
+    <canvas id="board" width="1680" height="1160"></canvas>
+    <script type="module">
+      import { NarratorAvatarRenderer } from "./src/narrator-mode.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const canvas = document.querySelector("#board");
+      const ctx = canvas.getContext("2d");
+      const states = [["fechada", 0, false], ["leve", .2, true], ["moderada", .5, true], ["aberta", .86, true]];
+      const narrators = [["santa", "Santa V5", "pm_santa"], ["dora", "Dora Cartoon V1", "pf_dora"], ["alex", "Alex Cartoon V1", "pm_alex"]];
+      const fail = (error) => {
+        document.title = `error: ${error.message}`;
+        if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: error.message, stack: error.stack }) }).catch(() => {});
+        throw error;
+      };
+
+      async function main() {
+        ctx.fillStyle = "#061329"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#f7d27a"; ctx.font = "700 31px Segoe UI, sans-serif"; ctx.fillText("FABULOOM · FACIAL FRAMING 023.4.1", 34, 44);
+        ctx.fillStyle = "#b9c9dc"; ctx.font = "18px Segoe UI, sans-serif"; ctx.fillText("Perfis por pack · escala preservada · boca filha da cabeça · Santa V5 como referência", 34, 73);
+        for (let row = 0; row < narrators.length; row += 1) {
+          const [id, name, voice] = narrators[row];
+          const y = 102 + row * 350;
+          ctx.fillStyle = "#f7d27a"; ctx.font = "700 22px Segoe UI, sans-serif"; ctx.fillText(`${name} · ${voice}`, 34, y + 24);
+          for (let column = 0; column < states.length; column += 1) {
+            const [label, amplitude, playing] = states[column];
+            const x = 18 + column * 414;
+            const cell = document.createElement("canvas"); cell.width = 330; cell.height = 330;
+            const avatar = new NarratorAvatarRenderer(cell, { characterId: id, assetRoot: new URL("./", location.href).href });
+            await avatar.load();
+            avatar.renderTo(cell.getContext("2d"), { x: 15, y: 0, size: 310, timeMs: 1700 + column * 260, speechAmplitude: amplitude, isPlaying: playing });
+            ctx.drawImage(cell, x, y + 34, 330, 330);
+            ctx.fillStyle = "#fff7dc"; ctx.font = "16px Segoe UI, sans-serif"; ctx.fillText(label, x + 16, y + 348);
+          }
+        }
+        const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("board PNG encoding failed")), "image/png"));
+        if (session) {
+          const upload = await fetch(`/capture/${encodeURIComponent(session)}/board.png`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob });
+          if (!upload.ok) throw new Error(`board upload failed: ${upload.status}`);
+          const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "facial-framing-state-board-v1", renderer: "NarratorAvatarRenderer", narrators: narrators.map(([id]) => id), mouth_states: states.map(([label]) => label), canvas: { width: canvas.width, height: canvas.height }, human_review_required: true }) });
+          if (!complete.ok) throw new Error(`completion upload failed: ${complete.status}`);
+        }
+        document.title = "completed";
+      }
+      main().catch(fail);
+    </script>
+  </body>
+</html>

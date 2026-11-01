@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1145" height="1374" viewBox="0 0 1145 1374">
+  <defs><clipPath id="arm"><path d="M697 780c141 61 302 65 448 24v515c-168 47-316-4-429-128Z"/></clipPath></defs>
+  <g clip-path="url(#arm)"><image href="torso.png" x="0" y="0" width="1145" height="1374" preserveAspectRatio="none"/></g>
+</svg>

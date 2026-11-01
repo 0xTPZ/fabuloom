@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fabuloom Visual QA Gate</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, sans-serif; --bg:#07142a; --panel:#0d2342; --line:#d6a84d66; --gold:#f7d27a; --ink:#d7e4f8; --ok:#6de0b0; --warn:#f7d27a; --bad:#ff8080; }
+      * { box-sizing: border-box; } body { margin:0; color:var(--ink); background:radial-gradient(circle at 80% 8%, #183b6a 0, var(--bg) 42%); }
+      header { padding:22px clamp(18px,4vw,54px) 14px; border-bottom:1px solid var(--line); } h1 { margin:0 0 6px; color:var(--gold); font-size:1.5rem; }
+      main { max-width:1380px; margin:18px auto; padding:0 18px; display:grid; gap:16px; } .panel { background:rgba(13,35,66,.94); border:1px solid var(--line); border-radius:12px; padding:14px; box-shadow:0 16px 45px #0004; }
+      .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; } label { display:grid; gap:4px; font-size:.84rem; } input,button { padding:8px 10px; border-radius:7px; border:1px solid #d6a84d88; background:#08172e; color:var(--ink); } button { cursor:pointer; font-weight:650; }
+      .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; } .card { background:#08172e; padding:10px; border-radius:8px; min-height:76px; } .card strong { display:block; color:var(--gold); font-size:1.1rem; margin-top:6px; } .passed { color:var(--ok)!important; } .pending,.needs-review { color:var(--warn)!important; } .failed { color:var(--bad)!important; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } .evidence { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } figure { margin:0; background:#050913; border-radius:8px; overflow:hidden; } figure img { display:block; width:100%; height:auto; max-height:520px; object-fit:contain; } figcaption { padding:7px; font-size:.8rem; color:#a9bdd8; }
+      table { width:100%; border-collapse:collapse; font-size:.82rem; } th,td { text-align:left; vertical-align:top; border-bottom:1px solid #d6a84d33; padding:6px; } .scroll { overflow:auto; max-height:420px; } ul { margin:8px 0 0 18px; padding:0; } .muted { color:#a9bdd8; font-size:.84rem; } code { color:#f7e2a0; }
+      @media (max-width:900px) { .cards,.grid { grid-template-columns:1fr 1fr; } } @media (max-width:600px) { .cards,.grid,.evidence { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Fabuloom Visual QA Gate</h1><p>Histórico de execuções, evidências antes/depois e estado de revisão. A aprovação artística continua humana.</p></header>
+    <main>
+      <section class="panel"><div class="toolbar"><label>Relatório JSON<input id="reportPath" size="68" /></label><button id="load" type="button">Carregar relatório</button><a href="./visual-inspector.html">Visual Inspector V1</a></div><p id="state" class="muted">Carregando…</p></section>
+      <section class="panel"><div class="cards"><div class="card">Gate técnico<strong id="technical">—</strong></div><div class="card">Revisão artística<strong id="artistic">—</strong></div><div class="card">Multimodal<strong id="multimodal">—</strong></div><div class="card">Correção<strong id="correction">—</strong></div></div></section>
+      <section class="grid"><article class="panel"><h2>Antes / depois</h2><div id="evidence" class="evidence"></div><p class="muted">As imagens e máscaras vêm do pacote local produzido pelo gate. Diferença visual não é, sozinha, prova de defeito.</p></article><article class="panel"><h2>Histórico de execuções</h2><div class="scroll"><table><thead><tr><th>ID</th><th>Variante</th><th>Status</th><th>Relatório</th></tr></thead><tbody id="executions"></tbody></table></div><h2>Limitações</h2><ul id="limitations"></ul></article></section>
+      <section class="panel"><h2>Plano de captura</h2><div class="scroll"><table><thead><tr><th>Captura</th><th>Tempo</th><th>Modo</th><th>Motivo</th></tr></thead><tbody id="captures"></tbody></table></div></section>
+    </main>
+    <script type="module">
+      const $ = (id) => document.querySelector(`#${id}`);
+      const defaultReport = "/exports/visual-qa/mission-013.3/visual-qa-report.json";
+      $("reportPath").value = new URLSearchParams(location.search).get("report") || defaultReport;
+      const text = (node, value) => { node.textContent = value ?? "—"; node.className = value ? String(value).toLowerCase().replaceAll(" ", "-") : ""; };
+      function figure(label, url) { if (!url) return null; const figure = document.createElement("figure"); const image = document.createElement("img"); image.loading = "lazy"; image.src = url; image.alt = label; const caption = document.createElement("figcaption"); caption.textContent = label; figure.append(image, caption); return figure; }
+      async function loadReport() {
+        const reportUrl = $("reportPath").value.trim();
+        try {
+          const report = await (await fetch(reportUrl, { cache: "no-store" })).json();
+          text($("technical"), report.technicalGate?.status); text($("artistic"), report.artisticReview?.status); text($("multimodal"), report.multimodal?.status); text($("correction"), report.correction?.status || "not-requested");
+          $("state").textContent = `Relatório carregado: ${report.generatedAt || "sem data"}. ${report.multimodal?.reason || ""}`;
+          $("evidence").replaceChildren();
+          for (const comparison of report.evidencePackage?.comparisons || []) for (const [label, url] of [[`${comparison.name} · antes`, comparison.beforeUrl], [`${comparison.name} · depois`, comparison.afterUrl], [`${comparison.name} · máscara`, comparison.diffMaskUrl], [`${comparison.name} · overlay`, comparison.overlayUrl]]) { const item = figure(label, url); if (item) $("evidence").append(item); }
+          $("executions").replaceChildren(...(report.executions || []).map((execution) => { const row = document.createElement("tr"); for (const value of [execution.id, execution.variant, execution.status, execution.reportUrl || execution.reportPath]) { const cell = document.createElement("td"); cell.textContent = value || "—"; row.append(cell); } return row; }));
+          $("captures").replaceChildren(...(report.plan?.captures || []).map((capture) => { const row = document.createElement("tr"); for (const value of [capture.name, `${capture.timeMs} ms`, capture.mode, capture.reason]) { const cell = document.createElement("td"); cell.textContent = value || "—"; row.append(cell); } return row; }));
+          $("limitations").replaceChildren(...(report.limitations || []).map((limitation) => { const item = document.createElement("li"); item.textContent = limitation; return item; }));
+        } catch (error) { $("state").textContent = `Falha ao carregar relatório: ${error.message}`; }
+      }
+      $("load").addEventListener("click", loadReport); await loadReport();
+    </script>
+  </body>
+</html>

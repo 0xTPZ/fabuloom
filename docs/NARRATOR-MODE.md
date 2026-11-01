@@ -1,0 +1,208 @@
+# Fabuloom Narrator Mode V1
+
+Narrator Mode is a horizontal, facial-presenter export mode for stories that
+do not need the full-body Character Stage. It reuses the existing Kokoro
+manifest, `LayeredCharacterRenderer`, Canvas capture boundary and FFmpeg mux,
+but composes a separate cinematic scene with a circular Santa V5 facial
+avatar.
+
+## Pipeline
+
+```text
+texto original → Kokoro pm_santa → WAVs medidos → manifesto de segmentos
+       → RMS PCM-16 → avatar facial circular + cenário SVG → PNGs determinísticos
+       → FFmpeg H.264/yuv420p + AAC → MP4 horizontal
+```
+
+Generate the demo with:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_demo.py --overwrite
+```
+
+Outputs stay outside Git under `E:\Fabuloom\workspace\exports`. The demo
+uses the exact V1 text, `pm_santa`, `pt-BR`, a 1920×1080 canvas and 30 fps.
+Kokoro model weights are not part of this repository.
+
+## Architecture boundary
+
+- `NarratorAvatarRenderer` filters the approved Santa V5 pack to neck, head,
+  hair and facial layers. It clips the result to a configurable gold/blue
+  circle; limbs, body and IK are not loaded.
+- `NarratorSceneRenderer` owns the original storyteller-office SVG, ambient
+  glow, title, avatar placement and safe subtitle area.
+- `createNarratorTimeline()` preserves measured `[start_ms, end_ms)` segment
+  intervals and marks word, phoneme and viseme timing as unavailable.
+- `SubtitleRenderer` renders segment captions only.
+- `capture-narrator-mode.html` uses real WAV samples to calculate the mouth
+  RMS envelope and streams deterministic PNG frames to the loopback server.
+- `narrator_mode_demo.py` invokes capture and FFmpeg; FFmpeg does not
+  implement a second animation rig.
+
+## DEV area
+
+Open `/narrator-mode.html` through `frontend/server.py`. The page provides the
+script text, voice and scene selectors, a Canvas preview, local WAV
+Play/Pause/Stop controls and a loopback-only “Gerar vídeo” action. The action
+starts the known `narrator_mode_demo.py` job; it does not accept shell
+commands, paths or executable names from the browser.
+
+## Visual QA
+
+Inspect actual rendered PNG samples with:
+
+```powershell
+node E:\Fabuloom\studio\tools\visual-inspector\narrator-mode-report.mjs
+```
+
+The report checks canvas dimensions, opaque/non-empty samples, deterministic
+differences between timestamps, circular avatar layout and the subtitle safe
+area. It is evidence for human review, not automatic artistic approval.
+
+## Facial correction V1.1
+
+Mission 017.1 keeps the approved Santa V5 PNGs unchanged and corrects only the
+Narrator Mode composition. Inspection of the source files showed that
+`mouth-closed.png` and `mouth-open.png` are complete lower-face plates: they
+already contain the moustache and beard. The previous avatar stacked one of
+those plates over `beard.png`, which made the mouth read as a thin duplicated
+line at export scale.
+
+The corrected experimental narrator pack hides the duplicate beard layer and
+uses one lower-face plate at the beard scale. `mouthStateAt()` maps the RMS
+envelope to closed, slight, moderate and open states; the open plate is selected
+for the two higher states and its vertical motion is deliberately subtle.
+`NarratorFacialRig` now feeds the same `facialPoseAt()` result into
+`LayeredCharacterRenderer`, so head tilt, eyelids, brows, hair and mouth are
+observed in the actual draw plan rather than only in a returned diagnostic
+object. The official Santa V5 pack and assets are not edited. V1.1 used a
+square 560×560 source window at `{ x: 260, y: 0 }`, reducing exposed neck while
+preserving the gold/blue frame.
+
+The close-up diagnostic is available at `/narrator-face-lab.html`. It renders
+before/after evidence, explicit blink and mouth states, head movement and
+individual layer toggles through the shared renderer. To regenerate the MP4
+without synthesizing Kokoro again:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_face_correction_demo.py --overwrite
+```
+
+The resulting MP4, before/after board, measured reports and Inspector output are
+generated under `E:\Fabuloom\workspace\exports\videos`. The correction demo
+reuses the Mission 017 WAV and manifest; word, phoneme and viseme timings remain
+unavailable.
+
+## Final avatar framing V1.2
+
+Mission 017.2 keeps the V1.1 facial correction and changes only the source
+window used to compose the circular avatar. Measuring the real transformed alpha
+bounds showed that the former crop ended at `y=560` while the effective beard
+could reach approximately `y=606`; this was a deterministic crop defect, not a
+new asset problem. The approved V1.2 crop is the square
+`{ x: 245, y: 35, width: 590, height: 590 }`, with normalized safe area
+`{ left: 0.06, top: 0.035, right: 0.94, bottom: 0.965 }`.
+
+`validateNarratorFaceCrop()`, `faceSafeAreaForCrop()` and
+`adjustNarratorFaceCrop()` keep the crop square, bounded by the 1080×1920
+source canvas, and deterministic. The face lab controls offset X/Y, zoom and
+safe-area overlay, then calls the same `NarratorAvatarRenderer.renderTo()` path
+used by the capture/exporter. Reset returns to the approved V1.2 values.
+
+Regenerate the V1.2 MP4 without new synthesis:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_framing_demo.py --overwrite --reuse-capture
+```
+
+The resulting MP4 and before/after, facial-state, safe-area and Visual
+Inspector evidence remain under `E:\Fabuloom\workspace\exports\videos`.
+The V1.2 render reuses the Mission 017 WAV and manifest. Human artistic review
+is still required; the framing change does not create word, phoneme or viseme
+timestamps.
+
+## Face alignment V1.3
+
+Mission 017.3 corrects the internal facial composition instead of changing the
+crop. The derived narrator pack defines a `head-local-v1` coordinate system
+based on the intrinsic `head-clean.png` frame (1316×1195). It records explicit
+landmarks for the eyes, glasses, brows, nose, moustache, mouth and beard base.
+
+The official PNGs have different transparent margins and intrinsic sizes. Their
+measured alpha bounds are now aligned to explicit target boxes in head-local
+coordinates before normalized layer transforms are generated. This prevents a
+transparent bitmap rectangle from being mistaken for the painted feature
+position. The official Santa V5 pack and source assets remain unchanged; the
+Narrator Mode composition is marked experimental.
+
+The face lab now exposes the actual renderer draw plan with a local coordinate
+grid, landmarks, measured-alpha target boxes, effective pivots, static
+`head.png` reference, before/after frame and individual layer toggles. It uses
+the same `NarratorAvatarRenderer` path as capture/export. The alignment report
+is generated with:
+
+```powershell
+node E:\Fabuloom\studio\tools\visual-inspector\narrator-face-alignment-report.mjs
+```
+
+The no-synthesis demo reuses the Mission 017 WAV and manifest:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_face_alignment_demo.py --overwrite
+```
+
+The V1.3 MP4, before/after board, pose board, reference board, layer board and
+JSON/Markdown inspection report are workspace artifacts under
+`E:\Fabuloom\workspace\exports\videos`. RMS remains an intensity-based mouth
+approximation; word, phoneme and viseme timestamps are still unavailable.
+Pixels and technical checks are evidence only. Artistic approval remains a
+human review step.
+
+## Anatomical boundary V1.4
+
+Mission 017.4 audits the actual alpha bounds of the lower face instead of
+adjusting the crop or guessing another pivot. `neck.png` contains both a skin
+neck and a complete blue/gold collar. `head-clean.png` also contains the lower
+skin transition and the visible collar. The beard asset contains facial hair
+only, and the approved mouth plates contain the moustache/beard/lips but no
+collar. The duplicated neck/collar therefore came from two collar-bearing
+layers, not from the mouth or beard alignment.
+
+The corrected derived pack retains `neck` as the structural parent of `head`
+so its hierarchy and transforms remain stable, but sets only the `neck` layer
+opacity to zero. `head-clean.png` remains the visible owner of the collar
+boundary. The official Santa V5 pack and all source PNGs remain unchanged.
+This is an explicit `head-clean-collar-v1.4` boundary, not a new character
+format or a second renderer.
+
+The face lab now includes semantic controls for neck pixels and beard pixels,
+an enlarged lower-face transition rendered through the real source canvas, and
+a color-coded anatomy ownership map. The no-synthesis V1.4 demo is reproducible
+with:
+
+```powershell
+E:\Fabuloom\workspace\.venv\Scripts\python.exe `
+  E:\Fabuloom\studio\examples\narrator_mode_neck_fix_demo.py --overwrite
+```
+
+It reuses the Mission 017 WAV/manifest and writes the V1.4 MP4, before/after,
+pose, asset, close-up and diagnostic boards under
+`E:\Fabuloom\workspace\exports\videos`. Technical evidence does not replace
+human artistic approval.
+
+## Known limits
+
+- Mouth motion is an RMS intensity approximation, not phoneme or viseme
+  alignment.
+- Captions are synchronized to measured audio segments, not individual words.
+- The office scenario is an original SVG composition and intentionally simple.
+- The facial pack is a controlled crop of Santa V5, not a mesh-deformed head.
+- The V1.1/V1.2 facial composition is experimental and requires human artistic
+  review; it does not replace the approved Santa V5 source pack.
+- MP4 and WAV files are generated artifacts and must stay in the workspace
+  export directory.
+

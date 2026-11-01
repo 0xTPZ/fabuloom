@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="./assets/favicon.svg" />
+    <title>Fabuloom Visual Inspector V1</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, sans-serif; --bg:#07142a; --panel:#0d2342; --line:#d6a84d66; --gold:#f7d27a; --ink:#d7e4f8; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: radial-gradient(circle at 80% 8%, #183b6a 0, var(--bg) 42%); color: var(--ink); }
+      header { padding: 22px clamp(18px, 4vw, 54px) 12px; border-bottom: 1px solid var(--line); }
+      h1 { margin: 0 0 6px; color: var(--gold); font-size: 1.45rem; }
+      p { margin: 4px 0; }
+      .layout { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 440px); gap: 18px; max-width: 1280px; margin: 18px auto; padding: 0 18px; }
+      .panel { background: rgba(13,35,66,.92); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: 0 16px 45px #0004; }
+      .stage-panel { min-width: 0; }
+      .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+      label { display: grid; gap: 4px; color: var(--ink); font-size: .86rem; }
+      select, input[type=file], button { border: 1px solid #d6a84d88; border-radius: 7px; background: #08172e; color: #f7e2a0; padding: 8px 10px; }
+      button { cursor: pointer; font-weight: 650; }
+      button:hover, button:focus-visible { border-color: var(--gold); outline: 2px solid #f7d27a55; }
+      .canvas-wrap { position: relative; background: #050913; border-radius: 9px; overflow: auto; max-height: 78vh; }
+      #stage { display: block; width: min(100%, 680px); height: auto; margin: 0 auto; }
+      .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: .82rem; }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; background: #50d8ff; }
+      .dot.warn { background: #f7d27a; } .dot.error { background: #ff6b6b; }
+      .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+      .stat { background: #08172e; border-radius: 7px; padding: 9px; } .stat strong { display:block; color:var(--gold); font-size:1.2rem; }
+      .issues { display: grid; gap: 8px; max-height: 380px; overflow: auto; }
+      .issue { border-left: 4px solid #50d8ff; background: #08172e; padding: 8px 9px; border-radius: 5px; }
+      .issue.warning { border-left-color: #f7d27a; } .issue.error { border-left-color: #ff6b6b; } .issue.hypothesis { border-left-color: #b98cff; }
+      .issue small { display:block; color:#a9bdd8; margin-top:3px; }
+      .compare { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+      .compare canvas { width:100%; height:auto; background:#050913; border-radius:7px; }
+      .history { width:100%; border-collapse: collapse; font-size:.82rem; } .history th,.history td { border-bottom:1px solid #d6a84d33; padding:6px; text-align:left; }
+      .muted { color:#a9bdd8; font-size:.84rem; }
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Fabuloom Visual Inspector V1</h1>
+      <p>Inspeção local reproduzível do rig: renderização, landmarks, diagnósticos e comparação. Nenhuma correção é aplicada automaticamente.</p>
+      <p><a href="./visual-qa.html">Abrir Visual QA Gate V1.3</a></p>
+    </header>
+    <main class="layout">
+      <section class="panel stage-panel" aria-label="Renderização">
+        <div class="controls">
+          <label>Personagem<select id="character"><option value="santa-v5">Santa V5 · pm_santa</option></select></label>
+          <label>Pose<select id="pose"><option value="neutral">Rosto/corpo neutro</option><option value="blink">Piscada</option><option value="mouth">Boca RMS aberta</option><option value="wave">WAVE_HELLO elevado</option><option value="point">POINT_AT</option></select></label>
+          <button id="render" type="button">Renderizar inspeção</button>
+          <button id="download" type="button">Exportar JSON</button>
+        </div>
+        <div class="canvas-wrap"><canvas id="stage" width="680" height="1140"></canvas></div>
+        <div class="legend"><span><i class="dot"></i>landmarks</span><span><i class="dot warn"></i>avisos</span><span><i class="dot error"></i>erros</span></div>
+        <p class="muted">O canvas usa diretamente <code>LayeredCharacterRenderer</code>. O RMS é uma entrada de diagnóstico; não é alinhamento fonético.</p>
+      </section>
+      <aside class="panel" aria-label="Diagnóstico">
+        <p id="state">Carregando assets locais…</p>
+        <div id="coverage" class="muted">Cobertura: preparando frame, landmarks e comparação. Análise temporal e referência artística ainda não executadas nesta tela.</div>
+        <div class="stat-grid"><div class="stat"><strong id="errors">—</strong>erros</div><div class="stat"><strong id="warnings">—</strong>avisos</div><div class="stat"><strong id="hypotheses">—</strong>hipóteses</div></div>
+        <h2>Problemas detectados</h2>
+        <div id="issues" class="issues"></div>
+        <h2>Referência visual</h2>
+        <label>Carregar PNG aprovado<input id="reference" type="file" accept="image/png" /></label>
+        <div class="compare"><canvas id="reference-preview" width="340" height="570"></canvas><canvas id="overlay-preview" width="340" height="570"></canvas></div>
+        <p class="muted">A sobreposição é uma evidência visual auxiliar. A comparação quantitativa com tolerância de antialiasing é gerada pela CLI. Visão por IA: não executada.</p>
+        <h2>Histórico</h2>
+        <table class="history"><thead><tr><th>Pose</th><th>Tempo</th><th>Estado</th></tr></thead><tbody id="history"></tbody></table>
+      </aside>
+    </main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { SANTA_V5_ALPHA_BOUNDS, SANTA_V5_ANATOMICAL_LANDMARKS } from "./src/santa-v5-calibration.mjs";
+      import { resolveLandmarks } from "./src/character-landmarks.mjs";
+      import { buildInspectionFrame, defaultInspectionConfig, diagnoseFrame } from "./src/visual-inspector-core.mjs";
+
+      const canvas = document.querySelector("#stage");
+      const rig = new SantaV5Rig();
+      const renderer = new LayeredCharacterRenderer(canvas, rig, SANTA_V5_PACK, { assetRoot: new URL("./", location.href).href });
+      let currentFrame = null;
+      let referenceImage = null;
+      const history = [];
+      const $ = (id) => document.querySelector(`#${id}`);
+
+      function setAnimation(mode) {
+        rig.clearAnimation();
+        if (mode === "wave") rig.setAnimation("WAVE_HELLO", 0);
+        if (mode === "point") {
+          rig.setPresentationTarget({ format: "fabuloom.presentation-target/0.1", id: "inspector-target", label: "alvo do inspetor", coordinateSpace: "normalized-stage", position: { x: .88, y: .18 } }, { arm: "right", width: 1080, height: 1920 });
+          rig.setAnimation("POINT_AT", 0);
+        }
+      }
+
+      function settingsFor(mode) {
+        if (mode === "blink") return { timeMs: 4330, isPlaying: false, amplitude: 0 };
+        if (mode === "mouth") return { timeMs: 1200, isPlaying: true, amplitude: .92 };
+        if (mode === "wave") return { timeMs: 1680, isPlaying: false, amplitude: 0 };
+        if (mode === "point") return { timeMs: 5200, isPlaying: false, amplitude: 0 };
+        return { timeMs: 0, isPlaying: false, amplitude: 0 };
+      }
+
+      function drawLandmarks(frame, diagnosis) {
+        const ctx = canvas.getContext("2d");
+        ctx.save();
+        for (const landmark of frame.landmarks.filter((candidate) => candidate.stage)) {
+          ctx.fillStyle = "#50d8ff"; ctx.beginPath(); ctx.arc(landmark.stage.x, landmark.stage.y, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#d7e4f8"; ctx.font = "12px Segoe UI"; ctx.fillText(landmark.id, landmark.stage.x + 7, landmark.stage.y - 5);
+        }
+        for (const finding of diagnosis.issues) {
+          const point = finding.evidence?.pivot || finding.evidence?.center;
+          if (!point) continue;
+          ctx.strokeStyle = finding.severity === "error" ? "#ff6b6b" : finding.severity === "warning" ? "#f7d27a" : "#b98cff";
+          ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(point.x, point.y, 12, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function renderIssues(diagnosis) {
+        const counts = { error: 0, warning: 0, hypothesis: 0 };
+        for (const finding of diagnosis.issues) counts[finding.severity] += 1;
+        $("errors").textContent = counts.error; $("warnings").textContent = counts.warning; $("hypotheses").textContent = counts.hypothesis;
+        $("state").textContent = counts.error ? "Correção necessária" : counts.warning || counts.hypothesis ? "Revisão recomendada" : "Sem defeitos detectados nesta captura";
+        $("coverage").textContent = "Verificações executadas: frame, landmarks, pivôs, bounds alfa e estado facial. Não executadas nesta tela: sequência temporal, comparação quantitativa da CLI e referência artística aprovada. Aguardando revisão humana.";
+        $("issues").replaceChildren(...(diagnosis.issues.length ? diagnosis.issues : [{ severity: "info", code: "ok", message: "Nenhum problema verificável neste quadro." }]).map((finding) => {
+          const element = document.createElement("div"); element.className = `issue ${finding.severity}`; element.innerHTML = `<strong>${finding.severity}</strong> · <code>${finding.code}</code><br>${finding.message}<small>${JSON.stringify(finding.evidence || {})}</small>`; return element;
+        }));
+      }
+
+      function updateComparison() {
+        const referenceCanvas = $("reference-preview");
+        const overlayCanvas = $("overlay-preview");
+        const referenceContext = referenceCanvas.getContext("2d");
+        const overlayContext = overlayCanvas.getContext("2d");
+        referenceContext.clearRect(0, 0, referenceCanvas.width, referenceCanvas.height);
+        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        if (!referenceImage) return;
+        referenceContext.drawImage(referenceImage, 0, 0, referenceCanvas.width, referenceCanvas.height);
+        overlayContext.drawImage(canvas, 0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayContext.globalAlpha = .5; overlayContext.drawImage(referenceImage, 0, 0, overlayCanvas.width, overlayCanvas.height); overlayContext.globalAlpha = 1;
+      }
+
+      async function renderInspection() {
+        const mode = $("pose").value;
+        setAnimation(mode);
+        const settings = settingsFor(mode);
+        const expression = mode === "wave" ? "wave" : mode === "point" ? "point" : "neutral";
+        renderer.setExpression(expression);
+        renderer.renderFrame({ timeMs: settings.timeMs, speechAmplitude: settings.amplitude, isPlaying: settings.isPlaying });
+        const plans = renderer.getLayerDrawPlan();
+        const landmarks = resolveLandmarks(SANTA_V5_ANATOMICAL_LANDMARKS, plans);
+        currentFrame = buildInspectionFrame({ characterId: SANTA_V5_PACK.id, pack: SANTA_V5_PACK, plans, resolvedAssets: Object.fromEntries(SANTA_V5_PACK.layers.map((layer) => [layer.id, renderer.resolvedAsset(layer)])), pose: rig.pose(), timeMs: settings.timeMs, isPlaying: settings.isPlaying, animationId: rig.animationId(), expression, width: canvas.width, height: canvas.height, alphaBounds: SANTA_V5_ALPHA_BOUNDS, landmarks, view: "full" });
+        const diagnosis = diagnoseFrame(currentFrame, defaultInspectionConfig());
+        drawLandmarks(currentFrame, diagnosis); renderIssues(diagnosis); updateComparison();
+        history.unshift({ mode, timeMs: settings.timeMs, state: diagnosis.issues.some((finding) => finding.severity === "error") ? "erro" : "ok" });
+        $("history").replaceChildren(...history.slice(0, 8).map((entry) => { const row = document.createElement("tr"); row.innerHTML = `<td>${entry.mode}</td><td>${entry.timeMs} ms</td><td>${entry.state}</td>`; return row; }));
+      }
+
+      $("render").addEventListener("click", () => renderInspection().catch((error) => { $("state").textContent = error.message; console.error(error); }));
+      $("download").addEventListener("click", () => { if (!currentFrame) return; const blob = new Blob([JSON.stringify(currentFrame, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "fabuloom-visual-inspection-frame.json"; link.click(); URL.revokeObjectURL(url); });
+      $("reference").addEventListener("change", () => { const file = $("reference").files?.[0]; if (!file) return; const image = new Image(); image.onload = () => { referenceImage = image; updateComparison(); }; image.src = URL.createObjectURL(file); });
+      await renderer.load(); await renderInspection();
+    </script>
+  </body>
+</html>

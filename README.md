@@ -1,40 +1,37 @@
-# Fabuloom Studio
+# Fabuloom Studio — Alpha preparation
 
-Fabuloom Studio is an open-source foundation for turning stories and scripts into narrated videos with animated characters.
+Fabuloom Studio is a local-first prototype for turning narrated stories into audiovisual scenes. This branch consolidates the current Studio shell, the Santa V5 Narrator Mode reference, deterministic Canvas rendering, local Kokoro manifests and the existing FFmpeg examples.
 
-The project is being designed as an independent application by 0xTPZ. It is intentionally separate from TopazioReader and Card Game Studio. Those projects are references only; no source code, models, environments, personal audio, or private context is published here.
+## What this Alpha preparation actually includes
 
-## Vision
+- A local browser Studio at `http://127.0.0.1:8765/`.
+- Project-local script editing with persistent projects and sentence-based scene creation.
+- Santa V5 Narrator Mode preview with measured audio timing when local manifests and WAV files exist.
+- Scene image import, Santa V5 narration generation and project-scoped MP4 export.
+- Dependency-free Python core contracts and Node renderer tests.
+- Diagnostic tooling and preserved DEV laboratories.
+- Project-scoped asynchronous MP4 export with per-scene zoom/pan rendering and controlled music ducking.
 
-Fabuloom should let a creator move from a written story to an editable scene timeline, with narration, characters, audio synchronization, and export targets that can grow from local desktop workflows to other platforms.
+## Important limits
 
-## Initial architecture
+This is a Draft Alpha preparation, not a published release. A new user can create a project, save a script, import one image per sentence, generate real Kokoro `pm_santa` narration when the optional runtime and model are available, preview the measured timeline and export a horizontal MP4. New scene authoring is intentionally simple: sentence segmentation, local image association and a small camera vocabulary. Advanced editing, word/phoneme/viseme alignment and broad media support remain outside the Alpha claim.
 
-1. Script editor — chapters, scenes, dialogue, narration, and structured metadata.
-2. TTS providers — Kokoro as the initial primary provider, Piper as an offline alternative, and a provider interface for future engines.
-3. Character engine — modular character identities, expressions, poses, and animation backends.
-4. Audio/animation synchronization — segment manifests, durations, cues, and alignment metadata.
-5. Scene director — camera, staging, voice direction, ambience, and transitions.
-6. Video compositor — layered assembly of voice, music, ambience, SFX, and animation.
-7. Multiplatform export — local video/audio outputs first, with future platform-specific adapters.
+Santa V5 is the production reference. Dora and Alex remain explicitly gated as `AWAITING_ART_APPROVAL`; experimental narrator packs are not Alpha features.
 
-## Current status
+## Start here
 
-This repository contains the documentation and architectural foundation only. The editor, animation engine, TTS runtime, and compositor are not implemented in this mission.
+Read [INSTALL.md](INSTALL.md), then [QUICKSTART.md](QUICKSTART.md). The full capability boundary is in [USER_GUIDE.md](USER_GUIDE.md), and known limitations are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-## Technology direction
+For invited Alpha testing, also read [ALPHA-TESTING-GUIDE.md](ALPHA-TESTING-GUIDE.md) and [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md). This source-only candidate is not published and does not grant redistribution rights for identity-bearing artwork.
 
-- Python for audio generation and processing.
-- Kokoro for the first TTS integration.
-- Piper for offline fallback.
-- TypeScript for the future interface.
-- FFmpeg for media export.
-- SQLite for local project data.
+## First production
 
-All dependencies and model licenses must be reviewed before integration. Large models, virtual environments, generated media, private context, and temporary files remain outside this public repository.
+1. Install the project-local environment and run `scripts/diagnose.ps1`.
+2. Start the loopback Studio and open `http://127.0.0.1:8765/`.
+3. Open **Projetos → ＋ Novo projeto**, then write and save a script.
+4. Open **Cenas** and import one PNG/JPEG/WebP per scene.
+5. Open **Áudio → Gerar narração Santa**, review **Prévia**, then choose **Exportação → Exportar MP4**.
 
-## License
+## Project status
 
-Original Fabuloom Studio code is intended to use the MIT License. This choice applies only to original project material; third-party code, models, voices, and media remain subject to their own licenses.
-
-See the contribution, security, architecture, and getting-started documents for project boundaries.
+This branch is intended for human review as a Draft Alpha preparation. It must not be treated as a published release until a clean-machine acceptance test confirms the complete supported path.

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none">
+  <defs><linearGradient id="doraPolishClosed" x1="627" y1="612" x2="627" y2="670" gradientUnits="userSpaceOnUse"><stop stop-color="#D98B84"/><stop offset="1" stop-color="#B76A67"/></linearGradient></defs>
+  <g transform="translate(0 -48)"><path d="M552 660C574 648 601 645 627 652C653 645 680 648 702 660C681 674 655 680 627 680C599 680 573 674 552 660Z" fill="url(#doraPolishClosed)" stroke="#8A5757" stroke-width="3.5" stroke-linejoin="round" opacity=".92"/>
+  <path d="M568 662C588 666 608 667 627 664C646 667 666 666 686 662" stroke="#F0B4AA" stroke-width="3.5" stroke-linecap="round" opacity=".58"/></g>
+</svg>

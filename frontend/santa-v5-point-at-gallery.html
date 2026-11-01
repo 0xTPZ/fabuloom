@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · POINT_AT</title>
+    <style>:root{color-scheme:dark;font:14px/1.35 Segoe UI,sans-serif}body{margin:0;background:#07142a;color:#eef5ff}header{padding:18px 24px;border-bottom:1px solid #d6a84d55}h1{margin:0 0 4px;color:#f7d27a;font-size:22px}main{max-width:1180px;margin:18px auto;padding:0 18px 28px}.board{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}figure{margin:0;padding:8px;background:#0d2342;border:1px solid #d6a84d55;border-radius:10px}canvas{display:block;width:100%;height:auto;background:#081a33;border-radius:6px}figcaption{min-height:3.6em;padding:8px 2px 2px;color:#f7d27a;font-weight:650}small{display:block;color:#b8c9df;font-weight:400}@media(max-width:820px){.board{grid-template-columns:repeat(2,minmax(150px,1fr))}}</style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · POINT_AT</h1><p>Prancha técnica com os alvos e o mesmo renderer usado no Character Stage.</p></header>
+    <main><section id="board" class="board"></section></main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { createPresentationTarget } from "./src/presentation-targets.mjs";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      const board = document.querySelector("#board");
+      const targets = { right: createPresentationTarget({ id: "book-right", position: { x: .90, y: .15 }, label: "Livro" }), left: createPresentationTarget({ id: "symbol-left", position: { x: .44, y: .15 }, label: "Símbolo" }) };
+      const samples = [["Repouso · direita",0,"right"],["Elevação · direita",1500,"right"],["Sustentação · direita",2700,"right"],["Elevação · esquerda",1500,"left"],["Retorno · esquerda",4000,"left"]];
+      const drawObject = (ctx, target) => { const x=target.position.x*420,y=target.position.y*956; ctx.save();ctx.translate(x,y); if(target.id==="book-right"){ctx.fillStyle="#d6a84d";ctx.strokeStyle="#fff2cf";ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(-40,-26,80,52,7);ctx.fill();ctx.stroke();}else{ctx.fillStyle="#1b5ca8";ctx.strokeStyle="#f7d27a";ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,30,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle="#f7d27a";ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(7,-5);ctx.lineTo(25,0);ctx.lineTo(7,5);ctx.lineTo(0,22);ctx.lineTo(-7,5);ctx.lineTo(-25,0);ctx.lineTo(-7,-5);ctx.closePath();ctx.fill();}ctx.restore();};
+      for (const [label,timeMs,side] of samples) { const figure=document.createElement("figure");const canvas=document.createElement("canvas");canvas.width=420;canvas.height=956;const caption=document.createElement("figcaption");caption.innerHTML=`${label}<small>${timeMs} ms</small>`;figure.append(canvas,caption);board.append(figure);const rig=new SantaV5Rig();rig.setSceneDuration(8500);rig.setPointAtTiming({durationMs:4000,holdMs:1300,attentionMs:300,anticipationMs:250,elevationMs:700,returnMs:1450});rig.setPresentationTarget(targets[side],{arm:side,elbowPreference:side==="left"?{x:-1,y:.55}:{x:1,y:.55}});rig.setAnimation("POINT_AT");const renderer=new LayeredCharacterRenderer(canvas,rig,SANTA_V5_PACK,{assetRoot:new URL("./",location.href).href,renderBackground:true});await renderer.load();renderer.setExpression(side==="left"?"point-left":"point");renderer.renderFrame({timeMs,speechAmplitude:0,isPlaying:false});drawObject(canvas.getContext("2d"),targets[side]);}
+      document.title="completed";
+    </script>
+  </body>
+</html>

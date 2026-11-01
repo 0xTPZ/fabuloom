@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fabuloom · laboratório facial do Narrator Mode V1.4</title>
+  <style>
+    :root { color-scheme: dark; font-family: Segoe UI, sans-serif; background: #061329; color: #fff7dc; }
+    body { margin: 0; padding: 24px; background: radial-gradient(circle at 70% 10%, #15335b, #061329 60%); }
+    main { max-width: 1520px; margin: 0 auto; }
+    h1 { color: #f7d27a; font-size: 28px; margin: 0 0 6px; }
+    p { color: #b7c5dc; margin: 0 0 16px; }
+    canvas { display: block; width: min(1500px, 100%); height: auto; border: 1px solid #c58c2b; background: #07172e; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 16px 0; }
+    label { color: #d9e5f7; }
+    select, button { color: #fff7dc; background: #0d2342; border: 1px solid #547cad; border-radius: 4px; padding: 6px 9px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #f7d27a; }
+    .layers { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #234a79; }
+    .anatomy { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; padding: 10px; border: 1px solid #5f4f2b; }
+    .status { color: #f7d27a; min-height: 1.4em; margin-top: 12px; }
+    code { color: #ffd98c; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Fabuloom · laboratório facial · Narrator Mode V1.4</h1>
+  <p>O painel central usa o mesmo <code>NarratorAvatarRenderer</code> do palco e da exportação. A correção anatômica mantém o nó do pescoço para preservar a hierarquia, mas oculta somente os pixels duplicados de <code>neck.png</code>.</p>
+  <div class="controls">
+    <label>Pose:
+      <select id="state">
+        <option value="open">Olhos abertos</option>
+        <option value="blink">Piscada</option>
+        <option value="closed">Boca fechada</option>
+        <option value="open-mouth">Boca aberta</option>
+        <option value="tilt">Cabeça inclinada</option>
+      </select>
+    </label>
+    <label>RMS: <input id="amplitude" type="range" min="0" max="1" step="0.01" value="0.72"></label>
+    <label>Offset X: <input id="offset-x" type="range" min="-80" max="80" step="1" value="0"></label>
+    <label>Offset Y: <input id="offset-y" type="range" min="-80" max="80" step="1" value="0"></label>
+    <label>Zoom: <input id="zoom" type="range" min="0.85" max="1.25" step="0.01" value="1"></label>
+    <label><input id="safe" type="checkbox" checked> área segura</label>
+    <label><input id="grid" type="checkbox" checked> grade local</label>
+    <label><input id="landmarks" type="checkbox" checked> landmarks</label>
+    <label><input id="alpha" type="checkbox" checked> caixas alfa</label>
+    <label><input id="pivots" type="checkbox" checked> pivôs</label>
+    <label><input id="reference" type="checkbox" checked> referência</label>
+    <label><input id="anatomy-map" type="checkbox"> mapa anatômico</label>
+    <button id="render">Renderizar comparação</button>
+    <button id="reset">Reset aprovado</button>
+  </div>
+  <div class="layers" id="layers"></div>
+  <div class="anatomy" id="anatomy-controls">
+    <strong>Inspeção da transição:</strong>
+    <label><input id="show-neck" type="checkbox"> pixels do pescoço</label>
+    <label><input id="show-beard" type="checkbox"> camada barba</label>
+    <span>Verde = neck.png · dourado = head-clean/cabeça · azul = gola integrada · rosa = placa da boca</span>
+  </div>
+  <canvas id="lab" width="1500" height="1260"></canvas>
+  <div class="status" id="status"></div>
+</main>
+<script type="module">
+  import {
+    adjustNarratorFaceCrop,
+    faceSafeAreaForCrop,
+    NARRATOR_FACE_ALPHA_BOUNDS,
+    NARRATOR_FACE_CROP,
+    NARRATOR_FACE_REFERENCE,
+    NARRATOR_FACE_SAFE_AREA,
+    NarratorAvatarRenderer,
+    createNarratorAvatarPack,
+    mouthStateAt,
+  } from "./src/narrator-mode.mjs";
+
+  const canvas = document.querySelector("#lab");
+  const context = canvas.getContext("2d");
+  const status = document.querySelector("#status");
+  const state = document.querySelector("#state");
+  const amplitude = document.querySelector("#amplitude");
+  const offsetX = document.querySelector("#offset-x");
+  const offsetY = document.querySelector("#offset-y");
+  const zoom = document.querySelector("#zoom");
+  const safe = document.querySelector("#safe");
+  const grid = document.querySelector("#grid");
+  const landmarks = document.querySelector("#landmarks");
+  const alpha = document.querySelector("#alpha");
+  const pivots = document.querySelector("#pivots");
+  const reference = document.querySelector("#reference");
+  const anatomyMap = document.querySelector("#anatomy-map");
+  const showNeck = document.querySelector("#show-neck");
+  const showBeard = document.querySelector("#show-beard");
+  // Use DOM-created image elements instead of the global Image constructor;
+  // this also works in the embedded browser used for local QA.
+  const source = document.createElement("img");
+  const staticReference = document.createElement("img");
+  source.src = "/exports/videos/.fabuloom-narrator-mode-v1-frames/000240.png";
+  staticReference.src = new URL("assets/characters/topazio-narrators-v5/santa/head.png", document.baseURI).href;
+  await Promise.all([
+    new Promise((resolve, reject) => { source.onload = resolve; source.onerror = reject; }),
+    new Promise((resolve, reject) => { staticReference.onload = resolve; staticReference.onerror = reject; }),
+  ]);
+
+  const avatarVariants = new Map();
+  for (const neckPixels of [false, true]) {
+    for (const beardPixels of [false, true]) {
+      const key = `${neckPixels ? 1 : 0}${beardPixels ? 1 : 0}`;
+      const variant = new NarratorAvatarRenderer(canvas, { assetRoot: document.baseURI, pack: createNarratorAvatarPack(undefined, { showNeckPixels: neckPixels, showBeardPixels: beardPixels }) });
+      await variant.load();
+      avatarVariants.set(key, variant);
+    }
+  }
+  const avatar = avatarVariants.get("00");
+  const visible = new Set(avatar.pack.layers.map((layer) => layer.id));
+  const layersElement = document.querySelector("#layers");
+  for (const layer of avatar.pack.layers) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox"; input.checked = true; input.dataset.layer = layer.id;
+    input.addEventListener("change", () => { input.checked ? visible.add(layer.id) : visible.delete(layer.id); render(); });
+    label.append(input, ` ${layer.id}`);
+    layersElement.append(label);
+  }
+  for (const variant of avatarVariants.values()) variant.setLayerVisibility((layer) => visible.has(layer.id));
+
+  function settings() {
+    const selected = state.value;
+    if (selected === "blink") return { timeMs: 4330, speechAmplitude: 0.42 };
+    if (selected === "closed") return { timeMs: 1200, speechAmplitude: 0 };
+    if (selected === "open-mouth") return { timeMs: 1800, speechAmplitude: 0.88 };
+    if (selected === "tilt") return { timeMs: 7600, speechAmplitude: 0.46 };
+    return { timeMs: 1800, speechAmplitude: Number(amplitude.value) };
+  }
+
+  function panel(title, subtitle, x, y, width, height) {
+    context.fillStyle = "#0a1c36"; context.fillRect(x, y, width, height);
+    context.strokeStyle = "#234a79"; context.lineWidth = 2; context.strokeRect(x, y, width, height);
+    context.fillStyle = "#f7d27a"; context.font = "700 22px Segoe UI"; context.fillText(title, x + 18, y + 32);
+    context.fillStyle = "#b7c5dc"; context.font = "15px Segoe UI"; context.fillText(subtitle, x + 18, y + 57);
+  }
+
+  function drawCircleImage(image, x, y, size) {
+    context.save(); context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 3, 0, Math.PI * 2); context.clip();
+    context.fillStyle = "#07172e"; context.fillRect(x, y, size, size);
+    context.drawImage(image, x, y, size, size);
+    context.restore();
+    context.strokeStyle = "#f7d27a"; context.lineWidth = 6; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 4, 0, Math.PI * 2); context.stroke();
+  }
+
+  function transformPoint(matrix, x, y) {
+    return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f };
+  }
+
+  function sourceToPanel(point, crop, bounds) {
+    return { x: bounds.x + (point.x - crop.x) * bounds.size / crop.width, y: bounds.y + (point.y - crop.y) * bounds.size / crop.height };
+  }
+
+  function headPoint(localX, localY, headPlan, crop, bounds) {
+    return sourceToPanel(transformPoint(headPlan.matrix, localX, localY), crop, bounds);
+  }
+
+  function drawMappedLine(points, color, width = 1, dash = []) {
+    context.save(); context.strokeStyle = color; context.lineWidth = width; context.setLineDash(dash); context.beginPath();
+    points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
+    context.stroke(); context.restore();
+  }
+
+  function drawHeadGrid(headPlan, crop, bounds) {
+    const lines = [0, 200, 400, 600, 800, 1000, 1200];
+    for (const x of lines) drawMappedLine([headPoint(x, 0, headPlan, crop, bounds), headPoint(x, NARRATOR_FACE_REFERENCE.height, headPlan, crop, bounds)], "rgba(93, 210, 235, 0.38)", 1, [5, 5]);
+    for (const y of [0, 200, 400, 600, 800, 1000, 1195]) drawMappedLine([headPoint(0, y, headPlan, crop, bounds), headPoint(NARRATOR_FACE_REFERENCE.width, y, headPlan, crop, bounds)], "rgba(93, 210, 235, 0.38)", 1, [5, 5]);
+    const topLeft = headPoint(0, 0, headPlan, crop, bounds);
+    context.fillStyle = "#8fe8f5"; context.font = "12px Segoe UI"; context.fillText("head-local-v1", topLeft.x + 5, topLeft.y + 16);
+  }
+
+  function drawLandmarks(headPlan, crop, bounds) {
+    context.save(); context.font = "12px Segoe UI"; context.textAlign = "left";
+    for (const [name, landmark] of Object.entries(NARRATOR_FACE_REFERENCE.landmarks)) {
+      const point = headPoint(landmark.x, landmark.y, headPlan, crop, bounds);
+      context.fillStyle = "#ffdf8a"; context.strokeStyle = "#321d08"; context.lineWidth = 3;
+      context.beginPath(); context.arc(point.x, point.y, 4, 0, Math.PI * 2); context.fill(); context.stroke();
+      context.fillStyle = "#fff7dc"; context.fillText(name, point.x + 7, point.y - 7);
+    }
+    context.restore();
+  }
+
+  function drawAlphaTargets(headPlan, crop, bounds, pack) {
+    const colors = { hair_front: "#a9a0ff", eyes: "#62e2ba", eyelids: "#62e2ba", brows: "#e9a4ff", glasses: "#ffcc63", mouth: "#ff8f8f" };
+    for (const layer of pack.layers) {
+      const assetName = String(layer.asset).split("/").pop();
+      if (!layer.face_alpha_target || !NARRATOR_FACE_ALPHA_BOUNDS[assetName]) continue;
+      const [left, top, right, bottom] = layer.face_alpha_target;
+      const points = [[left, top], [right, top], [right, bottom], [left, bottom], [left, top]].map(([x, y]) => headPoint(x, y, headPlan, crop, bounds));
+      drawMappedLine(points, colors[layer.id] || "#ffffff", 2, [6, 4]);
+      context.fillStyle = colors[layer.id] || "#ffffff"; context.font = "12px Segoe UI";
+      context.fillText(`${layer.id} · alfa alvo`, points[0].x + 4, points[0].y + 14);
+    }
+  }
+
+  function drawAnatomyMap(headPlan, crop, bounds) {
+    const regions = [
+      ["cabeça + gola integrada", 0, 0, 1316, 1195, "rgba(247,210,122,0.14)", "#f7d27a"],
+      ["pescoço duplicado · neck.png", 270, 860, 1045, 1195, "rgba(64,201,162,0.18)", "#40c9a2"],
+      ["gola proprietária do head-clean", 360, 965, 956, 1165, "rgba(91,143,217,0.20)", "#5b8fd9"],
+      ["placa inferior · mouth", 350, 625, 970, 1045, "rgba(240,127,145,0.12)", "#f07f91"],
+    ];
+    for (const [label, left, top, right, bottom, fill, stroke] of regions) {
+      const points = [[left, top], [right, top], [right, bottom], [left, bottom]].map(([x, y]) => headPoint(x, y, headPlan, crop, bounds));
+      context.save(); context.fillStyle = fill; context.strokeStyle = stroke; context.lineWidth = 2; context.beginPath(); context.moveTo(points[0].x, points[0].y); points.slice(1).forEach((point) => context.lineTo(point.x, point.y)); context.closePath(); context.fill(); context.stroke(); context.fillStyle = stroke; context.font = "12px Segoe UI"; context.fillText(label, points[0].x + 5, points[0].y + 16); context.restore();
+    }
+  }
+
+  function drawLowerFaceCloseup(selectedAvatar, crop) {
+    const x = 1108; const y = 727; const width = 350; const height = 190;
+    const sourceY = crop.y + crop.height * 0.42;
+    context.save(); context.fillStyle = "#000"; context.fillRect(x, y, width, height);
+    context.drawImage(selectedAvatar.sourceCanvas, crop.x, sourceY, crop.width, crop.height * 0.58, x, y, width, height);
+    context.strokeStyle = "#f7d27a"; context.lineWidth = 2; context.strokeRect(x, y, width, height); context.restore();
+    context.fillStyle = "#f7d27a"; context.font = "700 15px Segoe UI"; context.fillText("TRANSIÇÃO AMPLIADA · render real", x, y + height + 22);
+  }
+
+  function drawPivots(plan, crop, bounds) {
+    context.save();
+    for (const entry of plan) {
+      if (!entry.layer.face_alpha_target) continue;
+      const [anchorX, anchorY] = entry.layer.anchor || [0.5, 0.5];
+      const point = sourceToPanel(transformPoint(entry.matrix, entry.intrinsic[0] * anchorX, entry.intrinsic[1] * anchorY), crop, bounds);
+      context.strokeStyle = "#ffffff"; context.lineWidth = 2;
+      context.beginPath(); context.moveTo(point.x - 7, point.y); context.lineTo(point.x + 7, point.y); context.moveTo(point.x, point.y - 7); context.lineTo(point.x, point.y + 7); context.stroke();
+    }
+    context.restore();
+  }
+
+  function drawSafeOverlay(bounds, crop) {
+    if (!safe.checked) return;
+    const area = faceSafeAreaForCrop(crop, NARRATOR_FACE_SAFE_AREA);
+    const scale = bounds.size / crop.width;
+    context.save(); context.setLineDash([8, 7]); context.strokeStyle = "rgba(91, 221, 235, 0.95)"; context.lineWidth = 2;
+    context.strokeRect(bounds.x + (area.left - crop.x) * scale, bounds.y + (area.top - crop.y) * scale, area.width * scale, area.height * scale); context.restore();
+  }
+
+  function drawReference(x, y, width, height) {
+    const ratio = staticReference.naturalWidth / staticReference.naturalHeight;
+    const drawHeight = Math.min(height, width / ratio); const drawWidth = drawHeight * ratio;
+    const drawX = x + (width - drawWidth) / 2; const drawY = y + (height - drawHeight) / 2;
+    context.fillStyle = "#000"; context.fillRect(x, y, width, height); context.drawImage(staticReference, drawX, drawY, drawWidth, drawHeight);
+  }
+
+  function drawDiagnostics(plan, x, y) {
+    context.fillStyle = "#d9e5f7"; context.font = "13px Segoe UI";
+    const aligned = plan.filter((entry) => entry.layer.face_alpha_target);
+    context.fillText(`Sistema: ${NARRATOR_FACE_REFERENCE.coordinateSystem} · cabeça ${NARRATOR_FACE_REFERENCE.width}×${NARRATOR_FACE_REFERENCE.height} · camadas alinhadas: ${aligned.length}`, x, y);
+    context.fillText("Caixas tracejadas = limites alfa-alvo; cruzes = pivôs efetivos do draw plan; pontos = landmarks de referência.", x, y + 21);
+    context.fillText("Os limites alfa de origem são medidos nos PNGs oficiais; nenhuma precisão fonética é inferida.", x, y + 42);
+  }
+
+  function render() {
+    context.fillStyle = "#061329"; context.fillRect(0, 0, canvas.width, canvas.height);
+    panel("ANTES · quadro real V1", "placa facial anterior", 24, 78, 330, 560);
+    panel("DEPOIS · renderizador real V1.4", "coordenadas locais + plano Canvas", 372, 78, 700, 700);
+    panel("REFERÊNCIA ESTÁTICA", "head.png · identidade facial original", 1090, 78, 386, 560);
+    drawCircleImage(source, 54, 160, 270);
+    const pose = settings();
+    const crop = adjustNarratorFaceCrop(NARRATOR_FACE_CROP, { offsetX: Number(offsetX.value), offsetY: Number(offsetY.value), zoom: Number(zoom.value) });
+    const selectedAvatar = avatarVariants.get(`${showNeck.checked ? 1 : 0}${showBeard.checked ? 1 : 0}`);
+    const bounds = selectedAvatar.renderTo(context, { x: 472, y: 148, size: 500, timeMs: pose.timeMs, speechAmplitude: pose.speechAmplitude, isPlaying: pose.speechAmplitude > 0, crop });
+    drawSafeOverlay(bounds, crop);
+    const plan = selectedAvatar.renderer.getLayerDrawPlan();
+    const headPlan = plan.find((entry) => entry.layer.id === "head");
+    if (headPlan) {
+      if (grid.checked) drawHeadGrid(headPlan, crop, bounds);
+      if (alpha.checked) drawAlphaTargets(headPlan, crop, bounds, selectedAvatar.pack);
+      if (landmarks.checked) drawLandmarks(headPlan, crop, bounds);
+      if (pivots.checked) drawPivots(plan, crop, bounds);
+      if (anatomyMap.checked) drawAnatomyMap(headPlan, crop, bounds);
+    }
+    if (reference.checked) drawReference(1108, 145, 350, 430);
+    drawLowerFaceCloseup(selectedAvatar, crop);
+    context.fillStyle = "#f7d27a"; context.font = "700 20px Segoe UI";
+    context.fillText(`${state.options[state.selectedIndex].text} · boca ${mouthStateAt(pose.speechAmplitude, pose.speechAmplitude > 0)}`, 398, 724);
+    context.fillStyle = "#d9e5f7"; context.font = "14px Segoe UI";
+    context.fillText(`t=${pose.timeMs} ms · RMS=${pose.speechAmplitude.toFixed(2)} · crop ${Math.round(crop.x)},${Math.round(crop.y)},${Math.round(crop.width)}`, 398, 750);
+    context.fillText("Aprovação artística humana continua obrigatória.", 398, 773);
+    drawDiagnostics(plan, 32, 850);
+    context.fillStyle = "#b7c5dc"; context.font = "13px Segoe UI";
+    context.fillText("V1.3 à esquerda é evidência histórica; V1.4 ao centro é a composição que será exportada.", 32, 930);
+    context.fillText("As caixas e pontos podem ser desligados para inspeção limpa. O mapa anatômico é diagnóstico e não altera o exportador.", 32, 954);
+    context.fillText("Pescoço estrutural: presente no draw plan, opacity 0 na composição corrigida. Gola visível: head-clean.png.", 32, 978);
+    status.textContent = `Renderizado pelo caminho compartilhado · ${visible.size}/${selectedAvatar.pack.layers.length} camadas visíveis · ${plan.length} entradas no draw plan · neck opacity ${selectedAvatar.pack.layers.find((layer) => layer.id === "neck")?.opacity ?? 1}`;
+  }
+
+  document.querySelector("#render").addEventListener("click", render);
+  document.querySelector("#reset").addEventListener("click", () => { offsetX.value = 0; offsetY.value = 0; zoom.value = 1; safe.checked = true; grid.checked = true; landmarks.checked = true; alpha.checked = true; pivots.checked = true; reference.checked = true; anatomyMap.checked = false; showNeck.checked = false; showBeard.checked = false; render(); });
+  for (const element of [state, amplitude, offsetX, offsetY, zoom, safe, grid, landmarks, alpha, pivots, reference, anatomyMap, showNeck, showBeard]) { element.addEventListener("input", render); element.addEventListener("change", render); }
+  render();
+</script>
+</body>
+</html>

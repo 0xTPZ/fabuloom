@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" role="img" aria-label="Olhos do personagem">
+  <path d="M52 105q54-62 125 0-67 48-125 0ZM423 105q54-62 125 0-67 48-125 0Z" fill="#fbfaf4" stroke="#4a2d32" stroke-width="11"/>
+  <ellipse cx="133" cy="105" rx="22" ry="28" fill="#315b76"/><ellipse cx="467" cy="105" rx="22" ry="28" fill="#315b76"/>
+  <circle cx="133" cy="105" r="10" fill="#161d2c"/><circle cx="467" cy="105" r="10" fill="#161d2c"/>
+  <circle cx="126" cy="96" r="4" fill="#fff"/><circle cx="460" cy="96" r="4" fill="#fff"/>
+</svg>

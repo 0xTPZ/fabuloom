@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="./assets/favicon.svg" />
+    <title>Fabuloom Visual Inspector V1.2 · Imagens reais</title>
+    <style>
+      :root { color-scheme: dark; font-family: Segoe UI, sans-serif; --bg:#07142a; --panel:#0d2342; --line:#d6a84d66; --gold:#f7d27a; --ink:#d7e4f8; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: radial-gradient(circle at 80% 8%, #183b6a 0, var(--bg) 42%); color: var(--ink); }
+      header { padding: 22px clamp(18px, 4vw, 54px) 12px; border-bottom: 1px solid var(--line); }
+      h1 { margin: 0 0 6px; color: var(--gold); font-size: 1.45rem; }
+      p { margin: 5px 0; }
+      .layout { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 440px); gap: 18px; max-width: 1280px; margin: 18px auto; padding: 0 18px; }
+      .panel { background: rgba(13,35,66,.92); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: 0 16px 45px #0004; }
+      .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:14px; }
+      label { display:grid; gap:4px; color:var(--ink); font-size:.86rem; }
+      input[type=file], button { border:1px solid #d6a84d88; border-radius:7px; background:#08172e; color:#f7e2a0; padding:8px 10px; }
+      button { cursor:pointer; font-weight:650; }
+      button:hover, button:focus-visible { border-color:var(--gold); outline:2px solid #f7d27a55; }
+      .canvas-wrap { background:#050913; border-radius:9px; overflow:auto; max-height:78vh; }
+      canvas { display:block; width:min(100%,680px); height:auto; margin:0 auto; }
+      .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0; }
+      .stat { background:#08172e; border-radius:7px; padding:9px; }
+      .stat strong { display:block; color:var(--gold); font-size:1.2rem; }
+      .issue { border-left:4px solid #b98cff; background:#08172e; padding:8px 9px; border-radius:5px; margin:8px 0; }
+      .issue small { display:block; color:#a9bdd8; margin-top:3px; overflow-wrap:anywhere; }
+      .muted { color:#a9bdd8; font-size:.84rem; }
+      code { color:#f7d27a; }
+      @media (max-width:900px) { .layout { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Visual Inspector V1.2 · imagens reais</h1>
+      <p>Analisa PNGs históricos sem exigir personagem ativo no Character Stage. Nenhum rótulo de defeito é enviado ao analisador.</p>
+    </header>
+    <main class="layout">
+      <section class="panel">
+        <div class="controls">
+          <label>Imagem analisada<input id="image" type="file" accept="image/png" /></label>
+          <label>Referência opcional<input id="reference" type="file" accept="image/png" /></label>
+          <button id="analyze" type="button">Analisar pixels</button>
+        </div>
+        <div class="canvas-wrap"><canvas id="stage" width="680" height="1920"></canvas></div>
+        <p class="muted">As caixas indicam apenas regiões amplas de evidência. A segmentação de frames opacos é heurística e não substitui uma máscara alfa do rig.</p>
+      </section>
+      <aside class="panel">
+        <p id="state">Aguardando imagem.</p>
+        <p id="coverage" class="muted">Cobertura: ainda não executada.</p>
+        <div class="stat-grid"><div class="stat"><strong id="issues">—</strong>hipóteses</div><div class="stat"><strong id="components">—</strong>componentes</div><div class="stat"><strong id="confidence">—</strong>confiança</div></div>
+        <h2>Evidências</h2>
+        <div id="findings"><p class="muted">Nenhuma imagem analisada.</p></div>
+        <h2>IA multimodal</h2>
+        <p class="muted">Contrato disponível, provedor não configurado. Estado: <strong>não executada</strong>. Nenhuma imagem é enviada para serviço externo.</p>
+      </aside>
+    </main>
+    <script type="module">
+      import { analyzeRenderedPixels, diagnoseRenderedImage } from "./src/real-image-inspector.mjs";
+
+      const $ = (id) => document.querySelector(`#${id}`);
+      const canvas = $("stage");
+      const imageInput = $("image");
+      const referenceInput = $("reference");
+      let imageFile = null;
+      let referenceFile = null;
+
+      imageInput.addEventListener("change", () => { imageFile = imageInput.files?.[0] || null; });
+      referenceInput.addEventListener("change", () => { referenceFile = referenceInput.files?.[0] || null; });
+
+      async function loadPixels(file) {
+        if (!file) return null;
+        const bitmap = await createImageBitmap(file);
+        const scratch = document.createElement("canvas"); scratch.width = bitmap.width; scratch.height = bitmap.height;
+        const context = scratch.getContext("2d", { willReadFrequently: true }); context.drawImage(bitmap, 0, 0);
+        return { width: bitmap.width, height: bitmap.height, rgba: context.getImageData(0, 0, bitmap.width, bitmap.height).data, bitmap };
+      }
+
+      function drawEvidence(image, diagnosis) {
+        canvas.width = image.width; canvas.height = image.height;
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image.bitmap, 0, 0);
+        context.strokeStyle = "#ff4e40"; context.lineWidth = Math.max(3, Math.round(image.width / 220));
+        for (const finding of diagnosis.issues) {
+          const bounds = finding.region?.bounds || finding.region;
+          if (!bounds || !Number.isFinite(bounds.left)) continue;
+          context.strokeRect(bounds.left, bounds.top, bounds.width || bounds.right - bounds.left, bounds.height || bounds.bottom - bounds.top);
+        }
+      }
+
+      function renderDiagnosis(diagnosis) {
+        $("issues").textContent = diagnosis.issues.length;
+        $("components").textContent = diagnosis.metrics.foreground.componentCount;
+        $("confidence").textContent = diagnosis.metrics.foreground.confidence;
+        $("state").textContent = diagnosis.issues.length ? "Revisão humana necessária" : "Nenhuma hipótese nesta captura";
+        $("coverage").textContent = `Pixels, máscara de foreground, componentes, contornos e comparação: executados. Evidência: ${diagnosis.review.evidenceState}. IA multimodal: não executada.`;
+        $("findings").replaceChildren(...(diagnosis.issues.length ? diagnosis.issues : [{ code: "ok", message: "Nenhum problema visual sugerido pelos dados disponíveis." }]).map((finding) => { const element = document.createElement("div"); element.className = "issue"; element.innerHTML = `<strong>${finding.code}</strong><br>${finding.message || ""}<small>origem: ${finding.origin || "visual-pixels"} · confiança: ${finding.confidence || "—"}<br>${JSON.stringify(finding.evidence || {})}</small>`; return element; }));
+      }
+
+      $("analyze").addEventListener("click", async () => {
+        try {
+          const image = await loadPixels(imageFile); if (!image) throw new Error("Selecione uma imagem PNG.");
+          const reference = await loadPixels(referenceFile);
+          const currentMetrics = analyzeRenderedPixels(image, { region: { left: 80, top: Math.floor(image.height * .32), right: Math.min(image.width, Math.floor(image.width * .72)), bottom: Math.floor(image.height * .95) } });
+          const diagnosis = diagnoseRenderedImage(image, { reference, referenceMetrics: reference ? analyzeRenderedPixels(reference, { region: { left: 80, top: Math.floor(reference.height * .32), right: Math.min(reference.width, Math.floor(reference.width * .72)), bottom: Math.floor(reference.height * .95) } }) : null, options: { region: currentMetrics.analysisRegion, faceDifferenceThreshold: .22 } });
+          drawEvidence(image, diagnosis); renderDiagnosis(diagnosis);
+        } catch (error) { $("state").textContent = error.message; console.error(error); }
+      });
+    </script>
+  </body>
+</html>

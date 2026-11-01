@@ -1,0 +1,80 @@
+/**
+ * Fabuloom Layered Character Contract v0.1.
+ * Data-only representation: no TTS, Canvas, or private Animus dependencies.
+ * Coordinates and pivots use normalized [0,1] canvas space.
+ */
+export const CHARACTER_FORMAT = "fabuloom.character/0.1";
+export const ANIMATION_READY_PROFILE = "animation-ready/0.1";
+const idPattern = /^[a-z][a-z0-9_-]{1,63}$/;
+const safeAsset = /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)(?!.*:)(?!\/\/)[a-zA-Z0-9_./-]+\.(?:png|webp|svg)$/;
+const channels = new Set(["head_rotation","eye_open","mouth_open","breathing","left_arm","right_arm","hair_sway","brow_raise","expression","torso_rotation","torso_y","pelvis_x","pelvis_y","pelvis_rotation","left_arm_rotation","right_arm_rotation","left_forearm_rotation","right_forearm_rotation","left_hand_rotation","right_hand_rotation","left_thigh_rotation","right_thigh_rotation","left_shin_rotation","right_shin_rotation","left_foot_rotation","right_foot_rotation","left_foot_x","right_foot_x"]);
+const layerRoles = new Set(["torso","pelvis","neck","head","hair_back","hair_front","eyes","eyelids","brows","mouth","upper_arm","forearm","hand","upper_leg","lower_leg","foot","accessory","portrait","overlay"]);
+function valid(condition, message) { if (!condition) throw new TypeError(message); }
+function identifier(id, label) { valid(typeof id === "string" && idPattern.test(id), `Invalid ${label}`); }
+function unit(value, label) { valid(typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1, `Invalid ${label}: expected [0,1]`); }
+function point(value, label) { valid(Array.isArray(value) && value.length === 2, `Invalid ${label}`); value.forEach((n,i)=>unit(n,`${label}[${i}]`)); }
+function plainObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+/**
+ * Validate external character descriptors before loading any sprite resource.
+ * Reject unknown versions; never evaluate code or fetch remote URLs from a pack.
+ */
+export function validateCharacterPack(pack) {
+  valid(plainObject(pack), "Character pack must be an object");
+  valid(pack.format === CHARACTER_FORMAT, "Unsupported character pack format");
+  identifier(pack.id,"character id");
+  valid(typeof pack.name === "string" && pack.name.trim().length > 0, "Missing name");
+  if (pack.version !== undefined) valid(typeof pack.version === "string" && pack.version.length <= 32, "Invalid pack version");
+  if (pack.author !== undefined) valid(typeof pack.author === "string" && pack.author.length <= 160, "Invalid pack author");
+  if (pack.license !== undefined) valid(typeof pack.license === "string" && pack.license.length <= 160, "Invalid asset license");
+  if (pack.source !== undefined) valid(typeof pack.source === "string" && pack.source.length <= 500 && !/^https?:\/\//i.test(pack.source), "Invalid pack source");
+  if (pack.compatibility !== undefined) valid(plainObject(pack.compatibility), "Invalid compatibility metadata");
+  if (pack.voice !== undefined) {
+    valid(plainObject(pack.voice), "Invalid voice metadata");
+    if (pack.voice.id !== undefined) valid(typeof pack.voice.id === "string" && pack.voice.id.length <= 80, "Invalid suggested voice");
+  }
+  valid(Array.isArray(pack.layers) && pack.layers.length > 0 && pack.layers.length <= 128,"Invalid layer count");
+  valid(Array.isArray(pack.expressions), "Missing expressions");
+  valid(plainObject(pack.bindings), "Missing animation bindings");
+  if (pack.rig_profile !== undefined) valid(pack.rig_profile === ANIMATION_READY_PROFILE, "Unsupported rig profile");
+  const ids = new Set();
+  for (const layer of pack.layers) {
+    valid(plainObject(layer), "Invalid layer");
+    identifier(layer.id,"layer id");
+    valid(!ids.has(layer.id), "Duplicate layer id");
+    ids.add(layer.id);
+    valid(typeof layer.asset === "string" && safeAsset.test(layer.asset) && !layer.asset.includes("//"), "Unsafe sprite path");
+    if (layer.role !== undefined) valid(typeof layer.role === "string" && layerRoles.has(layer.role), "Invalid layer role");
+    if (layer.parent !== null) identifier(layer.parent,"layer parent");
+    point(layer.anchor,"layer anchor");
+    point(layer.position,"layer position");
+    if (layer.size !== undefined) point(layer.size,"layer size");
+    valid(Number.isInteger(layer.z) && layer.z >= -1000 && layer.z <= 1000,"Invalid z index");
+  }
+  for (const layer of pack.layers) {
+    valid(layer.parent === null || ids.has(layer.parent),"Unknown parent layer");
+    let current = layer;
+    const visited = new Set([current.id]);
+    while (current.parent !== null) {
+      valid(!visited.has(current.parent),"Layer hierarchy cycle");
+      visited.add(current.parent);
+      current = pack.layers.find(l=>l.id===current.parent);
+    }
+  }
+  const expressionIds = new Set();
+  for (const expression of pack.expressions) {
+    valid(plainObject(expression),"Invalid expression");
+    identifier(expression.id,"expression id");
+    valid(!expressionIds.has(expression.id),"Duplicate expression");
+    expressionIds.add(expression.id);
+    valid(plainObject(expression.overrides),"Invalid expression overrides");
+    for (const [layerId, asset] of Object.entries(expression.overrides)) {
+      valid(ids.has(layerId),"Unknown expression layer");
+      valid(typeof asset === "string" && safeAsset.test(asset) && !asset.includes("//"),"Unsafe expression sprite path");
+    }
+  }
+  for (const [channel, layerId] of Object.entries(pack.bindings)) {
+    valid(channels.has(channel), "Unsupported animation channel");
+    valid(typeof layerId === "string" && ids.has(layerId),"Unknown animation target");
+  }
+  return pack;
+}

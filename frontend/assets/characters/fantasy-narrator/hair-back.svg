@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1145" height="1374" viewBox="0 0 1145 1374">
+  <defs>
+    <linearGradient id="backHair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17121c" stop-opacity=".82"/>
+      <stop offset=".55" stop-color="#2b1d2c" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#121a39" stop-opacity=".78"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#backHair)" d="M190 260c-42 160-28 560 85 795 63 131 176 206 303 240-78-111-99-223-75-331 28-125 8-283-52-434-46-117-125-213-261-270Zm746 8c96 148 103 407 48 619-40 153-115 300-268 414 160-25 272-104 349-266 85-179 95-516 14-682-31-62-74-88-143-85Z"/>
+</svg>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Santa V5 · Arm comparison</title>
+    <style>
+      :root { color-scheme: dark; font: 14px/1.35 Segoe UI, sans-serif; }
+      body { margin: 0; background: #050d1d; color: #eef5ff; }
+      header { padding: 20px 26px; background: #07142a; border-bottom: 1px solid #d6a84d66; }
+      h1 { margin: 0 0 4px; color: #f7d27a; font-size: 24px; }
+      p { margin: 0; color: #b8c9df; }
+      main { max-width: 1540px; margin: 18px auto; padding: 0 18px 28px; }
+      .board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 14px; }
+      figure { margin: 0; padding: 9px; background: #0d2342; border: 1px solid #d6a84d55; border-radius: 9px; }
+      .crop { height: 720px; overflow: hidden; background: #081a33; border-radius: 6px; }
+      canvas { display: block; width: 100%; height: auto; }
+      figcaption { min-height: 3.2em; padding: 8px 2px 1px; color: #f7d27a; font-weight: 650; }
+      small { display: block; color: #b8c9df; font-weight: 400; }
+      @media (max-width: 900px) { .board { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Santa V5 · Arm anatomy comparison</h1><p>Mesmas poses, mesmo LayeredCharacterRenderer; a variante experimental usa bandas anatômicas isoladas e cuff independente.</p></header>
+    <main><section id="board" class="board"></section></main>
+    <script type="module">
+      import { LayeredCharacterRenderer } from "./src/layered-character.ts";
+      import { SantaV5Rig } from "./src/santa-v5-engine.ts";
+      import { SANTA_V5_PACK } from "./src/santa-v5-pack.mjs";
+      import { SANTA_V5_ANATOMY_EXPERIMENTAL_PACK } from "./src/santa-v5-anatomy-experimental-pack.mjs";
+
+      const samples = [
+        ["Rig rígido atual · repouso", SANTA_V5_PACK, "neutral", 0],
+        ["Assets reconstruídos · repouso", SANTA_V5_ANATOMY_EXPERIMENTAL_PACK, "neutral", 0],
+        ["Rig rígido atual · WAVE_HELLO", SANTA_V5_PACK, "wave", 1680],
+        ["Assets reconstruídos · WAVE_HELLO", SANTA_V5_ANATOMY_EXPERIMENTAL_PACK, "wave", 1680],
+      ];
+      async function render(label, pack, expression, timeMs) {
+        const figure = document.createElement("figure"); const crop = document.createElement("div"); crop.className = "crop";
+        const canvas = document.createElement("canvas"); canvas.width = 720; canvas.height = 1280; crop.append(canvas);
+        const caption = document.createElement("figcaption"); caption.innerHTML = `${label}<small>720×1280 · ${timeMs} ms</small>`; figure.append(crop, caption); document.querySelector("#board").append(figure);
+        const rig = new SantaV5Rig(); if (expression === "wave") rig.setAnimation("WAVE_HELLO", 0);
+        const renderer = new LayeredCharacterRenderer(canvas, rig, pack, { assetRoot: new URL("./", location.href).href, renderBackground: true });
+        await renderer.load(); renderer.setExpression(expression); renderer.renderFrame({ timeMs, speechAmplitude: 0.18, isPlaying: expression === "wave" });
+      }
+      for (const sample of samples) await render(...sample);
+      document.title = "completed";
+    </script>
+  </body>
+</html>

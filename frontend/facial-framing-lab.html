@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom · Facial Framing Calibration Lab</title>
+    <style>
+      :root{color-scheme:dark}body{margin:0;background:#061329;color:#ecf2fb;font:14px Segoe UI,sans-serif}main{display:flex;gap:18px;padding:18px;align-items:flex-start}aside{width:280px;padding:16px;background:#0e2342;border:1px solid #2d68b2;border-radius:12px}label{display:block;margin:12px 0 4px;color:#b9c9dc}input,select{width:100%}.value{float:right;color:#f7d27a}section{display:grid;grid-template-columns:repeat(4,220px);gap:12px}figure{margin:0}canvas{display:block;width:220px;height:220px;background:#07172e;border-radius:50%}figcaption{padding:6px 4px;color:#f7d27a}h1{font-size:20px;color:#f7d27a;margin:0 0 12px}.hint{color:#9fb5cf;line-height:1.4}
+    </style>
+  </head>
+  <body>
+    <main>
+      <aside>
+        <h1>Framing calibration · DEV</h1>
+        <label>Personagem</label><select id="character"><option value="dora">Dora</option><option value="alex">Alex</option><option value="santa">Santa V5</option></select>
+        <label>Escala da cabeça <span class="value" id="scaleValue"></span></label><input id="scale" type="range" min="0.55" max="0.80" step="0.0025" />
+        <label>Posição X <span class="value" id="xValue"></span></label><input id="x" type="range" min="0.40" max="0.60" step="0.0025" />
+        <label>Posição Y <span class="value" id="yValue"></span></label><input id="y" type="range" min="0.14" max="0.30" step="0.0025" />
+        <label>Escala da boca <span class="value" id="mouthScaleValue"></span></label><input id="mouthScale" type="range" min="0.80" max="1.10" step="0.0025" />
+        <label>Centro Y da boca <span class="value" id="mouthYValue"></span></label><input id="mouthY" type="range" min="0.42" max="0.60" step="0.0025" />
+        <p class="hint">Os controles alteram somente a cópia DEV do pack em memória. O valor final deve ser registrado no pack versionado; o mecanismo global e os assets oficiais não são modificados.</p>
+      </aside>
+      <section id="states"></section>
+    </main>
+    <script type="module">
+      import { NarratorAvatarRenderer, createOfficialNarratorAvatarPack } from "./src/narrator-mode.mjs";
+      const states = [["fechada",0,false],["leve",.2,true],["moderada",.5,true],["aberta",.86,true]];
+      const root = document.querySelector("#states");
+      const controls = Object.fromEntries(["character","scale","x","y","mouthScale","mouthY"].map((id) => [id, document.querySelector(`#${id}`)]));
+      const labels = Object.fromEntries([["scale","scaleValue"],["x","xValue"],["y","yValue"],["mouthScale","mouthScaleValue"],["mouthY","mouthYValue"]].map(([a,b]) => [a,document.querySelector(`#${b}`)]));
+      const canvases = states.map(([label]) => { const figure=document.createElement("figure"); const canvas=document.createElement("canvas"); canvas.width=330; canvas.height=330; const caption=document.createElement("figcaption"); caption.textContent=label; figure.append(canvas,caption); root.append(figure); return canvas; });
+      let avatar;
+      function clonePack() { return JSON.parse(JSON.stringify(createOfficialNarratorAvatarPack(controls.character.value))); }
+      function applyProfile(pack) {
+        const scale=Number(controls.scale.value), x=Number(controls.x.value), y=Number(controls.y.value), mouthScale=Number(controls.mouthScale.value), mouthY=Number(controls.mouthY.value);
+        const head=pack.layers.find((layer)=>layer.id==="head"); const mouth=pack.layers.find((layer)=>layer.id==="mouth");
+        head.size=[scale, scale*(1080/1920)]; head.position=[x,y]; mouth.size=[mouthScale,mouthScale]; mouth.position=[0.5,mouthY];
+        pack.framing={...pack.framing,base_size:[...head.size],base_position:[...head.position],mouth_position:[...mouth.position],mouth_scale:[...mouth.size]};
+        return pack;
+      }
+      async function draw() {
+        const pack=applyProfile(clonePack());
+        if (!avatar) avatar=new NarratorAvatarRenderer(canvases[0],{pack,characterId:controls.character.value,assetRoot:new URL("./",location.href).href}); else await avatar.setPack(pack);
+        for(let i=0;i<states.length;i+=1){const [label,amplitude,playing]=states[i];const ctx=canvases[i].getContext("2d");ctx.clearRect(0,0,330,330);avatar.renderTo(ctx,{x:10,y:10,size:310,timeMs:1700+i*260,speechAmplitude:amplitude,isPlaying:playing});ctx.save();ctx.strokeStyle="rgba(247,210,122,.45)";ctx.beginPath();ctx.moveTo(165,8);ctx.lineTo(165,322);ctx.moveTo(8,165);ctx.lineTo(322,165);ctx.stroke();ctx.restore();}
+        for(const [id,label] of Object.entries(labels)) label.textContent=Number(controls[id].value).toFixed(3);
+      }
+      function resetFromPack(){const p=createOfficialNarratorAvatarPack(controls.character.value);const h=p.layers.find((l)=>l.id==="head");const m=p.layers.find((l)=>l.id==="mouth");controls.scale.value=h.size[0];controls.x.value=h.position[0];controls.y.value=h.position[1];controls.mouthScale.value=m.size[0];controls.mouthY.value=m.position[1];draw();}
+      controls.character.addEventListener("change",resetFromPack); Object.values(controls).forEach((control)=>control.addEventListener("input",draw)); resetFromPack();
+    </script>
+  </body>
+</html>
