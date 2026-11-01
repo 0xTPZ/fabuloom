@@ -22,7 +22,7 @@ python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-The core has no mandatory third-party Python dependency. Kokoro is optional and requires separately reviewed model/provider licensing. Do not install it merely to open the Studio shell.
+The core has no mandatory third-party Python dependency. The command above is the supported editable install and works in a clean checkout because the repository declares its setuptools build backend. Kokoro remains optional for opening the shell, but is required for real Santa narration.
 
 ## Diagnose prerequisites
 
@@ -48,4 +48,4 @@ Open `http://127.0.0.1:8765/`. The server binds to loopback only and limits expo
 & .\.venv\Scripts\python.exe -m pip install -e ".[kokoro]"
 ```
 
-This does not download or provide model weights. Review [LICENSES.md](LICENSES.md) and the provider documentation before enabling it.
+This installs the provider and runtime dependencies in `.venv`; it does not bundle model weights. On first narration, Kokoro downloads the public `hexgrad/Kokoro-82M` model into the user's Hugging Face cache, or uses an existing public cache. Review [LICENSES.md](LICENSES.md) and [docs/KOKORO-INTEGRATION.md](docs/KOKORO-INTEGRATION.md) before enabling it. No global installation is performed.

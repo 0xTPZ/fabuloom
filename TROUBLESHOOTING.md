@@ -10,7 +10,7 @@ $env:PYTHONPATH = (Resolve-Path .\src).Path
 
 ## Preview says that no manifest is available
 
-The checkout has no private developer exports. The preview requires a compatible local measured manifest and referenced audio under the configured workspace. Do not copy files from `E:\Fabuloom\workspace\exports` into a clean installation.
+Select an existing project or generate narration from **Áudio** first. A clean checkout has no private developer exports and therefore starts with an empty preview. Do not copy files from `E:\Fabuloom\workspace\exports` into a clean installation.
 
 ## FFmpeg is missing
 
@@ -18,7 +18,7 @@ The Studio shell can be inspected without FFmpeg. Export examples cannot run unt
 
 ## Kokoro is unavailable
 
-Kokoro is optional. The core contracts and browser shell do not imply that model weights are present. Review provider/model licensing and install the optional extra only in a project-local environment.
+Kokoro is optional for opening the shell but required for real narration. Install the extra in the project-local environment with `python -m pip install -e ".[kokoro]"`. If the package is installed but generation still fails, check that the public `hexgrad/Kokoro-82M` model can be downloaded or is present in the Hugging Face cache, and that `pm_santa` is available. Never copy private models or generated audio into the repository.
 
 ## Port or path errors
 
