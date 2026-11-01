@@ -104,8 +104,8 @@ class StageHandler(BaseHTTPRequestHandler):
         if len(parts) != 2 or not parts[0] or parts[0] in {".", ".."}:
             self.send_error(400, "capture path must be /capture/<session>/<file>")
             return
-        if candidate.suffix.lower() not in {".png", ".json"}:
-            self.send_error(400, "capture accepts only PNG frames and JSON completion records")
+        if candidate.suffix.lower() not in {".png", ".jpg", ".jpeg", ".json"}:
+            self.send_error(400, "capture accepts only PNG/JPEG frames and JSON completion records")
             return
         raw_length = self.headers.get("Content-Length")
         try:
