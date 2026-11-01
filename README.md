@@ -248,3 +248,12 @@ missing; no CB-001 music is substituted. CB-003 has a 52-second H.264/AAC
 export with the required music, voice ducking and deterministic Canvas capture.
 Both remain proposed and pending human artistic review and music-rights
 confirmation. See `docs/CRONICAS-BREVES-031.md`.
+
+Mission 032 adds an isolated Santa expressive-direction laboratory. It audits
+the current Kokoro boundary, preserves `pm_santa`/`pt-BR`, and produces three
+comparison profiles—neutral, curious and suspense—for the two CB-002 questions.
+Only supported speed, punctuation and segmentation controls are used; pitch,
+volume, SSML, emotion tags and word/phoneme/viseme timing remain unavailable.
+The six WAV samples and manifests stay outside Git under
+`workspace\exports\voice-lab\mission-032-santa-expressive-v1`; no approved
+episode is changed. See `docs/SANTA-EXPRESSIVE-032.md`.
