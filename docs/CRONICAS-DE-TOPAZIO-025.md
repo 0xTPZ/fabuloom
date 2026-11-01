@@ -95,3 +95,25 @@ exportação FFmpeg e reconstrução da prancha sem nova síntese.
 O resultado está marcado como concluído tecnicamente, pendente de avaliação
 humana da narrativa, continuidade visual, pronúncia, mixagem e adequação de
 direitos para publicação no YouTube.
+
+## MISSÃO 025.1 — trilha Suno e mix V2
+
+A versão aprovada visualmente foi preservada em seu arquivo original. A V2
+reutiliza exatamente os mesmos 2463 frames, a timeline, as legendas e a
+narração, trocando somente a camada sonora.
+
+- Música: `Topázio — O Despertar dos Cristais _ Tema do Despertar.mp3`.
+- Origem registrada: faixa original fornecida pelo proprietário e gerada com
+  Suno; os direitos comerciais para publicação ainda precisam ser confirmados.
+- Ducking: sidechain da voz sobre a música com ratio 8, ataque de 35 ms e
+  release de 700 ms. Os SFX recebem ducking moderado separado para não competir
+  com Santa.
+- Controle final: fades suaves, `alimiter` com limite 0,92 e sem alteração de
+  velocidade ou tom da música.
+- Preservação verificada: `framemd5` com `2463` frames em cada vídeo e `0`
+  diferenças entre original e V2.
+- Nova saída: `<workspace>/workspace/exports/cronicas-de-topazio-channel-intro/cronicas-de-topazio-channel-intro-v2.mp4`.
+- Trechos de revisão humana: `reviews/cronicas-de-topazio-channel-intro-v2-review-{inicio,meio,fim}.wav`.
+
+A inteligibilidade subjetiva deve ser confirmada ouvindo os três trechos e o
+vídeo completo antes de qualquer publicação. A mídia continua fora do Git.
