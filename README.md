@@ -10,10 +10,11 @@ Fabuloom Studio is a local-first prototype for turning narrated stories into aud
 - Scene/profile inspection and links to existing local exports.
 - Dependency-free Python core contracts and Node renderer tests.
 - Diagnostic tooling and preserved DEV laboratories.
+- Project-scoped asynchronous MP4 export with per-scene zoom/pan rendering and controlled music ducking.
 
 ## Important limits
 
-This is a preparation branch, not a release. It does not yet provide a complete new-project workflow. The “Novo projeto” action is intentionally disabled; the Studio organizes existing local productions and shows their status. New scene authoring, general media import, automatic script-to-scene segmentation, and one-click MP4 export are not promised by this branch.
+This is a preparation branch, not a release. The first project workflow and MP4 export are now implemented, but real Kokoro narration still requires the optional provider and model. New scene authoring is intentionally simple: sentence segmentation, local image association and a small camera vocabulary. Advanced editing, word/phoneme/viseme alignment and broad media support remain outside the Alpha claim.
 
 Santa V5 is the production reference. Dora and Alex remain explicitly gated as `AWAITING_ART_APPROVAL`; experimental narrator packs are not Alpha features.
 
