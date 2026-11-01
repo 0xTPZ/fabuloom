@@ -16,8 +16,12 @@ const python = path.join(repo, ".venv", "Scripts", "python.exe");
 const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 let server;
 const logs = [];
+const defaultHfHome = path.join(process.env.USERPROFILE || os.homedir(), ".cache", "huggingface");
+const hfHome = process.env.HF_HOME || (existsSync(path.join(defaultHfHome, "hub", "models--hexgrad--Kokoro-82M")) ? defaultHfHome : undefined);
+const serverEnv = { ...process.env, FABULOOM_WORKSPACE_ROOT: workspace };
+if (hfHome) serverEnv.HF_HOME = hfHome;
 function startServer() {
-  server = spawn(python, [path.join(repo, "frontend", "server.py"), "--port", String(port)], { cwd: repo, env: { ...process.env, FABULOOM_WORKSPACE_ROOT: workspace }, stdio: ["ignore", "pipe", "pipe"] });
+  server = spawn(python, [path.join(repo, "frontend", "server.py"), "--port", String(port)], { cwd: repo, env: serverEnv, stdio: ["ignore", "pipe", "pipe"] });
   server.stdout.on("data", (chunk) => logs.push({ stream: "stdout", text: String(chunk) }));
   server.stderr.on("data", (chunk) => logs.push({ stream: "stderr", text: String(chunk) }));
 }
@@ -104,8 +108,9 @@ try {
     await reopened.locator('[data-route="audio"]').first().click();
     await reopened.locator("#generate-narration-button").click();
     let audioStatus = "";
-    for (let attempt = 0; attempt < 180; attempt += 1) { audioStatus = await reopened.locator("#audio-voice-state").innerText(); if (/concluída|indisponível|bloqueada/i.test(audioStatus)) break; await new Promise((resolve) => setTimeout(resolve, 1000)); }
-    if (!/concluída/i.test(audioStatus)) {
+    let operationStatus = "";
+    for (let attempt = 0; attempt < 300; attempt += 1) { operationStatus = await reopened.locator("#save-label").innerText(); audioStatus = await reopened.locator("#audio-voice-state").innerText(); if (/Narração Santa V5 concluída|Narração bloqueada/i.test(operationStatus)) break; await new Promise((resolve) => setTimeout(resolve, 1000)); }
+    if (!/Narração Santa V5 concluída/i.test(operationStatus)) {
       result.flows.push({ name: "Real narration through Studio button", status: "BLOCKED", note: audioStatus || "Kokoro did not complete" });
       result.classification = "BLOCKED";
     } else {

@@ -310,7 +310,7 @@ async function uploadAsset(file, kind, sceneId = "") {
 
 async function generateNarration() {
   if (!currentProject) return setStatus("Crie um projeto antes de gerar áudio");
-  try { setStatus("Kokoro está gerando a narração…"); currentProject = (await api(projectApiPath("/narration"), { method: "POST", body: JSON.stringify({ text: $("#script-text").value, voice_id: "pm_santa" }) })).project; voiceVerified = true; renderProjectState(); await loadProjectNarration(); setStatus("Narração Santa V5 concluída"); } catch (error) { setStatus(`Narração bloqueada: ${error.message}`); $("#audio-voice-state").textContent = "pm_santa · indisponível"; }
+  try { setStatus("Kokoro está gerando a narração…"); currentProject = (await api(projectApiPath("/narration"), { method: "POST", body: JSON.stringify({ text: $("#script-text").value, voice_id: "pm_santa" }) })).project; voiceVerified = true; renderProjectState(); await loadProjectNarration(); setStatus("Narração Santa V5 concluída"); } catch (error) { setStatus(`Narração bloqueada: ${error.message}`); $("#audio-voice-state").textContent = `pm_santa · indisponível (${error.message})`; }
 }
 
 async function loadProjectNarration() {
