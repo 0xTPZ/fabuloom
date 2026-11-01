@@ -135,7 +135,8 @@ def _environment_health() -> dict:
     ffmpeg_path = shutil.which("ffmpeg")
     ffprobe_path = shutil.which("ffprobe")
     kokoro_package = importlib.util.find_spec("kokoro") is not None
-    model_cache = Path.home() / ".cache" / "huggingface" / "hub" / "models--hexgrad--Kokoro-82M"
+    hf_home = Path(os.environ.get("HF_HOME", str(Path.home() / ".cache" / "huggingface"))).expanduser()
+    model_cache = hf_home / "hub" / "models--hexgrad--Kokoro-82M"
     model_ready = model_cache.exists()
     writable = os.access(WORKSPACE_ROOT, os.W_OK)
     return {

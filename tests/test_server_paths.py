@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -54,6 +55,17 @@ class ServerPathTests(unittest.TestCase):
             self.assertIn(key, health)
         self.assertIn(health["python_state"], {"PRONTO", "ERRO"})
         self.assertIn(health["voice"], {"PRONTO", "CONFIGURAÇÃO NECESSÁRIA", "ERRO", "VERIFICAÇÃO NECESSÁRIA"})
+
+    def test_environment_health_respects_isolated_huggingface_home(self):
+        previous = os.environ.get("HF_HOME")
+        try:
+            os.environ["HF_HOME"] = str(Path(__file__).parent / "fixtures" / "empty-huggingface-cache")
+            self.assertFalse(SERVER._environment_health()["model"])
+        finally:
+            if previous is None:
+                os.environ.pop("HF_HOME", None)
+            else:
+                os.environ["HF_HOME"] = previous
 
 
 if __name__ == "__main__":
