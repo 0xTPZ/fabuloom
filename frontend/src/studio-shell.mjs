@@ -9,6 +9,9 @@ import { manifestVoiceId, narrationForCharacter, narrationForUrl, TOPAZIO_NARRAT
 import { validateManifest } from "./timeline.ts";
 import { resolveCinematicTransform } from "./cinematic-composition.mjs";
 import { reconcileSceneDrafts } from "./scene-reconciliation.mjs";
+import { LayeredCharacterRenderer, LayeredCharacterRig } from "./layered-character.ts";
+import { COMMUNITY_DEMO_PACK } from "./community-demo-pack.mjs";
+import { loadLocalPackFiles } from "./character-pack-loader.mjs";
 import {
   DEV_LINKS,
   OFFICIAL_NARRATORS,
@@ -39,6 +42,9 @@ let selectedSceneId = null;
 let exportInProgress = false;
 let previewMode = "cinematic";
 let voiceVerified = false;
+let selectedCharacterPack = null;
+let characterRenderer = null;
+let characterRig = null;
 const cinematicImages = new Map();
 
 async function api(path, options = {}) {
@@ -124,7 +130,108 @@ function renderProjectState() {
   $("#script-count").textContent = `${($("#script-text").value || "").length} caracteres`;
   $("#script-save-state").textContent = currentProject ? "Projeto carregado" : "Crie um projeto primeiro";
   renderProjectScenes(); renderProjectExports();
+  selectedCharacterPack = currentProject?.character_pack || null;
+  renderCharacterLibrary();
+  if (selectedCharacterPack && !characterRenderer) void restoreCharacterPackFromProject(selectedCharacterPack);
   renderCinematicFrame(player?.positionMs || 0);
+}
+
+function packLibraryRoot() {
+  let panel = $("#studio-character-library");
+  if (panel) return panel;
+  const route = document.querySelector('[data-view="narrators"]');
+  if (!route) return null;
+  panel = document.createElement("article"); panel.id = "studio-character-library"; panel.className = "surface-card";
+  panel.innerHTML = '<div class="card-heading"><div><span class="eyebrow">CHARACTER LIBRARY</span><h3>Personagens do projeto</h3></div><span class="soft-label">packs locais</span></div><div id="studio-character-cards"></div><label for="studio-character-expression">Expressão</label><select id="studio-character-expression"><option value="neutral">Neutra</option><option value="smile">Encantado</option></select><div class="hero-card-actions"><input id="studio-character-pack-input" type="file" webkitdirectory directory multiple hidden><button id="studio-import-character-pack" class="gold-button" type="button">Importar pack local</button></div><p id="studio-character-library-status" class="card-footnote">A voz do projeto permanece independente do personagem visual.</p>';
+  route.appendChild(panel);
+  return panel;
+}
+
+function renderCharacterLibrary() {
+  const panel = packLibraryRoot(); if (!panel) return;
+  const cards = $("#studio-character-cards"); if (!cards) return;
+  cards.replaceChildren();
+  const refs = [
+    { id: "community-demo-geometric-v1", name: COMMUNITY_DEMO_PACK.name, author: COMMUNITY_DEMO_PACK.author, version: COMMUNITY_DEMO_PACK.version, license: COMMUNITY_DEMO_PACK.license, expression: "neutral" },
+    { id: "topazio-narrator-santa-v5", name: "Santa V5", author: "Referência existente", version: "V5", license: "separada do código MIT", expression: "neutral" },
+  ];
+  for (const item of refs) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "library-card";
+    button.innerHTML = "<strong></strong><small></small><em>Selecionar</em>";
+    button.querySelector("strong").textContent = item.name;
+    button.querySelector("small").textContent = `${item.author} · v${item.version} · ${item.license}`;
+    button.addEventListener("click", () => void selectStudioCharacterPack(item)); cards.appendChild(button);
+  }
+  const expression = $("#studio-character-expression"); if (expression) { expression.value = selectedCharacterPack?.expression || "neutral"; expression.onchange = () => void saveCharacterExpression(expression.value); }
+  if (panel.dataset.bound !== "true") {
+    panel.dataset.bound = "true";
+    $("#studio-import-character-pack").addEventListener("click", () => $("#studio-character-pack-input").click());
+    $("#studio-character-pack-input").addEventListener("change", (event) => void installStudioLocalPack(event.target.files));
+  }
+}
+
+async function saveCharacterExpression(expression) {
+  if (!currentProject?.character_pack) return;
+  try {
+    const reference = { ...currentProject.character_pack, expression };
+    currentProject = await api(projectApiPath("/character-pack"), { method: "POST", body: JSON.stringify({ character_pack: reference }) });
+    selectedCharacterPack = reference; if (characterRenderer) characterRenderer.setExpression(expression); $("#studio-character-library-status").textContent = `Expressão ${expression} salva no projeto.`;
+  } catch (error) { $("#studio-character-library-status").textContent = `Expressão não salva: ${error.message}`; }
+}
+
+async function installCommunityPack() {
+  const existing = await fetch("/api/packs/community-demo-geometric-v1/1.0.0", { cache: "no-store" });
+  if (existing.ok) return { id: "community-demo-geometric-v1", version: "1.0.0", ref: "community-demo-geometric-v1@1.0.0", license: "MIT", author: COMMUNITY_DEMO_PACK.author };
+  const manifest = await fetch("/assets/characters/community-demo-v1/manifest.json").then((response) => response.json());
+  const pack = manifest.pack || manifest; const files = [];
+  const paths = new Set(pack.layers.map((layer) => layer.asset));
+  for (const expression of pack.expressions || []) for (const asset of Object.values(expression.overrides || {})) paths.add(asset);
+  for (const relative of paths) {
+    const response = await fetch(`/assets/characters/community-demo-v1/${relative}`); const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte);
+    files.push({ path: relative, mime: relative.endsWith(".svg") ? "image/svg+xml" : "image/png", data: btoa(binary) });
+  }
+  return api("/api/packs/install", { method: "POST", body: JSON.stringify({ manifest, files }) });
+}
+
+async function persistStudioCharacterPack(pack, expression = "neutral") {
+  if (!currentProject) throw new Error("Crie ou abra um projeto antes de selecionar um personagem");
+  const installed = await installCommunityPack();
+  const reference = { id: installed.id, version: installed.version, contract: pack.format || "fabuloom.character/0.1", character_id: pack.id, expression, asset_ref: installed.ref, license: pack.license, author: pack.author };
+  currentProject = await api(projectApiPath("/character-pack"), { method: "POST", body: JSON.stringify({ character_pack: reference }) });
+  selectedCharacterPack = reference; return reference;
+}
+
+async function selectStudioCharacterPack(item) {
+  try {
+    const reference = await persistStudioCharacterPack(item, item.expression || "neutral");
+    characterRig = new LayeredCharacterRig(); characterRenderer = new LayeredCharacterRenderer(previewCanvas, characterRig, COMMUNITY_DEMO_PACK, { assetRoot: new URL("./assets/characters/community-demo-v1/", document.baseURI).href });
+    await characterRenderer.load(); characterRenderer.setExpression(reference.expression); previewMode = "character"; renderCharacterLibrary();
+    $("#studio-character-library-status").textContent = `${item.name} selecionado e salvo no projeto · expressão ${reference.expression}. Voz não alterada.`;
+  } catch (error) { $("#studio-character-library-status").textContent = `Personagem indisponível: ${error.message}`; }
+}
+
+async function restoreCharacterPackFromProject(reference) {
+  try {
+    const response = await fetch(`/api/packs/${encodeURIComponent(reference.id)}/${encodeURIComponent(reference.version)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("pack instalado não encontrado; reinstale este personagem");
+    const manifest = await response.json(); const pack = manifest.pack || manifest;
+    characterRig = new LayeredCharacterRig();
+    characterRenderer = new LayeredCharacterRenderer(previewCanvas, characterRig, pack, { assetUrlResolver: (asset) => `/api/packs/${encodeURIComponent(reference.id)}/${encodeURIComponent(reference.version)}/asset/${asset}` });
+    await characterRenderer.load(); characterRenderer.setExpression(reference.expression || "neutral"); previewMode = "character";
+    const status = $("#studio-character-library-status"); if (status) status.textContent = `${pack.name} restaurado do projeto · expressão ${reference.expression || "neutral"}.`;
+  } catch (error) { const status = $("#studio-character-library-status"); if (status) status.textContent = `Personagem salvo indisponível: ${error.message}`; }
+}
+
+async function installStudioLocalPack(files) {
+  try {
+    const loaded = await loadLocalPackFiles(files); const pack = loaded.pack;
+    const manifestFile = [...files].find((file) => file.name === "manifest.json" || file.webkitRelativePath?.endsWith("/manifest.json"));
+    const payload = await Promise.all([...files].filter((file) => file.name !== "manifest.json").map(async (file) => ({ path: file.name, mime: file.type, data: btoa(String.fromCharCode(...new Uint8Array(await file.arrayBuffer()))) })));
+    const installed = await api("/api/packs/install", { method: "POST", body: JSON.stringify({ manifest: JSON.parse(await manifestFile.text()), files: payload }) });
+    const reference = await api(projectApiPath("/character-pack"), { method: "POST", body: JSON.stringify({ character_pack: { id: installed.id, version: installed.version, contract: pack.format, character_id: pack.id, expression: "neutral", asset_ref: installed.ref, license: pack.license, author: pack.author } }) });
+    currentProject = reference; selectedCharacterPack = reference.character_pack; renderProjectState(); $("#studio-character-library-status").textContent = `${pack.name} instalado e salvo no projeto.`;
+  } catch (error) { $("#studio-character-library-status").textContent = `Importação bloqueada: ${error.message}`; }
 }
 
 function projectSceneAt(timeMs) {
@@ -570,6 +677,7 @@ function startRenderer() {
 function animationFrame(timeMs) {
   player?.tick();
   if (previewMode === "cinematic") renderCinematicFrame(player?.positionMs || timeMs);
+  else if (previewMode === "character" && characterRenderer) characterRenderer.renderFrame({ timeMs: player?.positionMs || timeMs, speechAmplitude: player?.amplitude() || 0, isPlaying: player?.state === "playing" });
   else if (sceneRenderer) sceneRenderer.renderFrame({ timeMs: player?.positionMs || timeMs, isPlaying: player?.state === "playing" });
   updatePlaybackUi();
   requestAnimationFrame(animationFrame);

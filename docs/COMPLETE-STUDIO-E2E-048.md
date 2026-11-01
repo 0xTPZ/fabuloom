@@ -22,8 +22,8 @@ PASS AUTOMÁTICO in the real `studio.html` surface:
 
 PARTIAL / NOT TESTED:
 
-- Ponto library association in `studio.html`: the production Studio has no character-pack selector. Ponto import/managed-pack recovery remains covered on the Character Stage surface by Mission 047, but the two surfaces are not yet joined.
-- Project-level pack and expression restoration in the production Studio: not available through current UI.
+- Ponto library association in `studio.html`: now covered by Mission 049's unified library flow; this document remains the baseline for the pre-integration run.
+- Project-level pack and expression restoration: covered by Mission 049's expanded harness.
 - MP4 export, FFprobe, and complete FFmpeg decode in this run: not tested because the production flow requires narration/audio and the harness deliberately avoids substituting direct API calls.
 - Native Windows file dialog: not tested. Playwright `setInputFiles()` validates the HTML control, not the native dialog.
 - Canvas × FFmpeg capture and metrics: not tested in this run; no parity PASS is claimed.

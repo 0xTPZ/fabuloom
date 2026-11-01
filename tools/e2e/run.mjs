@@ -35,6 +35,7 @@ try {
   await page.locator("#new-project-title").fill("E2E-Ponto");
   await page.locator("#new-project-description").fill("Projeto descartável de teste automatizado.");
   await page.locator("#project-dialog-submit").click();
+  await page.locator("#script-title").waitFor({ state: "visible", timeout: 10000 });
   await page.locator("#script-title").fill("E2E-Ponto");
   await page.locator("#script-text").fill("Ponto atravessa a ponte e encontra uma luz.");
   await page.locator("#save-project-button").click();
@@ -44,9 +45,16 @@ try {
   await page.locator('#scene-list img').first().waitFor({ timeout: 5000 });
   await page.locator("#scene-editor-camera").selectOption("zoom");
   await page.locator("#scene-save-button").click();
+  await page.locator('[data-route="narrators"]').first().click();
+  await page.getByRole("button", { name: /Ponto, demonstrador geométrico/ }).click();
+  await page.getByText(/Ponto, demonstrador geométrico selecionado e salvo/).waitFor({ timeout: 10000 });
+  await page.locator("#studio-character-expression").selectOption("smile");
+  let expressionStatus = "";
+  for (let attempt = 0; attempt < 50; attempt += 1) { expressionStatus = await page.locator("#studio-character-library-status").innerText(); if (/Expressão smile salva|não salva/.test(expressionStatus)) break; await new Promise((resolve) => setTimeout(resolve, 100)); }
+  if (!/Expressão smile salva/.test(expressionStatus)) throw new Error(`expression persistence failed: ${expressionStatus}`);
   await page.screenshot({ path: path.join(evidence, "studio-project-saved.png"), fullPage: true });
   result.flows.push({ name: "Studio create/script/scene/image/movement/save", status: "PASS" });
-  result.flows.push({ name: "Ponto library in production Studio", status: "PARTIAL", note: "Character pack library exists on Character Stage, but studio.html has no pack selector." });
+  result.flows.push({ name: "Ponto select/expression/project association", status: "PASS" });
   await context.close();
   await browser.close(); browser = null;
   server.kill();
@@ -66,11 +74,18 @@ try {
   const restoredImage = await reopened.locator('#scene-list img').count();
   const restoredProject = restoredText.includes("Ponto atravessa") && restoredImage > 0;
   result.flows.push({ name: "Project survives new browser context", status: restoredProject ? "PASS" : "FAIL" });
-  const installed = await reopened.request.get(`http://127.0.0.1:${port}/api/packs/community-demo-geometric-v1/1.0.0`);
-  result.flows.push({ name: "Managed pack recovery endpoint", status: installed.ok() ? "PASS" : "NOT TESTED", note: "This complete Studio flow did not install a character pack; Mission 047 covers that separate Character Stage flow." });
+  await reopened.locator('[data-route="narrators"]').first().click();
+  let restoredExpression = ""; let restoredPack = "";
+  for (let attempt = 0; attempt < 50; attempt += 1) { restoredExpression = await reopened.locator("#studio-character-expression").inputValue(); restoredPack = await reopened.locator("#studio-character-library-status").innerText(); if (/restaurado do projeto|indisponível/.test(restoredPack)) break; await new Promise((resolve) => setTimeout(resolve, 100)); }
+  const packRestored = restoredExpression === "smile" && /restaurado do projeto/.test(restoredPack);
+  result.flows.push({ name: "Ponto/pack/expression restored in Studio", status: packRestored ? "PASS" : "FAIL" });
+  const project = await reopened.request.get(`http://127.0.0.1:${port}/api/projects`);
+  const projectData = (await project.json()).projects.find((item) => item.title === "E2E-Ponto");
+  result.debug = { restoredExpression, restoredPack, projectData };
+  result.flows.push({ name: "Backend project_pack reference", status: projectData?.character_pack?.expression === "smile" ? "PASS" : "FAIL" });
   await reopened.screenshot({ path: path.join(evidence, "reopened.png"), fullPage: true });
   result.classification = restoredProject ? "PARTIAL" : "FAIL";
-  result.notes = "The real Studio project flow is automated. Ponto library/association remains PARTIAL because studio.html does not expose the character-pack selector; native Windows dialog is not exercised by Playwright.";
+  result.notes = "The real Studio project and Ponto character-pack flow are automated. Native Windows dialog, MP4/FFprobe, and Canvas×FFmpeg remain outside this run.";
   await fresh.close();
 } catch (error) { result.error = String(error.stack || error); }
 finally { if (browser) await browser.close().catch(() => {}); server.kill(); await writeFile(path.join(evidence, "result.json"), JSON.stringify(result, null, 2)); await writeFile(path.join(evidence, "report.html"), `<!doctype html><meta charset="utf-8"><title>Fabuloom E2E 047</title><h1>Fabuloom E2E 047</h1><p>Classification: <strong>${result.classification}</strong></p><ul>${result.flows.map((flow) => `<li>${flow.name}: ${flow.status}</li>`).join("")}</ul><p>Evidence: ${result.evidence}</p>`); }
