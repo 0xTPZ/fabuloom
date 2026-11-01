@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+import base64
+import json
 
 
 SERVER_PATH = Path(__file__).resolve().parents[1] / "frontend" / "server.py"
@@ -13,6 +15,38 @@ SPEC.loader.exec_module(SERVER)
 
 
 class ServerPathTests(unittest.TestCase):
+    def test_character_pack_installation_is_contained_and_rejects_active_svg(self):
+        with TemporaryDirectory() as directory:
+            previous = SERVER.PACKS_ROOT
+            SERVER.PACKS_ROOT = Path(directory) / "packs"
+            try:
+                svg = base64.b64encode(b'<svg><script>alert(1)</script></svg>').decode()
+                manifest = {"id": "demo", "version": "1.0", "pack": {"id": "demo", "layers": [{"asset": "face.svg"}]}}
+                with self.assertRaises(ValueError):
+                    SERVER._install_character_pack({"manifest": manifest, "files": [{"path": "face.svg", "mime": "image/svg+xml", "data": svg}]})
+                safe = base64.b64encode(b'<svg viewBox="0 0 1 1"></svg>').decode()
+                manifest["pack"]["license"] = "MIT"
+                result = SERVER._install_character_pack({"manifest": manifest, "files": [{"path": "face.svg", "mime": "image/svg+xml", "data": safe}]})
+                self.assertEqual(result["ref"], "demo@1.0")
+                self.assertTrue((SERVER.PACKS_ROOT / "demo" / "1.0" / "face.svg").is_file())
+                with self.assertRaises(ValueError):
+                    SERVER._install_character_pack({"manifest": {"id": "demo2", "version": "1.0", "pack": {"id": "demo2"}}, "files": [{"path": "../escape.svg", "mime": "image/svg+xml", "data": safe}]})
+            finally:
+                SERVER.PACKS_ROOT = previous
+
+    def test_project_character_pack_reference_survives_save_and_reload(self):
+        with TemporaryDirectory() as directory:
+            previous = SERVER.PROJECTS_ROOT
+            SERVER.PROJECTS_ROOT = Path(directory) / "projects"
+            try:
+                project = {"id": "project-demo", "title": "Demo", "scenes": [], "character_pack": {"id": "community-demo-geometric-v1", "version": "1.0.0", "contract": "fabuloom.character/0.1", "character_id": "community-demo-geometric-v1", "expression": "smile", "asset_ref": "community-demo-geometric-v1@1.0.0"}}
+                SERVER._save_project(project)
+                restored = SERVER._load_project("project-demo")
+                self.assertEqual(restored["character_pack"]["expression"], "smile")
+                self.assertNotIn("C:", json.dumps(restored))
+            finally:
+                SERVER.PROJECTS_ROOT = previous
+
     def test_scene_validation_accepts_supported_camera_and_rejects_unknown(self):
         SERVER._validate_scenes([{"id": "scene-001", "duration_ms": 1000, "camera": "zoom", "transition": "cut", "image": "assets/a.png"}])
         with self.assertRaises(ValueError):

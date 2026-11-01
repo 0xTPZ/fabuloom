@@ -51,11 +51,13 @@ CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
 PROJECTS_ROOT = WORKSPACE_ROOT / "workspace" / "projects"
+PACKS_ROOT = WORKSPACE_ROOT / "workspace" / "packs"
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.Lock()
 MAX_EXPORT_JOBS = 1
 MAX_JSON_BYTES = 8 * 1024 * 1024
 MAX_ASSET_BYTES = 25 * 1024 * 1024
+MAX_PACK_FILES = 128
 ALLOWED_IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 ALLOWED_AUDIO_TYPES = {"audio/wav": ".wav", "audio/x-wav": ".wav", "audio/mpeg": ".mp3", "audio/ogg": ".ogg"}
 ALLOWED_CAMERAS = {"static", "zoom", "pan-horizontal", "pan-vertical"}
@@ -138,7 +140,71 @@ def _build_timeline_audio(project_dir: Path, wav_files: list[Path], manifest: di
 
 
 def _project_summary(data: dict) -> dict:
-    return {key: data.get(key) for key in ("id", "title", "description", "format", "created_at", "updated_at", "scenes", "narrator", "audio", "exports")}
+    return {key: data.get(key) for key in ("id", "title", "description", "format", "created_at", "updated_at", "scenes", "narrator", "character_pack", "audio", "exports")}
+
+
+def _safe_pack_id(value: object) -> str:
+    result = str(value or "")
+    if not result or not result.replace("-", "").replace("_", "").isalnum() or result[0] == ".":
+        raise ValueError("invalid character pack id")
+    return result
+
+
+def _safe_pack_path(value: object) -> Path:
+    raw = str(value or "").replace("\\", "/")
+    path = Path(raw)
+    if not raw or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts) or path.suffix.lower() not in {".svg", ".png", ".webp"}:
+        raise ValueError("unsafe character pack asset path")
+    return path
+
+
+def _install_character_pack(body: dict) -> dict:
+    manifest = body.get("manifest")
+    files = body.get("files")
+    if not isinstance(manifest, dict) or not isinstance(files, list) or len(files) > MAX_PACK_FILES:
+        raise ValueError("invalid character pack installation payload")
+    pack = manifest.get("pack") if isinstance(manifest.get("pack"), dict) else manifest
+    pack_id = _safe_pack_id(manifest.get("id") or pack.get("id"))
+    version = str(manifest.get("version") or pack.get("version") or "0.1.0")
+    if len(version) > 32 or "/" in version or "\\" in version or version in {".", ".."}:
+        raise ValueError("invalid character pack version")
+    allowed = {}
+    declared = set()
+    for layer in pack.get("layers", []) if isinstance(pack.get("layers"), list) else []:
+        if isinstance(layer, dict) and layer.get("asset"): declared.add(str(layer["asset"]))
+    for expression in pack.get("expressions", []) if isinstance(pack.get("expressions"), list) else []:
+        for asset in (expression.get("overrides", {}) if isinstance(expression, dict) else {}).values():
+            declared.add(str(asset))
+    total = 0
+    for item in files:
+        if not isinstance(item, dict): raise ValueError("invalid pack file")
+        path = _safe_pack_path(item.get("path"))
+        if path.as_posix() not in declared:
+            raise ValueError("pack contains an undeclared asset")
+        if path.as_posix() in allowed: raise ValueError("duplicate pack asset")
+        if str(item.get("mime") or "") not in {"image/svg+xml", "image/png", "image/webp"}:
+            raise ValueError("unsupported pack asset type")
+        raw = base64.b64decode(str(item.get("data") or ""), validate=True)
+        if not raw or len(raw) > MAX_ASSET_BYTES: raise ValueError("pack asset is empty or too large")
+        if path.suffix.lower() == ".svg":
+            text = raw.decode("utf-8", errors="strict")
+            if any(token in text.lower() for token in ("<script", "onload=", "onerror=", "javascript:", "<foreignobject")):
+                raise ValueError("active SVG content is not allowed")
+        total += len(raw)
+        allowed[path.as_posix()] = raw
+    if total > MAX_ASSET_BYTES: raise ValueError("character pack exceeds the 25 MB limit")
+    target = (PACKS_ROOT / pack_id / version).resolve()
+    target.relative_to(PACKS_ROOT.resolve())
+    if target.exists(): raise ValueError("character pack version is already installed")
+    target.mkdir(parents=True, exist_ok=False)
+    try:
+        (target / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        for relative, raw in allowed.items():
+            output = (target / relative).resolve(); output.parent.mkdir(parents=True, exist_ok=True); output.write_bytes(raw)
+    except Exception:
+        shutil.rmtree(target, ignore_errors=True)
+        raise
+    return {"id": pack_id, "version": version, "ref": f"{pack_id}@{version}", "license": pack.get("license"), "author": pack.get("author")}
 
 
 def _validate_scenes(scenes: object) -> None:
@@ -248,6 +314,19 @@ class StageHandler(BaseHTTPRequestHandler):
                     continue
             self._send_json({"projects": projects})
             return
+        if path.startswith("/api/packs/"):
+            parts = path.removeprefix("/api/packs/").strip("/").split("/")
+            try:
+                pack_id, version = _safe_pack_id(parts[0]), parts[1]
+                root = (PACKS_ROOT / pack_id / version).resolve(); root.relative_to(PACKS_ROOT.resolve())
+                if len(parts) == 2 and parts[1] and (root / "manifest.json").is_file():
+                    self._send_json(json.loads((root / "manifest.json").read_text(encoding="utf-8"))); return
+                if len(parts) >= 4 and parts[2] == "asset":
+                    candidate = (root / Path("/".join(parts[3:]))).resolve(); candidate.relative_to(root)
+                    if not candidate.is_file(): raise FileNotFoundError
+                    payload = candidate.read_bytes(); self.send_response(200); self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"); self.send_header("Content-Length", str(len(payload))); self.end_headers(); self.wfile.write(payload); return
+            except (ValueError, IndexError, FileNotFoundError, json.JSONDecodeError):
+                self.send_error(404, "character pack not found"); return
         if path.startswith("/api/projects/"):
             project_id = path.removeprefix("/api/projects/").strip("/").split("/")
             if len(project_id) == 3 and project_id[1] == "export" and project_id[2] == "status":
@@ -335,6 +414,12 @@ class StageHandler(BaseHTTPRequestHandler):
             self.send_error(403, "capture accepts loopback requests only")
             return
         path = unquote(urlsplit(self.path).path)
+        if path == "/api/packs/install":
+            try:
+                self._send_json(_install_character_pack(_read_json_body(self, MAX_JSON_BYTES)), status=201)
+            except (ValueError, json.JSONDecodeError, base64.binascii.Error) as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
         if path == "/api/projects":
             try:
                 body = _read_json_body(self)
@@ -343,13 +428,27 @@ class StageHandler(BaseHTTPRequestHandler):
                     raise ValueError("project title is required and must be 120 characters or fewer")
                 project_id = f"project-{uuid.uuid4().hex[:12]}"
                 now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                project = {"id": project_id, "title": title, "description": str(body.get("description") or "").strip(), "format": body.get("format") or "horizontal-1080p", "created_at": now, "updated_at": now, "narrator": {"id": "santa", "name": "Santa V5", "voice_id": "pm_santa", "language": "pt-BR"}, "scenes": [], "audio": {}, "exports": []}
+                project = {"id": project_id, "title": title, "description": str(body.get("description") or "").strip(), "format": body.get("format") or "horizontal-1080p", "created_at": now, "updated_at": now, "narrator": {"id": "santa", "name": "Santa V5", "voice_id": "pm_santa", "language": "pt-BR"}, "character_pack": None, "scenes": [], "audio": {}, "exports": []}
                 self._send_json(_save_project(project), status=201)
             except (ValueError, json.JSONDecodeError) as exc:
                 self._send_json({"error": str(exc)}, status=400)
             return
         if path.startswith("/api/projects/"):
             parts = path.removeprefix("/api/projects/").strip("/").split("/")
+            if len(parts) == 2 and parts[1] == "character-pack":
+                try:
+                    project = _load_project(parts[0]); body = _read_json_body(self)
+                    reference = body.get("character_pack")
+                    if reference is not None and (not isinstance(reference, dict) or not reference.get("id") or not reference.get("version")):
+                        raise ValueError("invalid project character pack reference")
+                    project["character_pack"] = reference; self._send_json(_save_project(project)); return
+                except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+                    self._send_json({"error": str(exc)}, status=400); return
+            if len(parts) == 2 and parts[1] == "save-pack":
+                try:
+                    result = _install_character_pack(_read_json_body(self)); self._send_json(result, status=201); return
+                except (ValueError, json.JSONDecodeError, base64.binascii.Error) as exc:
+                    self._send_json({"error": str(exc)}, status=400); return
             if len(parts) == 2 and parts[1] in {"save", "assets", "narration", "export"}:
                 try:
                     project = _load_project(parts[0])
@@ -357,7 +456,7 @@ class StageHandler(BaseHTTPRequestHandler):
                     if parts[1] == "save":
                         if "scenes" in body:
                             _validate_scenes(body["scenes"])
-                        for field in ("title", "description", "format", "script", "scenes", "narrator", "audio"):
+                        for field in ("title", "description", "format", "script", "scenes", "narrator", "character_pack", "audio"):
                             if field in body:
                                 project[field] = body[field]
                         self._send_json(_save_project(project))

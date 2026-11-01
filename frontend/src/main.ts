@@ -75,6 +75,7 @@ const communityRig = new LayeredCharacterRig();
 const communityRenderer = new LayeredCharacterRenderer(canvas, communityRig, COMMUNITY_DEMO_PACK, { assetRoot: new URL("./assets/characters/community-demo-v1/", document.baseURI).href });
 let communityReady = false;
 let localPack = null;
+let activeProjectId = null;
 let santaV3Ready = false;
 let santaV4Ready = false;
 let santaV5Ready = false;
@@ -155,7 +156,6 @@ function selectCharacter(characterId, { loadVoice = true } = {}) {
     return Promise.resolve(false);
   }
   activeCharacterId = characterId;
-  try { localStorage.setItem("fabuloom.selectedCharacterPack", characterId); } catch (_error) { /* storage is optional */ }
   if (characterId === "community-demo") {
     activeRig = communityRig; activeRenderer = communityRenderer;
   } else if (characterId === "local-pack" && localPack) {
@@ -285,6 +285,15 @@ async function importLocalPack(files) {
   if (!files) return;
   try {
     localPack = await loadLocalPackFiles(files);
+    const manifestFile = [...files].find((file) => file.name === "manifest.json" || file.webkitRelativePath?.endsWith("/manifest.json"));
+    const payloadFiles = await Promise.all([...files].filter((file) => file.name !== "manifest.json").map(async (file) => ({
+      path: file.webkitRelativePath ? file.webkitRelativePath.split("/").slice(-1).join("/") : file.name,
+      mime: file.type, data: await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]); reader.onerror = reject; reader.readAsDataURL(file); }),
+    })));
+    const installed = await fetch("/api/packs/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ manifest: JSON.parse(await manifestFile.text()), files: payloadFiles }) }).then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error || "instalação recusada"); return result; });
+    if (activeProjectId) {
+      await fetch(`/api/projects/${encodeURIComponent(activeProjectId)}/character-pack`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ character_pack: { id: installed.id, version: installed.version, contract: localPack.pack.format, character_id: localPack.pack.id, expression: "neutral", asset_ref: installed.ref, license: installed.license, author: installed.author } }) });
+    }
     validateCharacterPack(localPack.pack);
     const option = characterSelect.querySelector('option[value="local-pack"]');
     if (option) { option.hidden = false; option.textContent = `${localPack.pack.name} · pack local`; }
@@ -548,8 +557,18 @@ async function initializeStage() {
   setVoiceInfo({ language: "pt-BR", state: "waiting" });
   await prepareLayeredCharacters();
   renderPackLibrary();
-  const remembered = localStorage.getItem("fabuloom.selectedCharacterPack");
-  if (remembered === "community-demo" && communityReady) { characterSelect.value = remembered; await selectCharacter(remembered, { loadVoice: false }); }
+  try {
+    const projects = await fetch("/api/projects", { cache: "no-store" }).then((response) => response.json());
+    activeProjectId = projects.projects?.[0]?.id || null;
+    const reference = projects.projects?.[0]?.character_pack;
+    if (reference?.id && reference?.version) {
+      const response = await fetch(`/api/packs/${encodeURIComponent(reference.id)}/${encodeURIComponent(reference.version)}`);
+      if (!response.ok) throw new Error("pack instalado não encontrado");
+      const manifest = await response.json(); const pack = manifest.pack || manifest;
+      const assets = {}; for (const layer of pack.layers) assets[layer.asset] = `/api/packs/${encodeURIComponent(reference.id)}/${encodeURIComponent(reference.version)}/asset/${layer.asset}`;
+      localPack = { pack, assetUrls: assets }; renderPackLibrary(); characterSelect.value = "local-pack"; await selectCharacter("local-pack", { loadVoice: false });
+    }
+  } catch (error) { if (libraryStatus) libraryStatus.textContent = `Pack do projeto indisponível: ${error.message}. Reinstale o pack para continuar.`; }
 }
 
 void initializeStage();
