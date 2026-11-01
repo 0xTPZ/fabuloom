@@ -121,7 +121,17 @@ async function generateNarration() {
 
 async function exportProject() {
   if (!currentProject) return setStatus("Crie um projeto antes de exportar");
-  try { $("#export-status").textContent = "Exportando MP4 com FFmpeg…"; currentProject = (await api(projectApiPath("/export"), { method: "POST", body: JSON.stringify({ format: "horizontal-1080p" }) })).project; renderProjectState(); $("#export-status").textContent = "MP4 concluído. Abra o arquivo na lista acima."; } catch (error) { $("#export-status").textContent = `Exportação bloqueada: ${error.message}`; }
+  try {
+    const response = await api(projectApiPath("/export"), { method: "POST", body: JSON.stringify({ format: "horizontal-1080p" }) });
+    const poll = async () => {
+      const status = await api(projectApiPath("/export/status"));
+      $("#export-status").textContent = `${status.message || status.state} · ${status.progress || 0}%`;
+      if (status.state === "completed") { currentProject = await api(`/api/projects/${encodeURIComponent(currentProject.id)}`); renderProjectState(); $("#export-status").textContent = "MP4 concluído. Abra o arquivo na lista acima."; return; }
+      if (status.state === "failed" || status.state === "cancelled") return;
+      window.setTimeout(() => void poll(), 700);
+    };
+    $("#export-status").textContent = `Exportação iniciada · ${response.job.job_id}`; void poll();
+  } catch (error) { $("#export-status").textContent = `Exportação bloqueada: ${error.message}`; }
 }
 
 const ROUTE_COPY = Object.freeze({
@@ -377,6 +387,7 @@ function renderProfiles() {
 
 function renderExports() {
   const list = $("#export-list");
+  if (!list) return;
   PRODUCTION_EXPORTS.forEach((item) => {
     const row = document.createElement("div");
     row.className = "export-row";

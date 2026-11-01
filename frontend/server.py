@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from urllib.parse import unquote, urlsplit
@@ -49,6 +50,9 @@ CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
 PROJECTS_ROOT = WORKSPACE_ROOT / "workspace" / "projects"
+JOBS: dict[str, dict] = {}
+JOBS_LOCK = threading.Lock()
+MAX_EXPORT_JOBS = 1
 MAX_JSON_BYTES = 8 * 1024 * 1024
 MAX_ASSET_BYTES = 25 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
@@ -121,6 +125,14 @@ class StageHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/projects/"):
             project_id = path.removeprefix("/api/projects/").strip("/").split("/")
+            if len(project_id) == 3 and project_id[1] == "export" and project_id[2] == "status":
+                with JOBS_LOCK:
+                    job = JOBS.get(project_id[0])
+                if not job:
+                    self.send_error(404, "export job not found")
+                else:
+                    self._send_json(job)
+                return
             if len(project_id) >= 3 and project_id[1] == "asset":
                 try:
                     root = _project_dir(project_id[0]).resolve()
@@ -337,6 +349,17 @@ class StageHandler(BaseHTTPRequestHandler):
             self.send_error(404, "unknown DELETE endpoint")
             return
         project_id = path.removeprefix("/api/projects/").strip("/")
+        export_parts = project_id.split("/")
+        if len(export_parts) == 3 and export_parts[1] == "export":
+            with JOBS_LOCK:
+                job = JOBS.get(export_parts[0])
+                if job and job.get("job_id") == export_parts[2] and job.get("state") in {"queued", "running"}:
+                    job["cancel_requested"] = True
+                    job["state"] = "cancelled"
+                    self._send_json(job)
+                    return
+            self.send_error(404, "export job not found")
+            return
         try:
             directory = _project_dir(project_id)
             if not directory.is_dir():
@@ -376,8 +399,12 @@ class StageHandler(BaseHTTPRequestHandler):
             for scene in project.setdefault("scenes", []):
                 if scene.get("id") == scene_id:
                     scene["image"] = record["path"]
-        else:
+        elif kind == "music":
             project.setdefault("audio", {})["music"] = record
+        elif kind == "voice":
+            project.setdefault("audio", {}).setdefault("wav_files", []).append(record["path"])
+        else:
+            raise ValueError("unsupported asset kind")
         _save_project(project)
         self._send_json({"asset": record, "project": project}, status=201)
 
@@ -408,6 +435,30 @@ class StageHandler(BaseHTTPRequestHandler):
         self._send_json({"project": project, "manifest": json.loads(manifest_path.read_text(encoding="utf-8"))}, status=201)
 
     def _handle_export(self, project: dict, body: dict) -> None:
+        with JOBS_LOCK:
+            if any(item.get("state") in {"queued", "running"} for item in JOBS.values()):
+                self._send_json({"error": "já existe uma exportação em andamento"}, status=409)
+                return
+            job_id = f"export-{uuid.uuid4().hex[:10]}"
+            job = {"job_id": job_id, "project_id": project["id"], "state": "queued", "progress": 0, "message": "Aguardando FFmpeg", "cancel_requested": False}
+            JOBS[project["id"]] = job
+        thread = threading.Thread(target=self._run_export_job, args=(project, body, job), daemon=True)
+        thread.start()
+        self._send_json({"job": job}, status=202)
+
+    def _run_export_job(self, project: dict, body: dict, job: dict) -> None:
+        try:
+            with JOBS_LOCK:
+                job["state"] = "running"; job["message"] = "Preparando cenas"
+            export = self._perform_export(project, body, job)
+            with JOBS_LOCK:
+                if job.get("state") == "cancelled": return
+                job.update({"state": "completed", "progress": 100, "message": "MP4 concluído", "export": export})
+        except Exception as exc:
+            with JOBS_LOCK:
+                if job.get("state") != "cancelled": job.update({"state": "failed", "message": str(exc), "error": str(exc)})
+
+    def _perform_export(self, project: dict, body: dict, job: dict) -> dict:
         audio = project.get("audio", {})
         wav_files = [(_project_dir(project["id"]) / item).resolve() for item in audio.get("wav_files", [])]
         if not wav_files or not all(path.is_file() for path in wav_files):
@@ -418,15 +469,30 @@ class StageHandler(BaseHTTPRequestHandler):
         output_dir = (EXPORT_ROOT / "projects" / project["id"]).resolve()
         output_dir.relative_to(EXPORT_ROOT.resolve())
         output_dir.mkdir(parents=True, exist_ok=True)
-        list_path = output_dir / "images.txt"
-        with list_path.open("w", encoding="utf-8") as handle:
-            for scene in scenes:
-                image = (_project_dir(project["id"]) / scene["image"]).resolve()
-                image.relative_to(_project_dir(project["id"]).resolve())
-                handle.write(f"file '{image.as_posix().replace("'", "'\\''")}'\n")
-                handle.write(f"duration {max(0.1, float(scene.get('duration_ms', 1000)) / 1000):.3f}\n")
-            image = (_project_dir(project["id"]) / scenes[-1]["image"]).resolve()
-            handle.write(f"file '{image.as_posix().replace("'", "'\\''")}'\n")
+        scene_dir = output_dir / "scenes"; scene_dir.mkdir(exist_ok=True)
+        scene_paths = []
+        for index, scene in enumerate(scenes):
+            with JOBS_LOCK:
+                if job.get("cancel_requested"): raise RuntimeError("exportação cancelada")
+                job["progress"] = int(index / max(1, len(scenes)) * 60); job["message"] = f"Renderizando cena {index + 1} de {len(scenes)}"
+            image = (_project_dir(project["id"]) / scene["image"]).resolve(); image.relative_to(_project_dir(project["id"]).resolve())
+            duration = max(0.1, float(scene.get("duration_ms", 1000)) / 1000)
+            camera = scene.get("camera", "static")
+            if camera == "zoom":
+                vf = "scale=2304:1296:force_original_aspect_ratio=increase,crop=2304:1296,zoompan=z='min(zoom+0.0015,1.12)':d=1:s=1920x1080:fps=30"
+            elif camera == "pan-horizontal":
+                vf = "scale=2304:1296:force_original_aspect_ratio=increase,crop=2304:1296,zoompan=z='1.08':x='(iw-iw/zoom)*on/(30*20)':y='(ih-ih/zoom)/2':d=1:s=1920x1080:fps=30"
+            elif camera == "pan-vertical":
+                vf = "scale=2304:1296:force_original_aspect_ratio=increase,crop=2304:1296,zoompan=z='1.08':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*on/(30*20)':d=1:s=1920x1080:fps=30"
+            else:
+                vf = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+            target = scene_dir / f"scene-{index:03d}.mp4"
+            subprocess.run(["ffmpeg", "-y", "-loop", "1", "-i", str(image), "-t", f"{duration:.3f}", "-vf", vf, "-r", "30", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True, capture_output=True, text=True)
+            scene_paths.append(target)
+        list_path = output_dir / "scenes.txt"
+        list_path.write_text("\n".join(f"file '{path.as_posix()}'" for path in scene_paths) + "\n", encoding="utf-8")
+        video_path = output_dir / "video-only.mp4"
+        subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", str(video_path)], check=True, capture_output=True, text=True)
         voice_list = output_dir / "voice.txt"
         voice_list.write_text("\n".join(f"file '{path.as_posix()}'" for path in wav_files) + "\n", encoding="utf-8")
         voice_path = output_dir / "voice.wav"
@@ -435,18 +501,19 @@ class StageHandler(BaseHTTPRequestHandler):
         else:
             subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(voice_list), "-c", "copy", str(voice_path)], check=True, capture_output=True, text=True)
         output = output_dir / f"{project['id']}-1080p.mp4"
-        command = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-i", str(voice_path)]
+        command = ["ffmpeg", "-y", "-i", str(video_path), "-i", str(voice_path)]
         music = project.get("audio", {}).get("music", {}).get("path")
         if music and (_project_dir(project["id"]) / music).is_file():
-            command += ["-i", str((_project_dir(project["id"]) / music).resolve()), "-filter_complex", "[1:a]volume=1.0[voice];[2:a]volume=0.18[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[aout]", "-map", "0:v", "-map", "[aout]"]
+            command += ["-stream_loop", "-1", "-i", str((_project_dir(project["id"]) / music).resolve()), "-filter_complex", "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice_main][voice_side];[2:a]loudnorm=I=-26:TP=-2:LRA=12[bed];[bed][voice_side]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400[ducked];[ducked]volume=0.35[music];[voice_main][music]amix=inputs=2:duration=first:dropout_transition=2,alimiter=limit=0.95[aout]", "-map", "0:v", "-map", "[aout]"]
         else:
-            command += ["-map", "0:v", "-map", "1:a"]
-        command += ["-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2", "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(output)]
+            command += ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95"]
+        command += ["-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(output)]
+        with JOBS_LOCK: job["progress"] = 85; job["message"] = "Finalizando MP4"
         subprocess.run(command, check=True, capture_output=True, text=True)
         export = {"path": str(output.relative_to(WORKSPACE_ROOT)).replace("\\", "/"), "format": "1920x1080 H.264/AAC MP4", "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
         project.setdefault("exports", []).append(export)
         _save_project(project)
-        self._send_json({"project": project, "export": export}, status=201)
+        return export
 
     def log_message(self, format: str, *args: object) -> None:
         print(f"[stage] {self.address_string()} {format % args}")
