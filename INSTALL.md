@@ -42,6 +42,12 @@ python .\frontend\server.py --port 8765
 
 Open `http://127.0.0.1:8765/`. The server binds to loopback only and limits export paths to the configured workspace. A clean checkout starts, but it will show empty preview/export states until local manifests, audio and profiles are supplied.
 
+## Windows launcher
+
+After preparing Python and, if desired, the local `.venv`, double-click `Iniciar Fabuloom.bat`. The launcher resolves its own folder, prefers `.venv`, checks that Python is compatible, verifies whether port 8765 already serves Fabuloom, starts the loopback-only server when necessary, waits for `/studio.html`, and opens the browser. It does not install packages, change PATH, alter the firewall, or require administrator privileges.
+
+If Python or the virtual environment is absent, the launcher stops with instructions; it does not create or install them automatically. Kokoro and FFmpeg remain optional for narration/export and do not block opening the Studio. Press Enter in the launcher window to stop a server started by that launcher. If an existing Fabuloom server was detected, the launcher does not stop it.
+
 ## Optional Kokoro provider
 
 ```powershell
