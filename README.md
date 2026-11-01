@@ -197,3 +197,13 @@ packs rather than reusing Santa's face. The selection is validated against the
 measured local manifest and the renderer reports `AWAITING_ART_APPROVAL` until
 the owner approves the new art. See `docs/OFFICIAL-NARRATORS-V1.md` and
 `frontend/official-narrators-board.html`.
+
+Mission 027 produces the Chapter 2 cinematic episode from the exact DOCX
+boundary `Capítulo 2 — O minotauro e a cicatriz` (paragraphs 25–46). It uses
+real Kokoro `pm_santa` timing, 16 environment-only story plans, the official
+`santa-library-topazioverse-v1` scene registry, and the approved Santa V5
+medallion in every scene. Character Registry approval is enforced at runtime;
+the seven guardian concepts remain `DRAFT` and cannot enter production. The
+MP4 and evidence remain outside Git under
+`workspace\exports\topazio-book1-capitulo2-cronicas`; see
+`docs/CRONICAS-DE-TOPAZIO-027.md`.

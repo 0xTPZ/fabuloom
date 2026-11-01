@@ -72,6 +72,17 @@ class CharacterRegistryTests(unittest.TestCase):
             with self.assertRaisesRegex(CharacterRegistryError, "hash mismatch"):
                 registry.resolve("demo-character-v1-base")
 
+    def test_draft_identity_is_blocked_from_production(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "character.png"
+            image.write_bytes(b"character")
+            registry_path = root / "registry.json"
+            registry_path.write_text(json.dumps(_payload()), encoding="utf-8")
+            registry = CharacterRegistry.from_json(registry_path, workspace_root=root)
+            with self.assertRaisesRegex(CharacterRegistryError, "not approved"):
+                registry.require_approved("demo-character-v1-base")
+
 
 if __name__ == "__main__":
     unittest.main()
