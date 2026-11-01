@@ -207,3 +207,13 @@ the seven guardian concepts remain `DRAFT` and cannot enter production. The
 MP4 and evidence remain outside Git under
 `workspace\exports\topazio-book1-capitulo2-cronicas`; see
 `docs/CRONICAS-DE-TOPAZIO-027.md`.
+
+Mission 028 produces the Chapter 3 cinematic episode from the exact DOCX
+boundary `Capítulo 3 — Sete caminhos para Gaia` (paragraphs 48–105; separator
+106; next chapter heading 107). It uses real Kokoro `pm_santa` timing, 20
+environment-only story plans, the official `santa-library-topazioverse-v1`
+scene registry and the approved Santa V5 medallion. The seven guardian concepts
+remain `DRAFT` and are blocked by the runtime policy. The MP4, plates and
+reports remain outside Git under
+`workspace\exports\topazio-book1-capitulo3-cronicas`; see
+`docs/CRONICAS-DE-TOPAZIO-028.md`.
