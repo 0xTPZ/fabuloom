@@ -1,8 +1,10 @@
 # Getting started
 
-The repository contains the dependency-free Fabuloom Core V0.1 contracts and
-an optional Kokoro PT-BR provider on the Mission 005 integration branch. The
-editor, animation engine, and video compositor are not implemented.
+For the community-facing path, start with the repository-root [INSTALL.md](../INSTALL.md) and [QUICKSTART.md](../QUICKSTART.md). This file retains the developer-level contract details.
+
+This preparation branch contains the dependency-free Fabuloom Core contracts,
+the local Studio shell, Santa V5 Narrator Mode and optional Kokoro integration.
+The full project/editor workflow and one-click export job are not implemented.
 
 ## Layout
 
@@ -44,14 +46,11 @@ The repository does not contain model weights, WAVs, manifestos or caches. See
 capability limits. The optional real-model test remains skipped unless the
 user explicitly enables it.
 
-## Studio UI branch and local workspace
+## Studio UI and local workspace
 
-The default `main` branch is currently the public Core foundation. The
-Mission 021 Studio shell is available on the development branch:
-
-```powershell
-git switch --detach mission-021-ui-reforge
-```
+The public `main` branch remains the Core foundation. This preparation branch
+contains the Studio shell and should be used through the isolated release
+worktree or a review checkout.
 
 The frontend has no `package.json` because it intentionally runs without a
 bundler. Node is used for the dependency-free `.mjs` test suite. FFmpeg is a
