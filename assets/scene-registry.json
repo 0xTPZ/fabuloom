@@ -1,0 +1,22 @@
+{
+  "format": "fabuloom.scene-asset-registry/0.1",
+  "format_version": "0.1.0",
+  "assets": [
+    {
+      "id": "santa-library-topazioverse-v1",
+      "version": "1.0.0",
+      "relative_path": "workspace/exports/official-scenes/santa-library-topazioverse-v1/library-base.png",
+      "sha256": "1E38477EDD9E62D5AA5AE7D63D4784F3C5FD5B65A6486FBC1B187C0933395770",
+      "asset_type": "background_plate",
+      "approval_state": "awaiting_human_artistic_approval",
+      "provenance": "original conceptual fantasy plate generated locally for Fabuloom; no character embedded",
+      "compatible_narrator": "Santa V5",
+      "composition_profiles": {
+        "host": "lower-left presenter with open center and upper-right title space",
+        "medallion": "lower-left circular narrator avatar with subtitle-safe lower band"
+      },
+      "camera": "deterministic_canvas_cover_with_slow_push",
+      "safe_zones": "center and upper-right kept free of readable detail"
+    }
+  ]
+}
