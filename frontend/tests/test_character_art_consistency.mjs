@@ -41,6 +41,10 @@ test("cartoon packs use one identity base and compact explicit mouth states", ()
       assert.doesNotMatch(svg, /<rect[^>]+width="1254"/);
       assert.match(svg, /stroke=/);
     }
+    assert.equal(pack.mouth_polish_status, "v1.1-experimental-awaiting-art-approval");
+    assert.ok(existsSync(local(`assets/characters/topazio-narrators-cartoon-v1/${pack.character}/mouth-closed.svg`)), "previous mouth state must remain preserved");
+    assert.match(pack.facial_states.mouth.closed, /mouth-polish-closed\.svg$/);
+    assert.match(pack.facial_states.mouth.open, /mouth-polish-open\.svg$/);
   }
 });
 
