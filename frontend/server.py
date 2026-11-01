@@ -209,8 +209,9 @@ def main() -> int:
     global CAPTURE_ROOT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--capture-dir", help="local loopback capture directory; must stay inside the workspace")
     args = parser.parse_args()
-    configured_capture = os.environ.get("FABULOOM_CAPTURE_DIR")
+    configured_capture = args.capture_dir or os.environ.get("FABULOOM_CAPTURE_DIR")
     if configured_capture:
         candidate = Path(configured_capture).resolve()
         try:
