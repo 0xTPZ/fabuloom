@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabuloom · Mouth Anchor Calibration 023.4.3</title>
+    <style>html,body{margin:0;background:#061329}canvas{display:block}</style>
+  </head>
+  <body>
+    <canvas id="board" width="1840" height="1180"></canvas>
+    <script type="module">
+      import { buildLayerDrawPlan } from "./src/layered-character.ts";
+      import {
+        NARRATOR_FACE_REFERENCE,
+        NarratorAvatarRenderer,
+      } from "./src/narrator-mode.mjs";
+      import { TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1 } from "./src/topazio-narrator-packs-cartoon-v1.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const canvas = document.querySelector("#board");
+      const context = canvas.getContext("2d");
+      const states = [["closed", 0, false], ["slight", .2, true], ["moderate", .5, true], ["open", .86, true]];
+      const narrators = [["santa", "Santa V5", "pm_santa"], ["dora", "Dora", "pf_dora"], ["alex", "Alex", "pm_alex"]];
+      const colors = { head_center: "#5b8fd9", nose_center: "#f7d27a", mouth_center: "#55d6a5", mouth_left: "#f07f91", mouth_right: "#f07f91", chin_upper_limit: "#ef9b55" };
+
+      function transformPoint(matrix, x, y) { return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }; }
+      function localToCell(avatar, bounds, localPoint, landmarks) {
+        const head = avatar.renderer.getLayerDrawPlan().find((entry) => entry.layer.id === "head");
+        if (!head) return null;
+        const source = transformPoint(head.matrix, localPoint[0], localPoint[1]);
+        return { x: bounds.x + (source.x - avatar.crop.x) * bounds.size / avatar.crop.width, y: bounds.y + (source.y - avatar.crop.y) * bounds.size / avatar.crop.height };
+      }
+      function marker(ctx, point, color, radius = 5) {
+        if (!point) return;
+        ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = "#061329"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(point.x, point.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+      }
+      function drawLandmarks(avatar, cellContext, bounds, landmarks) {
+        if (!landmarks) return;
+        const points = Object.fromEntries(Object.entries(landmarks).map(([key, value]) => [key, localToCell(avatar, bounds, value, landmarks)]));
+        cellContext.save();
+        const mouth = [points.mouth_left, points.mouth_right].filter(Boolean);
+        if (mouth.length === 2) { cellContext.strokeStyle = colors.mouth_left; cellContext.setLineDash([5, 4]); cellContext.beginPath(); cellContext.moveTo(mouth[0].x, mouth[0].y); cellContext.lineTo(mouth[1].x, mouth[1].y); cellContext.stroke(); }
+        if (points.chin_upper_limit) { cellContext.strokeStyle = colors.chin_upper_limit; cellContext.setLineDash([3, 5]); cellContext.beginPath(); cellContext.moveTo(bounds.x + 20, points.chin_upper_limit.y); cellContext.lineTo(bounds.x + bounds.size - 20, points.chin_upper_limit.y); cellContext.stroke(); }
+        cellContext.restore();
+        for (const [key, point] of Object.entries(points)) marker(cellContext, point, colors[key] || "#fff");
+      }
+      function drawLegend(ctx, x, y) {
+        ctx.fillStyle = "#d6e3f3"; ctx.font = "16px Segoe UI,sans-serif";
+        ctx.fillText("landmarks: azul=head · dourado=nose · verde=mouth · rosa=cantos · laranja=limite do queixo", x, y);
+      }
+      function fail(error) {
+        document.title = `error: ${error.message}`;
+        if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: error.message, stack: error.stack }) }).catch(() => {});
+        throw error;
+      }
+      async function main() {
+        context.fillStyle = "#061329"; context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "#f7d27a"; context.font = "700 30px Segoe UI,sans-serif"; context.fillText("FABULOOM · MOUTH ANCHOR CALIBRATION 023.4.3", 30, 42);
+        context.fillStyle = "#b9c9dc"; context.font = "17px Segoe UI,sans-serif"; context.fillText(`${TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1} · renderizador real · offsets persistidos nos packs`, 30, 70);
+        drawLegend(context, 30, 98);
+        for (let row = 0; row < narrators.length; row += 1) {
+          const [id, name, voice] = narrators[row];
+          const y = 116 + row * 350;
+          const avatarCanvas = document.createElement("canvas"); avatarCanvas.width = 330; avatarCanvas.height = 330;
+          const avatar = new NarratorAvatarRenderer(avatarCanvas, { characterId: id, assetRoot: new URL("./", location.href).href });
+          await avatar.load();
+          const pack = avatar.pack;
+          context.fillStyle = "#f7d27a"; context.font = "700 21px Segoe UI,sans-serif"; context.fillText(`${name} · ${voice}`, 30, y + 24);
+          if (pack.framing?.mouth_offset) { context.fillStyle = "#b9c9dc"; context.font = "14px Segoe UI,sans-serif"; context.fillText(`offset local: [${pack.framing.mouth_offset.join(", ")}] · posição efetiva: [${pack.layers.find((layer) => layer.id === "mouth").position.join(", ")}]`, 370, y + 23); }
+          for (let column = 0; column < states.length; column += 1) {
+            const [label, amplitude, playing] = states[column];
+            const x = 18 + column * 455;
+            const cell = document.createElement("canvas"); cell.width = 330; cell.height = 330;
+            const cellContext = cell.getContext("2d");
+            avatar.renderTo(cellContext, { x: 10, y: 0, size: 310, timeMs: 1700 + column * 260, speechAmplitude: amplitude, isPlaying: playing });
+            const bounds = { x: 10, y: 0, size: 310 };
+            drawLandmarks(avatar, cellContext, bounds, pack.face_reference?.landmarks || null);
+            context.drawImage(cell, x, y + 34, 330, 330);
+            context.fillStyle = "#fff7dc"; context.font = "16px Segoe UI,sans-serif"; context.fillText(label, x + 14, y + 348);
+          }
+        }
+        const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("calibration board PNG encoding failed")), "image/png"));
+        if (session) {
+          const upload = await fetch(`/capture/${encodeURIComponent(session)}/board.png`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob });
+          if (!upload.ok) throw new Error(`board upload failed: ${upload.status}`);
+          const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "mouth-anchor-calibration-lab-v1", renderer: "NarratorAvatarRenderer", contract: TOPAZIO_NARRATOR_MOUTH_ANCHOR_CONTRACT_V1, narrators: narrators.map(([id]) => id), states: states.map(([label]) => label), canvas: { width: canvas.width, height: canvas.height }, human_review_required: true }) });
+          if (!complete.ok) throw new Error(`completion upload failed: ${complete.status}`);
+        }
+        document.title = "completed";
+      }
+      main().catch(fail);
+    </script>
+  </body>
+</html>
