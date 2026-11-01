@@ -23,6 +23,15 @@ export function validateCharacterPack(pack) {
   valid(pack.format === CHARACTER_FORMAT, "Unsupported character pack format");
   identifier(pack.id,"character id");
   valid(typeof pack.name === "string" && pack.name.trim().length > 0, "Missing name");
+  if (pack.version !== undefined) valid(typeof pack.version === "string" && pack.version.length <= 32, "Invalid pack version");
+  if (pack.author !== undefined) valid(typeof pack.author === "string" && pack.author.length <= 160, "Invalid pack author");
+  if (pack.license !== undefined) valid(typeof pack.license === "string" && pack.license.length <= 160, "Invalid asset license");
+  if (pack.source !== undefined) valid(typeof pack.source === "string" && pack.source.length <= 500 && !/^https?:\/\//i.test(pack.source), "Invalid pack source");
+  if (pack.compatibility !== undefined) valid(plainObject(pack.compatibility), "Invalid compatibility metadata");
+  if (pack.voice !== undefined) {
+    valid(plainObject(pack.voice), "Invalid voice metadata");
+    if (pack.voice.id !== undefined) valid(typeof pack.voice.id === "string" && pack.voice.id.length <= 80, "Invalid suggested voice");
+  }
   valid(Array.isArray(pack.layers) && pack.layers.length > 0 && pack.layers.length <= 128,"Invalid layer count");
   valid(Array.isArray(pack.expressions), "Missing expressions");
   valid(plainObject(pack.bindings), "Missing animation bindings");
