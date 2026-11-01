@@ -7,6 +7,7 @@ import {
 } from "./narrator-mode.mjs";
 import { manifestVoiceId, narrationForCharacter, narrationForUrl, TOPAZIO_NARRATION_CATALOG } from "./topazio-narrations.mjs";
 import { validateManifest } from "./timeline.ts";
+import { resolveCinematicTransform } from "./cinematic-composition.mjs";
 import {
   DEV_LINKS,
   OFFICIAL_NARRATORS,
@@ -35,6 +36,8 @@ let loadToken = 0;
 let currentProject = null;
 let selectedSceneId = null;
 let exportInProgress = false;
+let previewMode = "cinematic";
+const cinematicImages = new Map();
 
 async function api(path, options = {}) {
   const response = await fetch(path, { cache: "no-store", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
@@ -119,6 +122,38 @@ function renderProjectState() {
   $("#script-count").textContent = `${($("#script-text").value || "").length} caracteres`;
   $("#script-save-state").textContent = currentProject ? "Projeto carregado" : "Crie um projeto primeiro";
   renderProjectScenes(); renderProjectExports();
+  renderCinematicFrame(player?.positionMs || 0);
+}
+
+function projectSceneAt(timeMs) {
+  const scenes = currentProject?.scenes || [];
+  let cursor = 0;
+  for (const scene of scenes) {
+    const duration = Math.max(100, Number(scene.duration_ms) || 1000);
+    if (timeMs <= cursor + duration || scene === scenes.at(-1)) return { scene, localMs: Math.max(0, timeMs - cursor), duration };
+    cursor += duration;
+  }
+  return null;
+}
+
+function cinematicImage(scene) {
+  if (!scene?.image || !currentProject) return null;
+  const url = projectApiPath(`/asset/${encodeURIComponent(scene.image)}`);
+  if (!cinematicImages.has(url)) { const image = new Image(); image.src = url; cinematicImages.set(url, image); }
+  return cinematicImages.get(url);
+}
+
+function renderCinematicFrame(timeMs = 0) {
+  if (!previewCanvas || previewMode !== "cinematic") return;
+  const context = previewCanvas.getContext("2d"); const width = previewCanvas.width; const height = previewCanvas.height;
+  context.fillStyle = "#101827"; context.fillRect(0, 0, width, height);
+  const active = projectSceneAt(timeMs);
+  if (!active) { context.fillStyle = "#f1d27a"; context.font = "32px sans-serif"; context.fillText("Crie um projeto para visualizar as cenas", 90, height / 2); return; }
+  const image = cinematicImage(active.scene);
+  if (!image || !image.complete || !image.naturalWidth) { context.fillStyle = "#d7e0ed"; context.font = "28px sans-serif"; context.fillText(active.scene.image ? "Carregando imagem da cena…" : "Adicione uma imagem a esta cena", 90, height / 2); return; }
+  const progress = Math.min(1, active.localMs / active.duration); const camera = active.scene.camera || "static";
+  const { scale, offsetX, offsetY } = resolveCinematicTransform({ camera, progress, width, height, imageWidth: image.naturalWidth, imageHeight: image.naturalHeight, localMs: active.localMs });
+  context.drawImage(image, offsetX, offsetY, image.naturalWidth * scale, image.naturalHeight * scale);
 }
 
 async function loadProject(projectId) { currentProject = await api(`/api/projects/${encodeURIComponent(projectId)}`); renderProjectState(); setStatus(`Projeto ${currentProject.title} aberto`); await loadProjectNarration(); }
@@ -483,6 +518,8 @@ function bindScriptDraft() {
   $("#scene-up-button")?.addEventListener("click", () => void moveSelectedScene(-1));
   $("#scene-down-button")?.addEventListener("click", () => void moveSelectedScene(1));
   $("#refresh-health-button")?.addEventListener("click", () => void loadHealth());
+  $("#preview-mode-cinematic")?.addEventListener("click", () => { previewMode = "cinematic"; setStatus("Prévia cinematográfica"); renderCinematicFrame(player?.positionMs || 0); });
+  $("#preview-mode-narrator")?.addEventListener("click", () => { previewMode = "narrator"; setStatus("Narrator Mode"); });
 }
 
 async function loadHealth() {
@@ -522,7 +559,8 @@ function startRenderer() {
 
 function animationFrame(timeMs) {
   player?.tick();
-  if (sceneRenderer) sceneRenderer.renderFrame({ timeMs: player?.positionMs || timeMs, isPlaying: player?.state === "playing" });
+  if (previewMode === "cinematic") renderCinematicFrame(player?.positionMs || timeMs);
+  else if (sceneRenderer) sceneRenderer.renderFrame({ timeMs: player?.positionMs || timeMs, isPlaying: player?.state === "playing" });
   updatePlaybackUi();
   requestAnimationFrame(animationFrame);
 }
