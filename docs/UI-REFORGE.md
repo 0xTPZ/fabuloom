@@ -15,7 +15,7 @@ character renderer or a new export pipeline.
 | `frontend/index.html` Character Stage | Historical full-body stage | Legacy reference | Area DEV |
 | Face lab, Santa galleries, Visual Inspector and QA | Calibration and evidence | Experimental / diagnostic | Area DEV |
 | Roteiro and Cenas editing | Local draft and profile inspection | Experimental | Studio Roteiro / Cenas |
-| New project creation and full editor | Not implemented in this mission | Incomplete | Intentionally disabled |
+| New project creation and full editor | Project creation and basic script/scenes are implemented; full editor remains out of scope | Partial | Basic Alpha workflow enabled |
 
 The audit found that the old root page mixed Lia, Ari, Santa V3, Santa V4,
 Santa V5 and narrator packs in one experimental selector. Narrator Mode was
@@ -87,7 +87,7 @@ final artistic judgment.
 
 ## Known limits and next priorities
 
-- The shell does not yet create or rename project files.
+- The shell creates and persists project files; advanced rename/versioning remains out of scope.
 - Roteiro edits are local browser drafts, not persisted project contracts.
 - Scene editing and export-job controls remain read-only views of existing
   capabilities.

@@ -4,7 +4,7 @@ For the community-facing path, start with the repository-root [INSTALL.md](../IN
 
 This preparation branch contains the dependency-free Fabuloom Core contracts,
 the local Studio shell, Santa V5 Narrator Mode and optional Kokoro integration.
-The full project/editor workflow and one-click export job are not implemented.
+The Alpha project workflow is available from the Studio: create a project, save a sentence-based script, import scene images, generate Santa narration and start a local MP4 export. A full nonlinear editor remains out of scope.
 
 ## Layout
 

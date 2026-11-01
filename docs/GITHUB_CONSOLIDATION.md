@@ -22,7 +22,7 @@ Core contracts / serialization
 
 Studio shell
   └─ reads local manifests, profiles and existing exports
-      └─ does not create a complete project or export job yet
+      └─ creates a basic project and starts a local export job; advanced editing remains out of scope
 ```
 
 ## Branch families

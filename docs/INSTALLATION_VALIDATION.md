@@ -15,8 +15,8 @@ Validation is split between the dependency-free core and the Studio shell. A cle
 | Loopback server | HTTP root response | Supported by `frontend/server.py` |
 | Workspace containment | Export root inside workspace | Enforced by server |
 | Kokoro | Optional provider/model | Not bundled; license/model gate remains |
-| New project | UI button | Not implemented; disabled intentionally |
-| New MP4 from UI | Export action | Not implemented; existing links only |
+| New project | UI button | Implemented and persisted under the configured workspace |
+| New MP4 from UI | Export action | Implemented as an asynchronous local FFmpeg job |
 
 ## Acceptance rule
 

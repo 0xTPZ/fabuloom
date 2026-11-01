@@ -19,7 +19,7 @@ commit `cee6d93`, e não é obtida por um clone padrão de `main`.
 | AUD-01 | bloqueador | Clone padrão de `main` não contém frontend, servidor, `pyproject.toml` ou testes executáveis. | Documentado; lançamento depende de uma decisão de branch/release. |
 | AUD-02 | alta | A documentação inicial não informava `PYTHONPATH=src` para a descoberta Python. | Corrigido na documentação desta branch. |
 | AUD-03 | alta | O servidor fixava `E:\Fabuloom` e uma instalação clonada acessava os exports do desenvolvedor. | Corrigido com `FABULOOM_WORKSPACE_ROOT`/`FABULOOM_EXPORT_ROOT`. |
-| AUD-04 | alta | A UI organiza produções existentes, mas não cria projeto, cena, importação de imagem ou job de exportação. | Mantido explícito; planejado para a MISSÃO 025. |
+| AUD-04 | alta | A UI agora cria projetos, gera cenas por sentença, importa imagens e inicia jobs locais de exportação. | Resolvido no fluxo Alpha; editor avançado permanece fora do escopo. |
 | AUD-05 | média | Dora e Alex têm packs técnicos V2 no Character Stage, mas a prévia oficial do Studio mantém Santa V5 como visual e troca apenas a voz. | Documentado para a MISSÃO 023. |
 | AUD-06 | média | Kokoro, WAVs, manifestos, cenas e MP4s não são distribuídos no repositório. | Correto para modelos/mídia; exige bootstrap documentado. |
 | AUD-07 | média | A matriz visual e a validação de interface não equivalem a aprovação artística ou a um editor de produção. | Mantido como limite explícito. |
