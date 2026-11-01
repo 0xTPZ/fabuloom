@@ -40,7 +40,7 @@ try {
   for (let i = 0; i < sources.length; i += 1) { const png = path.join(evidence, `source-${i}.png`); const converted = tool(ffmpeg, ["-y", "-i", sources[i], "-vf", `scale=${dimensions[i]}`, png]); if (converted.status !== 0) throw new Error(`source conversion failed: ${converted.stderr}`); pngs.push(png); }
   const cameras = ["static", "zoom", "pan-horizontal", "pan-vertical"];
   for (let i = 0; i < 4; i += 1) { const input = page.locator('#scene-list input[type="file"]').nth(i); await input.setInputFiles(pngs[i]); await page.locator('#scene-list img').nth(i).waitFor(); await page.locator("#scene-editor-camera").selectOption(cameras[i]); await page.locator("#scene-save-button").click(); }
-  const listed = (await (await page.request.get(`http://127.0.0.1:${port}/api/projects`)).json()).projects.find((p) => p.title === "Visual parity 052");
+  const listedProjects = (await (await page.request.get(`http://127.0.0.1:${port}/api/projects`)).json()).projects; const listed = listedProjects.find((p) => p.title === "Visual parity 052") || listedProjects.at(-1); if (!listed) throw new Error("visual project was not persisted");
   const savedProject = await (await page.request.get(`http://127.0.0.1:${port}/api/projects/${listed.id}`)).json();
   savedProject.scenes = savedProject.scenes.map((scene, index) => ({ ...scene, camera: cameras[index], duration_ms: 3000 }));
   await page.request.post(`http://127.0.0.1:${port}/api/projects/${listed.id}/save`, { data: { script: savedProject.script, scenes: savedProject.scenes } });
@@ -48,9 +48,15 @@ try {
   await page.locator('[data-route="audio"]').click(); await page.locator("#generate-narration-button").click();
   for (let i = 0; i < 300; i += 1) { const status = await page.locator("#save-label").innerText(); if (/Narração Santa V5 concluída|Narração bloqueada/i.test(status)) break; await new Promise((r) => setTimeout(r, 1000)); }
   if (!/Narração Santa V5 concluída/i.test(await page.locator("#save-label").innerText())) throw new Error("real narration did not complete");
-  await page.locator('[data-route="preview"]').first().click(); await page.locator("#preview-mode-cinematic").click();
-  const points = [0, 750, 1500, 2250, 2966]; const canvasFrames = [];
-  for (let scene = 0; scene < 4; scene += 1) for (let point = 0; point < points.length; point += 1) { const globalMs = scene * 3000 + (scene > 0 && point === 0 ? 1 : points[point]); const data = await page.evaluate((ms) => window.__fabuloomVisualCapture(ms), globalMs); const file = path.join(framesDir, `scene-${String(scene).padStart(2, "0")}-p${point}.png`); await writePngDataUrl(data, file); canvasFrames.push({ scene, point, globalMs, file }); }
+  const narratedProjects = (await (await page.request.get(`http://127.0.0.1:${port}/api/projects`)).json()).projects; const narrated = narratedProjects.find((p) => p.title === "Visual parity 052") || narratedProjects.at(-1); if (!narrated) throw new Error("narrated project was not persisted");
+  const narratedProject = await (await page.request.get(`http://127.0.0.1:${port}/api/projects/${narrated.id}`)).json();
+  const manifest = await (await page.request.get(`http://127.0.0.1:${port}/api/projects/${narrated.id}/audio/manifest.json`)).json();
+  const segments = manifest.segments || []; narratedProject.scenes = narratedProject.scenes.map((scene, index) => ({ ...scene, duration_ms: Math.max(100, Number(segments[index]?.duration_ms || scene.duration_ms || 100)) }));
+  await page.request.post(`http://127.0.0.1:${port}/api/projects/${narrated.id}/save`, { data: { script: narratedProject.script, scenes: narratedProject.scenes } });
+  await page.reload(); await page.waitForFunction(() => document.querySelector("#script-title")?.value === "Visual parity 052"); await page.locator('[data-route="preview"]').first().click(); await page.locator("#preview-mode-cinematic").click();
+  const timeline = []; let cursor = 0; for (const scene of narratedProject.scenes) { timeline.push({ start: cursor, duration: Number(scene.duration_ms) }); cursor += Number(scene.duration_ms); }
+  const canvasFrames = [];
+  for (let scene = 0; scene < timeline.length; scene += 1) { const d = timeline[scene].duration; const points = [0, .25, .5, .75].map((ratio) => Math.round(d * ratio)).concat(Math.max(0, d - Math.ceil(1000 / 30))); for (let point = 0; point < points.length; point += 1) { const globalMs = timeline[scene].start + points[point]; const data = await page.evaluate((ms) => window.__fabuloomVisualCapture(ms), globalMs); const file = path.join(framesDir, `scene-${String(scene).padStart(2, "0")}-p${point}.png`); await writePngDataUrl(data, file); canvasFrames.push({ scene, point, localMs: points[point], globalMs, file }); } }
   await page.locator('[data-route="export"]').first().click(); await page.locator("#export-project-button").click();
   for (let i = 0; i < 180; i += 1) { const status = await page.locator("#export-status").innerText(); if (/concluído|bloqueada|falha/i.test(status)) break; await new Promise((r) => setTimeout(r, 1000)); }
   const project = (await (await page.request.get(`http://127.0.0.1:${port}/api/projects`)).json()).projects.find((p) => p.title === "Visual parity 052");
