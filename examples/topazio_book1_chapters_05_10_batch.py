@@ -20,6 +20,8 @@ import sys
 import tempfile
 import time
 from urllib.parse import urlencode
+from zipfile import ZipFile
+from xml.etree import ElementTree
 
 import topazio_book1_chapter3_cronicas_demo as chapter3
 import topazio_book1_chapter1_cronicas_demo as v1
@@ -195,8 +197,15 @@ def _chapter_heading(text: str, number: int) -> bool:
 
 
 def _load_docx_paragraphs(path: Path) -> list[str]:
-    from docx import Document
-    return [paragraph.text for paragraph in Document(path).paragraphs]
+    """Read paragraph text from a DOCX without requiring python-docx."""
+    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with ZipFile(path) as archive:
+        root = ElementTree.fromstring(archive.read("word/document.xml"))
+    paragraphs = []
+    for paragraph in root.iter(namespace + "p"):
+        text = "".join(node.text or "" for node in paragraph.iter(namespace + "t"))
+        paragraphs.append(text)
+    return paragraphs
 
 
 def preflight_source(path: Path = SOURCE_DOC) -> dict[int, dict]:
