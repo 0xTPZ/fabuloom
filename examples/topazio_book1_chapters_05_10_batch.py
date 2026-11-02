@@ -788,6 +788,11 @@ def run_batch(*, overwrite: bool = False, port: int = 8790, capture_timeout: flo
                 index["chapters"] = [item for item in index["chapters"] if item["chapter"] != number] + [entry]
                 _write_json(BATCH_ROOT / "BATCH-INDEX.json", index)
                 _write_batch_report(index)
+                _update_batch_status(lot=batch_name, chapter=number, stage="FAILED", next_action="corrigir o ambiente e retomar o capítulo", started_at=batch_started)
+                failed_status = json.loads(BATCH_STATUS_PATH.read_text(encoding="utf-8"))
+                failed_status["state"] = "BLOCKED"
+                failed_status["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+                _write_json(BATCH_STATUS_PATH, failed_status)
                 raise
             index["chapters"] = [item for item in index["chapters"] if item["chapter"] != number] + [entry]
             _write_json(BATCH_ROOT / "BATCH-INDEX.json", index)
