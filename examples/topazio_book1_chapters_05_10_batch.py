@@ -777,19 +777,30 @@ def _write_batch_report(index: dict) -> None:
     (BATCH_ROOT / "BATCH-REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def run_batch(*, overwrite: bool = False, port: int = 8790, capture_timeout: float = 2400) -> dict:
+def run_batch(*, overwrite: bool = False, port: int = 8790, capture_timeout: float = 2400, start_chapter: int = 5) -> dict:
+    if start_chapter not in range(5, 11):
+        raise ValueError("start_chapter must be between 5 and 10")
     batch = preflight_source(SOURCE_DOC)
     BATCH_ROOT.mkdir(parents=True, exist_ok=True)
     source_snapshot = _previous_snapshot()
     configs = [_make_config(number, batch["chapters"][number], batch) for number in range(5, 11)]
-    index = {"format": "fabuloom.cronicas-book1-batch/0.1", "runner_version": RUNNER_VERSION, "source_doc": str(SOURCE_DOC), "source_doc_sha256": batch["source_doc_sha256"], "chapters": [], "state": "RUNNING", "previous_chapters_snapshot": source_snapshot}
+    existing_index_path = BATCH_ROOT / "BATCH-INDEX.json"
+    existing_index = json.loads(existing_index_path.read_text(encoding="utf-8")) if existing_index_path.is_file() else {}
+    if start_chapter > 5 and existing_index.get("source_doc_sha256") == batch["source_doc_sha256"]:
+        index = existing_index
+        index.update({"runner_version": RUNNER_VERSION, "state": "RUNNING", "previous_chapters_snapshot": source_snapshot})
+    else:
+        index = {"format": "fabuloom.cronicas-book1-batch/0.1", "runner_version": RUNNER_VERSION, "source_doc": str(SOURCE_DOC), "source_doc_sha256": batch["source_doc_sha256"], "chapters": [], "state": "RUNNING", "previous_chapters_snapshot": source_snapshot}
     _write_json(BATCH_ROOT / "BATCH-INDEX.json", index)
     batch_started = time.perf_counter()
     for batch_name, numbers in (("A", (5, 6)), ("B", (7, 8)), ("C", (9, 10))):
+        selected_numbers = tuple(number for number in numbers if number >= start_chapter)
+        if not selected_numbers:
+            continue
         lot_started = time.perf_counter()
         index.setdefault("batch_summaries", [])
-        _update_batch_status(lot=batch_name, chapter=None, stage=f"LOTE_{batch_name}_START", next_action=f"iniciar capítulo {numbers[0]:02d}", started_at=batch_started)
-        for number in numbers:
+        _update_batch_status(lot=batch_name, chapter=None, stage=f"LOTE_{batch_name}_START", next_action=f"iniciar capítulo {selected_numbers[0]:02d}", started_at=batch_started)
+        for number in selected_numbers:
             config = next(item for item in configs if item["number"] == number)
             config["batch_label"] = batch_name
             entry = {"chapter": number, "batch": batch_name, "title": config["source"]["title"], "status": "RUNNING", "project_root": str(config["project_root"])}
@@ -849,13 +860,14 @@ def main() -> int:
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--port", type=int, default=8790)
     parser.add_argument("--capture-timeout", type=float, default=2400)
+    parser.add_argument("--start-chapter", type=int, choices=range(5, 11), default=5, help="resume sequentially from this chapter without rerunning earlier completed chapters")
     args = parser.parse_args()
     batch = preflight_source(SOURCE_DOC)
     if args.preflight or not args.batch:
         print(json.dumps({key: value for key, value in batch.items() if key != "chapters"} | {"chapters": [{key: value for key, value in chapter.items() if key not in {"text", "paragraphs"}} for chapter in batch["chapters"].values()]}, ensure_ascii=False, indent=2, sort_keys=True))
         if not args.batch:
             return 0
-    result = run_batch(overwrite=args.overwrite, port=args.port, capture_timeout=args.capture_timeout)
+    result = run_batch(overwrite=args.overwrite, port=args.port, capture_timeout=args.capture_timeout, start_chapter=args.start_chapter)
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if result["state"] == "DONE" else 1
 
