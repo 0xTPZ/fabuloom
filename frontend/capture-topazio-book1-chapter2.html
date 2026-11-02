@@ -37,8 +37,32 @@
         return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
       }
       async function readWav(url) {
-        const response = await fetch(url); if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
-        return decodeMonoPcm16Wav(await response.arrayBuffer());
+        let lastError = null;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (!response.ok) throw new Error(`audio request failed with HTTP ${response.status}`);
+            return decodeMonoPcm16Wav(await response.arrayBuffer());
+          } catch (error) {
+            lastError = error;
+            await new Promise((resolve) => setTimeout(resolve, 120 * (attempt + 1)));
+          }
+        }
+        throw lastError || new Error("audio request failed");
+      }
+      async function readWavs(segments) {
+        const results = new Array(segments.length);
+        let nextIndex = 0;
+        const worker = async () => {
+          while (true) {
+            const index = nextIndex++;
+            if (index >= segments.length) return;
+            results[index] = await readWav(exportUrl(segments[index].audio_uri));
+          }
+        };
+        const workerCount = Math.min(8, Math.max(1, segments.length));
+        await Promise.all(Array.from({ length: workerCount }, worker));
+        return results;
       }
       function sceneWeight(timeMs, scene, index, scenes, fadeMs) {
         if (timeMs < scene.start_ms - fadeMs / 2 || timeMs > scene.end_ms + fadeMs / 2) return 0;
@@ -126,7 +150,7 @@
         if (plan.character_policy?.draft_rendering !== "blocked" || plan.character_policy?.approved_only !== true) fail("character policy is not locked");
         if (plan.scenes.some((scene) => scene.environment_only && scene.character_registry_id !== "santa-v5-base")) fail("unapproved story character in scene plan");
         const manifestResponse = await fetch(`/exports/${plan.manifest}`); if (!manifestResponse.ok) fail(`manifest request failed with HTTP ${manifestResponse.status}`); const manifest = await manifestResponse.json(); validateNarratorManifest(manifest);
-        const wavs = await Promise.all(manifest.segments.map((segment) => readWav(exportUrl(segment.audio_uri)))); const sampleRate = wavs[0].sampleRate; if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
+        const wavs = await readWavs(manifest.segments); const sampleRate = wavs[0].sampleRate; if (wavs.some((wav) => wav.sampleRate !== sampleRate)) fail("WAV sample rates differ");
         const amplitudeAt = createRmsReader(composePcmSegments(manifest, wavs, sampleRate), sampleRate), images = {};
         for (const scene of plan.scenes) { const image = document.createElement("img"); image.src = `/exports/${scene.image}`; await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`scene image failed: ${scene.image}`)); }); images[scene.id] = image; }
         const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href }); await avatar.load(); const timeline = createNarratorTimeline(manifest); const frameCount = Math.ceil(manifest.duration_ms / 1000 * fps); const pending = new Set();
