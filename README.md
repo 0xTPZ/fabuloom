@@ -257,3 +257,10 @@ volume, SSML, emotion tags and word/phoneme/viseme timing remain unavailable.
 The six WAV samples and manifests stay outside Git under
 `workspace\exports\voice-lab\mission-032-santa-expressive-v1`; no approved
 episode is changed. See `docs/SANTA-EXPRESSIVE-032.md`.
+
+Mission 033 finalizes CB-002 using the existing owner-provided track
+`A Sombra que Olhava para o Sol.mp3`, preserving the measured `pm_santa`
+narration and concentrating the voice improvement on ducking and mix
+intelligibility. The vertical MP4, SRT, manifest, storyboard, music-selection
+report and voice-direction report remain outside Git pending human artistic
+review and commercial-rights confirmation. See `docs/CRONICAS-BREVES-033.md`.

@@ -91,14 +91,18 @@ def test_completed_cb003_manifest_and_srt_have_measured_segment_count() -> None:
     assert len(re.findall(r"(?m)^\d+$", srt)) == len(segments)
 
 
-def test_missing_cb002_music_blocks_only_cb002_final_video_when_local_report_exists() -> None:
+def test_cb002_report_preserves_either_mission_031_block_or_later_finalization() -> None:
     report_path = CB002 / "reports" / "technical-report.json"
     if not report_path.exists():
         pytest.skip("local Mission 031 exports are not part of a source checkout")
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["export_status"] == "BLOCKED_BY_MISSING_MUSIC"
-    assert report["music"]["exists"] is False
-    assert report["video"] is None
-    assert report["validation"]["final_video"] is False
-    assert not list((CB002 / "videos").glob("*.mp4"))
+    if report["export_status"] == "BLOCKED_BY_MISSING_MUSIC":
+        assert report["music"]["exists"] is False
+        assert report["video"] is None
+        assert report["validation"]["final_video"] is False
+        assert not list((CB002 / "videos").glob("*.mp4"))
+    else:
+        assert report["export_status"] == "completed_pending_human_artistic_review"
+        assert report["music"]["exists"] is True
+        assert report["video"]
