@@ -110,3 +110,14 @@ The correction option is an isolated replay of the preserved historical Santa
 V5 head regression against the clean production variant. It does not edit
 official assets. The multimodal provider is currently unavailable and reports
 `not-executed` rather than fabricating an AI result.
+
+## Music Studio V1
+
+Open `/studio.html#music` while the loopback server is running. The module
+lists local music from `workspace/inputs/music`, reports real FFprobe metadata,
+draws the decoded PCM/RMS waveform, and offers 15–30 second candidate windows.
+Saving creates a local versioned project; export creates independent full
+16:9 and vertical 9:16 MP4s through `examples/music_studio_demo.py`. The
+Living Worlds renderer is shared by the browser preview and deterministic
+Canvas capture. It uses environmental assets only—no narrator, character,
+captions or lip-sync—and preserves the source music speed and pitch.

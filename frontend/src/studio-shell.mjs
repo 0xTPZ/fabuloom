@@ -7,6 +7,7 @@ import {
 } from "./narrator-mode.mjs";
 import { manifestVoiceId, narrationForCharacter, narrationForUrl, TOPAZIO_NARRATION_CATALOG } from "./topazio-narrations.mjs";
 import { validateManifest } from "./timeline.ts";
+import { initMusicStudio } from "./music-studio.mjs";
 import {
   DEV_LINKS,
   OFFICIAL_NARRATORS,
@@ -40,6 +41,7 @@ const ROUTE_COPY = Object.freeze({
   scenes: ["COMPOSIÇÃO", "Cenas", "Visualize os perfis de produção e suas cenas medidas."],
   narrators: ["ELENCO OFICIAL", "Narradores", "Personagens prontos para a experiência atual do Studio."],
   audio: ["SOM", "Áudio", "Voz, música, efeitos e limites reais do pipeline local."],
+  music: ["TRILHA CINEMATOGRÁFICA", "Music Studio", "Análise real de música e composição Living Worlds em dois formatos."],
   preview: ["COMPOSIÇÃO AO VIVO", "Prévia", "Veja a composição compartilhada com o Narrator Mode."],
   export: ["SAÍDA", "Exportação", "Arquivos produzidos e validados pelo pipeline existente."],
   dev: ["DESENVOLVIMENTO", "Área DEV", "Laboratórios e referências preservados fora do fluxo principal."],
@@ -362,6 +364,7 @@ async function init() {
   renderProfiles();
   renderExports();
   renderDevLinks();
+  await initMusicStudio();
   await startRenderer();
   await loadNarration(selectedNarration);
   renderRoute(location.hash.slice(1) || "dashboard");

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head><meta charset="utf-8"/><title>Fabuloom · Music Studio capture</title><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style></head>
+  <body>
+    <canvas id="capture-canvas"></canvas><pre id="status">initializing</pre>
+    <script type="module">
+      import { drawLivingWorldFrame, validateMusicStudioProject } from "./src/music-studio-renderer.mjs";
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const projectUrl = params.get("project");
+      const mode = params.get("mode") === "short" ? "short" : "full";
+      const fps = Number(params.get("fps") || 5);
+      const canvas = document.querySelector("#capture-canvas");
+      canvas.width = mode === "short" ? 1080 : 1920; canvas.height = mode === "short" ? 1920 : 1080;
+      const context = canvas.getContext("2d");
+      const status = document.querySelector("#status");
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+      const exportUrl = (project, relative) => `/exports/${project.asset_root.split("/").map(encodeURIComponent).join("/")}/${relative.split("/").map(encodeURIComponent).join("/")}`;
+      async function loadImage(project, asset) {
+        const image = new Image(); image.src = exportUrl(project, asset.path);
+        await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`asset failed: ${asset.path}`)); });
+        return image;
+      }
+      async function sendFrame(index, timeMs) {
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+        if (!blob) throw new Error("JPEG encoding failed");
+        const response = await fetch(`/capture/${encodeURIComponent(session)}/src-${String(index).padStart(6, "0")}.jpg`, { method: "POST", headers: { "Content-Type": "image/jpeg", "X-Frame-Time-Ms": String(timeMs) }, body: blob });
+        if (!response.ok) throw new Error(`frame upload failed: ${response.status}`);
+      }
+      async function main() {
+        if (!session || !projectUrl) fail("session and project are required");
+        const response = await fetch(projectUrl); if (!response.ok) fail(`project request failed: ${response.status}`);
+        const project = validateMusicStudioProject(await response.json());
+        const images = Object.fromEntries(await Promise.all(project.assets.map(async (asset) => [asset.id, await loadImage(project, asset)])));
+        const timeline = project[mode]; const frameCount = Math.max(1, Math.ceil(timeline.duration_ms / 1000 * fps)); const pending = new Set();
+        for (let index = 0; index < frameCount; index += 1) {
+          const timeMs = Math.round(index * 1000 / fps);
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          drawLivingWorldFrame(context, project, images, timeMs, mode);
+          const upload = sendFrame(index, timeMs); pending.add(upload); upload.then(() => pending.delete(upload), () => pending.delete(upload));
+          if (pending.size >= 8) await Promise.race(pending);
+        }
+        await Promise.all(pending);
+        const completion = { mode: `music-studio-${mode}`, duration_ms: timeline.duration_ms, canvas: { width: canvas.width, height: canvas.height }, fps, frame_count: frameCount, output_fps: 30, timing_source: "source_music_duration_and_rms_envelope", music_source: project.source.filename, no_narrator: true, no_characters: true, no_lip_sync: true };
+        const done = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });
+        if (!done.ok) fail(`completion upload failed: ${done.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>
