@@ -260,7 +260,10 @@ async function prepareLayeredCharacters() {
     santaV3Option.disabled = true;
     santaV3Option.textContent = "Santa V3 · asset indisponível";
   }
-  if (narratorReady.dora) await selectCharacter("dora");
+  // New/public sessions start with the neutral, MIT-licensed demo pack.
+  // Project-aware Studio restoration remains responsible for saved choices.
+  if (communityReady) await selectCharacter("community-demo", { loadVoice: false });
+  else if (narratorReady.dora) await selectCharacter("dora");
   else if (layeredReady) await selectCharacter("fantasy", { loadVoice: false });
   else await selectCharacter("geometric", { loadVoice: false });
 }
