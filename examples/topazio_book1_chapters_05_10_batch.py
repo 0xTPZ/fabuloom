@@ -416,17 +416,19 @@ def _validate_story_coverage(config: dict, manifest: dict) -> None:
 def _timeline(config: dict, manifest: dict, library_path: Path, library_sha256: str) -> dict:
     base = chapter3.base
     scenes = list(base.build_scene_schedule(manifest, library_path, library_sha256))
+    relative_project = config["project_root"].relative_to(EXPORT_ROOT).as_posix()
     for scene in scenes:
         scene["character_registry_id"] = APPROVED_CHARACTER_ID
         scene["library_asset_id"] = "santa-library-topazioverse-v1"
         scene["library_sha256"] = library_sha256
         if scene["kind"] == "story":
+            scene["image"] = f"{relative_project}/assets/generated/{Path(scene['image']).name}"
             scene["character_visual_policy"] = "Santa V5 medallion only; no story characters"
             scene["environment_only"] = True
     return {
         "format": "fabuloom.topazioverse-chapter/0.2",
         "title": f"Crônicas de Topázio — Livro 1 — Capítulo {config['number']}: {config['source']['title'].split('—', 1)[-1].strip()}",
-        "manifest": f"{config['project_id']}/manifest.json",
+        "manifest": f"{relative_project}/manifest.json",
         "duration_ms": manifest["duration_ms"],
         "transition_ms": TRANSITION_MS,
         "source_document": "workspace/inputs/book1/Topazio-O-Despertar-dos-Cristais.docx",
