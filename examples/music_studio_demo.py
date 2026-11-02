@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -33,6 +34,8 @@ OUTPUT_FPS = 30
 FULL_SIZE = (1920, 1080)
 SHORT_SIZE = (1080, 1920)
 DEFAULT_ASSET_ROOT = "music-studio/music-studio-v1-o-chamado-do-vazio"
+BATCH_ROOT = "music-studio/book1-v11"
+SUPPORTED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".ogg"}
 
 
 def _json(path: Path, payload: object) -> None:
@@ -59,7 +62,7 @@ def _safe_relative_music(value: str) -> Path:
         candidate.relative_to(MUSIC_ROOT)
     except ValueError as exc:
         raise ValueError("music asset must stay inside workspace/inputs/music") from exc
-    if candidate.suffix.lower() not in {".mp3", ".wav", ".flac", ".m4a", ".ogg"}:
+    if candidate.suffix.lower() not in SUPPORTED_AUDIO_EXTENSIONS:
         raise ValueError("unsupported music asset format")
     if not candidate.is_file():
         raise FileNotFoundError(candidate)
@@ -146,7 +149,39 @@ def analyze_source(source: Path) -> dict:
 
 
 def _project_name_from_source(source: Path) -> str:
-    return source.stem.lower().replace(" ", "-").replace("—", "-").replace("_", "-")
+    normalized = unicodedata.normalize("NFKD", source.stem).encode("ascii", "ignore").decode("ascii")
+    slug = "-".join(part for part in "".join(character.lower() if character.isalnum() else " " for character in normalized).split() if part)
+    return slug or f"track-{_sha256(source)[:10]}"
+
+
+def discover_music(root: Path = MUSIC_ROOT) -> list[Path]:
+    """Return only supported files directly inside the mission's book1 folder."""
+    return sorted((path for path in root.iterdir() if path.is_file() and path.suffix.lower() in SUPPORTED_AUDIO_EXTENSIONS), key=lambda path: path.name.casefold())
+
+
+def _batch_style_for_source(source: Path) -> str:
+    name = source.stem.casefold()
+    if "vazio" in name or "sombra" in name:
+        return "obsidian-void"
+    if "gaia" in name or "ecos" in name:
+        return "gaia-contemplative"
+    if "alba" in name or "luz" in name or "cristais" in name or "despertar" in name:
+        return "crystal-dawn"
+    return "topazioverse-living-worlds"
+
+
+def _short_selection_from_candidate(duration_ms: int, candidate: dict | None, requested_start_ms: int | None, requested_end_ms: int | None) -> tuple[int, int, str]:
+    if requested_start_ms is not None or requested_end_ms is not None:
+        start = max(0, int(requested_start_ms or 0))
+        end = min(duration_ms, int(requested_end_ms if requested_end_ms is not None else start + 24000))
+        return start, end, "owner_or_manual_range"
+    desired = min(24000, duration_ms)
+    if candidate:
+        center = (int(candidate["start_ms"]) + int(candidate["end_ms"])) // 2
+        start = max(0, min(max(0, duration_ms - desired), center - desired // 2))
+    else:
+        start = 0
+    return start, min(duration_ms, start + desired), "highest_rms_candidate_centered_24s"
 
 
 def _asset_sources() -> list[tuple[str, Path, str]]:
@@ -164,9 +199,10 @@ def _asset_sources() -> list[tuple[str, Path, str]]:
 
 def _style(style_id: str) -> dict:
     styles = {
-        "topazioverse-living-worlds": {"id": "topazioverse-living-worlds", "label": "Topazioverse Living Worlds", "palette": {"deep": "#060b1c", "mid": "#182c63", "accent": "#7d63ff", "gold": "#e6c77a", "mist": "#b7c8ff"}},
-        "obsidian-void": {"id": "obsidian-void", "label": "Obsidian Void", "palette": {"deep": "#05040e", "mid": "#211347", "accent": "#9a64ff", "gold": "#d4b3ff", "mist": "#a9a2d4"}},
-        "crystal-dawn": {"id": "crystal-dawn", "label": "Crystal Dawn", "palette": {"deep": "#0b1727", "mid": "#26547b", "accent": "#67d7ff", "gold": "#f1d487", "mist": "#d3f4ff"}},
+        "topazioverse-living-worlds": {"id": "topazioverse-living-worlds", "label": "Topazioverse Living Worlds", "palette": {"deep": "#060b1c", "mid": "#182c63", "accent": "#5478c8", "gold": "#e6c77a", "mist": "#b7c8ff", "fog": "#91b4dd", "spark": "#f5d98a", "reflection": "#6e9cdd"}},
+        "obsidian-void": {"id": "obsidian-void", "label": "Obsidian Void", "palette": {"deep": "#05040e", "mid": "#211347", "accent": "#5d4f9e", "gold": "#d4b3ff", "mist": "#a9a2d4", "fog": "#74699d", "spark": "#c6b7ff", "reflection": "#695aaf"}},
+        "crystal-dawn": {"id": "crystal-dawn", "label": "Crystal Dawn", "palette": {"deep": "#0b1727", "mid": "#26547b", "accent": "#4caeca", "gold": "#f1d487", "mist": "#d3f4ff", "fog": "#9ad4d4", "spark": "#ffe7a2", "reflection": "#7bd3e8"}},
+        "gaia-contemplative": {"id": "gaia-contemplative", "label": "Gaia Contemplative", "palette": {"deep": "#071713", "mid": "#234a3e", "accent": "#5a9b74", "gold": "#e8d58a", "mist": "#b9d8b1", "fog": "#80b79a", "spark": "#f3e39e", "reflection": "#76b998"}},
     }
     return styles.get(style_id, styles["topazioverse-living-worlds"])
 
@@ -183,22 +219,33 @@ def _scene_list(duration_ms: int, *, start_ms: int = 0, end_ms: int | None = Non
     return scenes
 
 
-def create_project(asset: str, style_id: str, short_start_ms: int | None, short_end_ms: int | None, name: str | None) -> tuple[Path, dict]:
+def create_project(
+    asset: str,
+    style_id: str,
+    short_start_ms: int | None,
+    short_end_ms: int | None,
+    name: str | None,
+    *,
+    project_root_base: Path | None = None,
+) -> tuple[Path, dict]:
     source = _safe_relative_music(asset)
     analysis = analyze_source(source)
     duration_ms = int(analysis["metadata"]["duration_ms"])
-    candidates = analysis["energy_candidates"]
-    candidate = analysis.get("selected_candidate") or {"start_ms": 0, "end_ms": min(duration_ms, 24000)}
-    start = max(0, int(short_start_ms if short_start_ms is not None else candidate["start_ms"]))
-    end = min(duration_ms, int(short_end_ms if short_end_ms is not None else candidate["end_ms"]))
+    candidate = analysis.get("selected_candidate")
+    start, end, selection_method = _short_selection_from_candidate(duration_ms, candidate, short_start_ms, short_end_ms)
     if end <= start:
         raise ValueError("short selection must end after its start")
     if end - start < 15000 or end - start > 30000:
         raise ValueError("short selection must be between 15 and 30 seconds")
-    project_id = name or _project_name_from_source(source)
-    project_id = "".join(character if character.isalnum() or character in "-_" else "-" for character in project_id.lower()).strip("-") or "music-project"
-    project_root = (EXPORT_ROOT / "music-studio" / f"music-studio-v1-{project_id}").resolve()
+    project_slug = _project_name_from_source(source)
+    requested_name = name or project_slug
+    requested_name = "".join(character if character.isalnum() or character in "-_" else "-" for character in requested_name.lower()).strip("-") or "music-project"
+    base_root = (project_root_base or (EXPORT_ROOT / "music-studio")).resolve()
+    base_root.relative_to(EXPORT_ROOT.resolve())
+    project_root = (base_root / (requested_name if project_root_base else f"music-studio-v1-{requested_name}")).resolve()
     project_root.relative_to(EXPORT_ROOT.resolve())
+    project_id = project_root.name
+    style = _style(_batch_style_for_source(source) if style_id == "auto" else style_id)
     project_root.mkdir(parents=True, exist_ok=True)
     (project_root / "audio").mkdir(exist_ok=True)
     (project_root / "assets").mkdir(exist_ok=True)
@@ -220,14 +267,16 @@ def create_project(asset: str, style_id: str, short_start_ms: int | None, short_
         "id": project_root.name,
         "asset_root": project_root.relative_to(EXPORT_ROOT).as_posix(),
         "title": "Music Studio · " + source.stem,
-        "style": _style(style_id),
-        "source": {**analysis["source"], "analysis": analysis["metadata"], "copied_audio": source_copy.relative_to(project_root).as_posix(), "pitch_or_speed_changed": False},
+        "display_title": source.stem,
+        "renderer_version": "music-studio-v1.1",
+        "style": style,
+        "source": {**analysis["source"], "display_title": source.stem, "analysis": analysis["metadata"], "copied_audio": source_copy.relative_to(project_root).as_posix(), "pitch_or_speed_changed": False},
         "analysis": {"waveform": analysis["waveform"], "energy_candidates": analysis["energy_candidates"], "timing": analysis["timing"]},
         "visual_policy": {"mode": "Topazioverse Living Worlds", "narrator": None, "characters": [], "narration": None, "lip_sync": False, "captions": False, "assets_are_environmental_only": True},
         "assets": assets,
         "full": {"width": 1920, "height": 1080, "fps": OUTPUT_FPS, "duration_ms": duration_ms, "audio_start_ms": 0, "audio_end_ms": duration_ms, "scenes": _scene_list(duration_ms)},
         "short": {"width": 1080, "height": 1920, "fps": OUTPUT_FPS, "duration_ms": end - start, "audio_start_ms": start, "audio_end_ms": end, "scenes": _scene_list(end - start, start_ms=0, end_ms=end - start, vertical=True)},
-        "short_selection": {"start_ms": start, "end_ms": end, "duration_ms": end - start, "selection_method": "owner_or_highest_rms_candidate", "candidate_method": "heuristic_rms_window"},
+        "short_selection": {"start_ms": start, "end_ms": end, "duration_ms": end - start, "selection_method": selection_method, "candidate_method": "heuristic_rms_window"},
         "rights": {"music_origin": "owner-supplied local file; editorially associated with Suno concepts", "commercial_confirmation": "required before publication", "models_or_weights_included": False},
     }
     _json(project_root / "analysis.json", analysis)
@@ -291,7 +340,7 @@ def capture_frames(project_root: Path, mode: str, frames_root: Path, *, port: in
         _wait_http(f"http://127.0.0.1:{port}/capture-music-studio.html", 20)
         relative = project_root.relative_to(EXPORT_ROOT).as_posix()
         url = f"http://127.0.0.1:{port}/capture-music-studio.html?session={session}&project=/exports/{relative}/project.json&mode={mode}&fps={CAPTURE_FPS}"
-        browser = subprocess.Popen([edge, "--headless=new", "--hide-scrollbars", f"--window-size={1920 if mode == 'full' else 1080},{1080 if mode == 'full' else 1920}", "--run-all-compositor-stages-before-draw", f"--user-data-dir={profile}", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        browser = subprocess.Popen([edge, "--headless=new", "--disable-gpu", "--disable-gpu-compositing", "--force-device-scale-factor=1", "--disable-background-networking", "--hide-scrollbars", f"--window-size={1920 if mode == 'full' else 1080},{1080 if mode == 'full' else 1920}", f"--user-data-dir={profile}", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         complete = session_dir / "complete.json"
         error = session_dir / "error.json"
         deadline = time.monotonic() + timeout
@@ -346,6 +395,182 @@ def _probe_output(path: Path) -> dict:
     return json.loads(result.stdout)
 
 
+def _validate_output(path: Path, timeline: dict) -> dict:
+    """Validate an encoded pair without rendering it again."""
+    expected_duration = int(timeline["duration_ms"])
+    probe = _probe_output(path)
+    streams = probe.get("streams", [])
+    video = next((item for item in streams if item.get("codec_type") == "video"), {})
+    audio_stream = next((item for item in streams if item.get("codec_type") == "audio"), {})
+    measured = float(probe.get("format", {}).get("duration") or 0.0)
+    duration_ok = abs(measured - expected_duration / 1000) <= 0.25
+    geometry_ok = (int(video.get("width") or 0), int(video.get("height") or 0)) == (int(timeline["width"]), int(timeline["height"]))
+    decode = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(path), "-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"], text=True, capture_output=True)
+    black = subprocess.run(["ffmpeg", "-hide_banner", "-vf", "blackdetect=d=0.15:pic_th=0.98", "-an", "-i", str(path), "-f", "null", "-"], text=True, capture_output=True)
+    black_intervals = [line.strip() for line in (black.stderr or "").splitlines() if "black_start:" in line]
+    return {
+        "ffprobe": probe,
+        "duration_ok": duration_ok,
+        "geometry_ok": geometry_ok,
+        "decode_ok": decode.returncode == 0,
+        "blackdetect_intervals": black_intervals,
+        "audio_codec_ok": audio_stream.get("codec_name") == "aac",
+        "video_codec_ok": video.get("codec_name") == "h264",
+        "all_ok": duration_ok and geometry_ok and decode.returncode == 0 and audio_stream.get("codec_name") == "aac" and video.get("codec_name") == "h264",
+    }
+
+
+def make_board_from_video(video: Path, duration_ms: int, output: Path, *, vertical: bool) -> None:
+    """Recover a board when a valid encode exists but its capture session was cleaned."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".music-board-video-", dir=output.parent) as temp:
+        files = []
+        for index, value in enumerate((0.08, 0.33, 0.58, 0.83)):
+            source = Path(temp) / f"{index:02d}.png"
+            timestamp = max(0.0, min(max(0.0, duration_ms / 1000 - 0.1), duration_ms / 1000 * value))
+            _run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{timestamp:.3f}", "-i", str(video), "-frames:v", "1", str(source)])
+            files.append(source)
+        width, height = (540, 960) if vertical else (640, 360)
+        scaled = []
+        for index, source in enumerate(files):
+            target = Path(temp) / f"scaled-{index:02d}.png"
+            _run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x050814", str(target)])
+            scaled.append(target)
+        inputs = [argument for file in scaled for argument in ("-i", str(file))]
+        cell_width, cell_height = (540, 960) if vertical else (640, 360)
+        layout = "|".join(f"{index % 2 * cell_width}_{index // 2 * cell_height}" for index in range(len(scaled)))
+        _run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", f"xstack=inputs=4:layout={layout}:fill=black,format=rgb24[out]", "-map", "[out]", "-frames:v", "1", str(output)])
+
+
+def _write_technical_report(project_root: Path, project: dict, reports: dict, *, version: str) -> None:
+    lines = [
+        f"# Fabuloom Music Studio {version} — relatório técnico",
+        "",
+        f"- Projeto: `{project['title']}`",
+        f"- Fonte: `{project['source']['filename']}`",
+        f"- Duração original medida: `{project['source']['analysis']['duration_seconds']:.3f} s`",
+        f"- Formato fonte: `{project['source']['analysis']['format_name']}` · `{project['source']['analysis']['sample_rate']} Hz` · `{project['source']['analysis']['channels']} canais`",
+        f"- Estilo: `{project['style']['label']}`",
+        f"- Short: `{project['short_selection']['start_ms']}–{project['short_selection']['end_ms']} ms` · `{project['short_selection']['selection_method']}`",
+        "- Análise: envelope RMS obtido de PCM decodificado por FFmpeg; BPM, beats e transições: indisponíveis.",
+        "- Efeitos: névoa, partículas, reflexos e fragmentos luminosos orgânicos; sem faixa roxa, polígonos repetitivos ou personagens.",
+        "- Render: Canvas determinístico compartilhado com a prévia; sem narrador, legendas ou lip-sync.",
+        "- Áudio: arquivo original preservado; sem alteração de velocidade ou pitch; AAC apenas no contêiner final.",
+        "- Direitos: confirmação comercial da origem Suno continua pendente antes de publicação.",
+        "- Revisão artística humana: pendente.",
+        "",
+        "## Saídas",
+        "",
+    ]
+    for mode, output in reports.get("outputs", {}).items():
+        validation = output.get("validation", {})
+        lines.extend([
+            f"### {mode}",
+            f"- Vídeo: `{output.get('video')}`",
+            f"- Prancha: `{output.get('board')}`",
+            f"- Duração medida: `{validation.get('ffprobe', {}).get('format', {}).get('duration', '—')} s`",
+            f"- Validação: `{'OK' if validation.get('all_ok') else 'FALHA'}` · decode=`{validation.get('decode_ok')}` · blackdetect intervalos=`{len(validation.get('blackdetect_intervals', []))}`",
+            "",
+        ])
+    (project_root / "reports" / "technical-report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def export_project_v11(project_path: Path, formats: set[str], *, overwrite: bool = False, port: int = 8797, capture_timeout: float = 1800) -> dict:
+    """Export one V1.1 project, reusing validated outputs on resume."""
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    if project.get("format") != PROJECT_FORMAT:
+        raise ValueError("unsupported Music Studio project format")
+    project_root = project_path.parent
+    audio = project_root / project["source"]["copied_audio"]
+    if not audio.is_file():
+        raise FileNotFoundError(audio)
+    reports = {"version": "music-studio-v1.1", "project": project_path.relative_to(EXPORT_ROOT).as_posix(), "source": project["source"], "formats": sorted(formats), "outputs": {}, "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    for index, mode in enumerate(("full", "short")):
+        if mode not in formats:
+            continue
+        timeline = project[mode]
+        output = project_root / "videos" / f"fabuloom-music-studio-{_project_name_from_source(Path(project['source']['filename']))}-{mode}.mp4"
+        board = project_root / "captures" / f"{mode}-board.png"
+        preview = project_root / "previews" / f"{mode}-preview.mp4"
+        reused = False
+        validation = None
+        if output.is_file() and not overwrite:
+            try:
+                validation = _validate_output(output, timeline)
+                reused = bool(validation["all_ok"])
+            except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError):
+                reused = False
+        if reused:
+            _write_progress(project_root, f"reused-{mode}", 50 + index * 25, mode=mode)
+            if not board.is_file():
+                make_board_from_video(output, int(timeline["duration_ms"]), board, vertical=mode == "short")
+            if not preview.is_file():
+                _run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(output), "-t", "8", "-vf", "scale=270:480" if mode == "short" else "scale=640:360", "-c:v", "libx264", "-crf", "25", "-c:a", "aac", "-b:a", "96k", str(preview)])
+        else:
+            _write_progress(project_root, f"capturing-{mode}", 10 + index * 35, mode=mode)
+            frame_dir, completion = capture_frames(project_root, mode, project_root / "captures" / mode, port=port + index, timeout=capture_timeout)
+            _write_progress(project_root, f"encoding-{mode}", 55 + index * 25, mode=mode)
+            render_mp4(frame_dir, audio, output, int(timeline["duration_ms"]), start_ms=int(timeline["audio_start_ms"]), overwrite=overwrite or output.exists())
+            make_board(frame_dir, int(timeline["duration_ms"]), board, vertical=mode == "short")
+            validation = _validate_output(output, timeline)
+            if not validation["all_ok"]:
+                raise RuntimeError(f"V1.1 output validation failed for {mode}: {validation}")
+            _run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(output), "-t", "8", "-vf", "scale=270:480" if mode == "short" else "scale=640:360", "-c:v", "libx264", "-crf", "25", "-c:a", "aac", "-b:a", "96k", str(preview)])
+            shutil.rmtree(frame_dir, ignore_errors=True)
+        reports["outputs"][mode] = {"video": output.relative_to(EXPORT_ROOT).as_posix(), "preview": preview.relative_to(EXPORT_ROOT).as_posix(), "board": board.relative_to(EXPORT_ROOT).as_posix(), "reused": reused, "validation": validation or _validate_output(output, timeline)}
+    if set(reports["outputs"]) != set(formats):
+        raise RuntimeError("requested Music Studio formats were not all exported")
+    _write_progress(project_root, "completed", 100, outputs={mode: item["video"] for mode, item in reports["outputs"].items()})
+    _json(project_root / "reports" / "technical-report.json", reports)
+    _write_technical_report(project_root, project, reports, version="V1.1")
+    return reports
+
+
+def export_book1_batch(*, overwrite: bool = False, port: int = 8797, capture_timeout: float = 1800) -> dict:
+    """Process all supported book1 tracks sequentially and write resumable indexes."""
+    batch_root = (EXPORT_ROOT / BATCH_ROOT).resolve()
+    batch_root.relative_to(EXPORT_ROOT.resolve())
+    batch_root.mkdir(parents=True, exist_ok=True)
+    tracks = discover_music(MUSIC_ROOT / "book1")
+    preferred = next((track for track in tracks if track.stem.casefold() == "o chamado do vazio"), None)
+    if preferred is not None:
+        tracks = [preferred] + [track for track in tracks if track != preferred]
+    records: list[dict] = []
+
+    def save_index() -> None:
+        _json(batch_root / "INDEX.json", {"format": "fabuloom.music-studio-batch/0.1", "version": "music-studio-v1.1", "input_root": (MUSIC_ROOT / "book1").relative_to(WORKSPACE_ROOT).as_posix(), "tracks": records})
+        lines = ["# Fabuloom Music Studio V1.1 — Book 1 batch", "", f"- Faixas encontradas: **{len(tracks)}**", f"- Pares concluídos: **{sum(item.get('status') == 'DONE' for item in records)}**", f"- Falhas/pendências: **{sum(item.get('status') != 'DONE' for item in records)}**", "- Direitos comerciais: `pending_owner_confirmation` para todas as faixas.", ""]
+        for item in records:
+            lines.extend([f"## {item['filename']}", f"- Status: `{item['status']}`", f"- Fonte: `{item['source']}`", f"- SHA-256: `{item['sha256']}`", f"- Estilo: `{item.get('style', '—')}`", f"- Projeto: `{item.get('project', '—')}`", f"- Full: `{item.get('full', '—')}`", f"- Short: `{item.get('short', '—')}`", f"- Duração: `{item.get('duration_seconds', '—')} s`", f"- Short range: `{item.get('short_start_ms', '—')}–{item.get('short_end_ms', '—')} ms`", f"- Erro: `{item.get('error', '—')}`", ""])
+        (batch_root / "BATCH-REPORT.md").write_text("\n".join(lines), encoding="utf-8")
+
+    for source in tracks:
+        relative = source.relative_to(MUSIC_ROOT).as_posix()
+        base_record = {"filename": source.name, "source": source.relative_to(WORKSPACE_ROOT).as_posix(), "sha256": _sha256(source), "status": "PENDING", "rights": "pending_owner_confirmation"}
+        try:
+            analysis = analyze_source(source)
+            candidate = analysis.get("selected_candidate")
+            start, end, _ = _short_selection_from_candidate(int(analysis["metadata"]["duration_ms"]), candidate, None, None)
+            style_id = _batch_style_for_source(source)
+            slug = _project_name_from_source(source)
+            project_path = batch_root / slug / "project.json"
+            if project_path.is_file():
+                existing = json.loads(project_path.read_text(encoding="utf-8"))
+                if existing.get("source", {}).get("sha256") != base_record["sha256"]:
+                    raise RuntimeError("existing project has a different source hash")
+                project_root, project = project_path.parent, existing
+            else:
+                project_root, project = create_project(relative, style_id, start, end, slug, project_root_base=batch_root)
+            reports = export_project_v11(project_root / "project.json", {"full", "short"}, overwrite=overwrite, port=port, capture_timeout=capture_timeout)
+            record = {**base_record, "status": "DONE", "project": reports["project"], "style": project["style"]["id"], "duration_seconds": project["source"]["analysis"]["duration_seconds"], "short_start_ms": project["short_selection"]["start_ms"], "short_end_ms": project["short_selection"]["end_ms"], "full": reports["outputs"]["full"]["video"], "short": reports["outputs"]["short"]["video"], "boards": {mode: item["board"] for mode, item in reports["outputs"].items()}, "validation": {mode: item["validation"] for mode, item in reports["outputs"].items()}}
+        except Exception as exc:  # Isolate a broken track and keep the batch resumable.
+            record = {**base_record, "status": "FAILED", "error": f"{type(exc).__name__}: {exc}"}
+        records.append(record)
+        save_index()
+    save_index()
+    return {"batch_root": batch_root.relative_to(EXPORT_ROOT).as_posix(), "track_count": len(tracks), "completed": sum(item["status"] == "DONE" for item in records), "failed": sum(item["status"] != "DONE" for item in records), "tracks": records}
+
+
 def export_project(project_path: Path, formats: set[str], *, overwrite: bool = False, port: int = 8797, capture_timeout: float = 1800) -> dict:
     project = json.loads(project_path.read_text(encoding="utf-8"))
     if project.get("format") != PROJECT_FORMAT:
@@ -397,12 +622,16 @@ def main() -> int:
     parser.add_argument("--name")
     parser.add_argument("--create-project", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
+    parser.add_argument("--batch-book1", action="store_true", help="export every supported track in workspace/inputs/music/book1")
     parser.add_argument("--project")
     parser.add_argument("--formats", default="both")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--port", type=int, default=8797)
     parser.add_argument("--capture-timeout", type=float, default=1800)
     args = parser.parse_args()
+    if args.batch_book1:
+        print(json.dumps(export_book1_batch(overwrite=args.overwrite, port=args.port, capture_timeout=args.capture_timeout), ensure_ascii=False, indent=2))
+        return 0
     if args.analyze_only:
         source = _safe_relative_music(args.asset or "")
         print(json.dumps(analyze_source(source), ensure_ascii=False, indent=2))

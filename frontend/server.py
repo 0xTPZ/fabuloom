@@ -111,9 +111,18 @@ def _music_catalog() -> list[dict]:
 
 def _music_project_path(project_id: str) -> Path:
     safe = "".join(character if character.isalnum() or character in "-_" else "-" for character in str(project_id)).strip("-")
-    candidate = (EXPORT_ROOT / "music-studio" / safe / "project.json").resolve()
-    candidate.relative_to(EXPORT_ROOT.resolve())
-    return candidate
+    projects_root = (EXPORT_ROOT / "music-studio").resolve()
+    projects_root.relative_to(EXPORT_ROOT.resolve())
+    for candidate in projects_root.rglob("project.json"):
+        candidate = candidate.resolve()
+        candidate.relative_to(EXPORT_ROOT.resolve())
+        try:
+            project = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if project.get("id") == safe:
+            return candidate
+    return (projects_root / safe / "project.json").resolve()
 
 
 def _start_music_export(project_path: Path, formats: str, overwrite: bool) -> str:
@@ -127,7 +136,7 @@ def _start_music_export(project_path: Path, formats: str, overwrite: bool) -> st
     handle = log_path.open("w", encoding="utf-8")
     process = subprocess.Popen(command, cwd=str(FRONTEND_ROOT.parent), stdout=handle, stderr=subprocess.STDOUT, env=os.environ.copy())
     with MUSIC_LOCK:
-        MUSIC_JOBS[job_id] = {"id": job_id, "state": "running", "process": process, "log": log_path, "project": project_path}
+        MUSIC_JOBS[job_id] = {"id": job_id, "state": "running", "process": process, "log": log_path, "project": project_path, "formats": formats}
     def monitor() -> None:
         code = process.wait()
         handle.close()
@@ -162,7 +171,7 @@ class StageHandler(BaseHTTPRequestHandler):
             projects_root = EXPORT_ROOT / "music-studio"
             projects = []
             if projects_root.is_dir():
-                for project_path in sorted(projects_root.glob("*/project.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+                for project_path in sorted(projects_root.rglob("project.json"), key=lambda item: item.stat().st_mtime, reverse=True):
                     try:
                         project = json.loads(project_path.read_text(encoding="utf-8"))
                         projects.append({"id": project.get("id"), "title": project.get("title"), "format": project.get("format"), "source": project.get("source", {}).get("filename"), "path": project_path.relative_to(EXPORT_ROOT).as_posix(), "updated_at": project_path.stat().st_mtime})

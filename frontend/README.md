@@ -121,3 +121,18 @@ Saving creates a local versioned project; export creates independent full
 Living Worlds renderer is shared by the browser preview and deterministic
 Canvas capture. It uses environmental assets only—no narrator, character,
 captions or lip-sync—and preserves the source music speed and pitch.
+
+### Music Studio V1.1 batch
+
+The V1.1 runner processes every supported file directly inside
+`workspace/inputs/music/book1` sequentially:
+
+```powershell
+python examples/music_studio_demo.py --batch-book1 --port 8900
+```
+
+It writes resumable projects and both outputs under
+`workspace/exports/music-studio/book1-v11`, with dynamic source titles and
+ambient fog/particle/reflection effects instead of the old purple footer and
+repeated geometric crystals. `INDEX.json` and `BATCH-REPORT.md` are generated
+after each track. Rights remain a pending owner confirmation gate.
