@@ -9,6 +9,7 @@ export const STUDIO_SECTIONS = Object.freeze([
   Object.freeze({ id: "scenes", label: "Cenas", icon: "◇", status: "experimental" }),
   Object.freeze({ id: "narrators", label: "Narradores", icon: "✦", status: "stable" }),
   Object.freeze({ id: "audio", label: "Áudio", icon: "◉", status: "stable" }),
+  Object.freeze({ id: "music", label: "Music Studio", icon: "♪", status: "experimental" }),
   Object.freeze({ id: "preview", label: "Prévia", icon: "▷", status: "stable" }),
   Object.freeze({ id: "export", label: "Exportação", icon: "⇩", status: "stable" }),
 ]);

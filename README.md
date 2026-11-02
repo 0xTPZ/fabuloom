@@ -274,3 +274,14 @@ The 1920x1080 H.264/AAC export, SRT, manifest, storyboard and reports remain
 outside Git under `workspace\exports\bastidores\bt-001-por-tras-das-cronicas`.
 Commercial music rights and final human artistic approval remain pending. See
 `docs/BASTIDORES-BT-001.md`.
+
+Mission 035 adds Music Studio V1 to the main `frontend/studio.html` shell.
+It catalogs owner-supplied local MP3/WAV files with FFprobe, derives a real
+PCM/RMS waveform without claiming BPM or beat timing, and saves the versioned
+`fabuloom.music-studio-project/0.1` contract. The shared environmental Canvas
+renderer produces a full 1920x1080 video at the source duration and an
+independently framed 1080x1920 Short of 15–30 seconds. This mode intentionally
+contains no Santa V5, narrator, captions, lip-sync or Draft characters. Outputs
+and evidence remain outside Git under `workspace\\exports\\music-studio`; see
+`docs/FABULOOM-MUSIC-STUDIO-V1.md`. Commercial rights for Suno-origin music
+must be confirmed before publication.

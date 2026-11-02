@@ -10,7 +10,10 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from urllib.parse import unquote, urlsplit
+import threading
+import time
+import uuid
+from urllib.parse import parse_qs, unquote, urlsplit
 
 
 FRONTEND_ROOT = Path(__file__).resolve().parent
@@ -43,6 +46,98 @@ EXPORT_ROOT = export_root_for(WORKSPACE_ROOT, os.environ.get("FABULOOM_EXPORT_RO
 CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
+MUSIC_JOBS: dict[str, dict] = {}
+MUSIC_LOCK = threading.Lock()
+MUSIC_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".ogg"}
+
+
+def _music_root() -> Path:
+    return (WORKSPACE_ROOT / "workspace" / "inputs" / "music").resolve()
+
+
+def _safe_music_asset(value: str) -> Path:
+    raw = str(value).replace("\\", "/").strip().lstrip("/")
+    candidate = (_music_root() / raw).resolve()
+    try:
+        candidate.relative_to(_music_root())
+    except ValueError as exc:
+        raise ValueError("asset must stay inside workspace/inputs/music") from exc
+    if candidate.suffix.lower() not in MUSIC_EXTENSIONS or not candidate.is_file():
+        raise ValueError("music asset not found or unsupported")
+    return candidate
+
+
+def _read_request(handler: BaseHTTPRequestHandler, max_bytes: int = 64 * 1024) -> dict:
+    raw_length = handler.headers.get("Content-Length")
+    try:
+        content_length = int(raw_length or "0")
+    except ValueError as exc:
+        raise ValueError("invalid request length") from exc
+    if content_length < 0 or content_length > max_bytes:
+        raise ValueError("request is too large")
+    payload = handler.rfile.read(content_length)
+    if len(payload) != content_length:
+        raise ValueError("incomplete request body")
+    data = json.loads(payload.decode("utf-8")) if payload else {}
+    if not isinstance(data, dict):
+        raise ValueError("request must be an object")
+    return data
+
+
+def _music_runner() -> Path:
+    return FRONTEND_ROOT.parent / "examples" / "music_studio_demo.py"
+
+
+def _music_python() -> str:
+    configured = WORKSPACE_ROOT / "workspace" / ".venv" / "Scripts" / "python.exe"
+    return str(configured if configured.is_file() else Path(sys.executable))
+
+
+def _music_catalog() -> list[dict]:
+    catalog = []
+    for source in sorted(_music_root().rglob("*")):
+        if not source.is_file() or source.suffix.lower() not in MUSIC_EXTENSIONS:
+            continue
+        relative = source.relative_to(_music_root()).as_posix()
+        try:
+            probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration,format_name,size:stream=codec_name,sample_rate,channels", "-of", "json", str(source)], check=True, text=True, capture_output=True)
+            data = json.loads(probe.stdout)
+            stream = next((item for item in data.get("streams", []) if item.get("codec_name")), {})
+            catalog.append({"asset": relative, "filename": source.name, "duration_ms": int(round(float(data.get("format", {}).get("duration") or 0) * 1000)), "format": data.get("format", {}).get("format_name"), "codec": stream.get("codec_name"), "sample_rate": int(stream.get("sample_rate") or 0), "channels": int(stream.get("channels") or 0), "size_bytes": int(data.get("format", {}).get("size") or source.stat().st_size)})
+        except (OSError, subprocess.CalledProcessError, ValueError, json.JSONDecodeError):
+            catalog.append({"asset": relative, "filename": source.name, "metadata_error": True, "size_bytes": source.stat().st_size})
+    return catalog
+
+
+def _music_project_path(project_id: str) -> Path:
+    safe = "".join(character if character.isalnum() or character in "-_" else "-" for character in str(project_id)).strip("-")
+    candidate = (EXPORT_ROOT / "music-studio" / safe / "project.json").resolve()
+    candidate.relative_to(EXPORT_ROOT.resolve())
+    return candidate
+
+
+def _start_music_export(project_path: Path, formats: str, overwrite: bool) -> str:
+    job_id = uuid.uuid4().hex[:12]
+    project_root = project_path.parent
+    log_path = project_root / "reports" / f"export-{job_id}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    command = [_music_python(), str(_music_runner()), "--project", str(project_path), "--formats", formats, "--port", str(8800 + int(job_id[:3], 16) % 500), "--capture-timeout", "1800"]
+    if overwrite:
+        command.append("--overwrite")
+    handle = log_path.open("w", encoding="utf-8")
+    process = subprocess.Popen(command, cwd=str(FRONTEND_ROOT.parent), stdout=handle, stderr=subprocess.STDOUT, env=os.environ.copy())
+    with MUSIC_LOCK:
+        MUSIC_JOBS[job_id] = {"id": job_id, "state": "running", "process": process, "log": log_path, "project": project_path}
+    def monitor() -> None:
+        code = process.wait()
+        handle.close()
+        with MUSIC_LOCK:
+            job = MUSIC_JOBS.get(job_id)
+            if job:
+                job["state"] = "completed" if code == 0 else "failed"
+                job["exit_code"] = code
+    threading.Thread(target=monitor, daemon=True).start()
+    return job_id
 
 
 class StageHandler(BaseHTTPRequestHandler):
@@ -50,6 +145,53 @@ class StageHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = unquote(urlsplit(self.path).path)
+        query = parse_qs(urlsplit(self.path).query)
+        if path == "/api/music/catalog":
+            self._send_json({"format": "fabuloom.music-catalog/0.1", "assets": _music_catalog()})
+            return
+        if path == "/api/music/analyze":
+            try:
+                asset = (query.get("asset") or [""])[0]
+                source = _safe_music_asset(asset)
+                result = subprocess.run([_music_python(), str(_music_runner()), "--analyze-only", "--asset", source.relative_to(_music_root()).as_posix()], cwd=str(FRONTEND_ROOT.parent), check=True, text=True, capture_output=True, env=os.environ.copy())
+                self._send_json(json.loads(result.stdout))
+            except (ValueError, FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
+        if path == "/api/music/projects":
+            projects_root = EXPORT_ROOT / "music-studio"
+            projects = []
+            if projects_root.is_dir():
+                for project_path in sorted(projects_root.glob("*/project.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+                    try:
+                        project = json.loads(project_path.read_text(encoding="utf-8"))
+                        projects.append({"id": project.get("id"), "title": project.get("title"), "format": project.get("format"), "source": project.get("source", {}).get("filename"), "path": project_path.relative_to(EXPORT_ROOT).as_posix(), "updated_at": project_path.stat().st_mtime})
+                    except (OSError, ValueError, json.JSONDecodeError):
+                        continue
+            self._send_json({"format": "fabuloom.music-projects/0.1", "projects": projects})
+            return
+        if path == "/api/music/project":
+            try:
+                project_path = _music_project_path((query.get("id") or [""])[0])
+                self._send_json(json.loads(project_path.read_text(encoding="utf-8")))
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                self._send_json({"error": str(exc)}, status=404)
+            return
+        if path.startswith("/api/music/jobs/"):
+            job_id = path.removeprefix("/api/music/jobs/")
+            with MUSIC_LOCK:
+                job = dict(MUSIC_JOBS.get(job_id) or {})
+            if not job:
+                self._send_json({"error": "job not found"}, status=404)
+                return
+            process = job.pop("process", None)
+            log_path = job.get("log")
+            progress_path = Path(job["project"]).parent / "reports" / "progress.json"
+            job["log"] = "/exports/" + log_path.relative_to(EXPORT_ROOT).as_posix() if log_path else None
+            job["progress"] = json.loads(progress_path.read_text(encoding="utf-8")) if progress_path.is_file() else {"stage": job["state"], "progress": 0}
+            job["project"] = Path(job["project"]).relative_to(EXPORT_ROOT).as_posix()
+            self._send_json(job)
+            return
         if path == "/narrator-mode/status":
             self._send_narrator_status()
             return
@@ -84,6 +226,37 @@ class StageHandler(BaseHTTPRequestHandler):
             self.send_error(403, "capture accepts loopback requests only")
             return
         path = unquote(urlsplit(self.path).path)
+        if path == "/api/music/project":
+            try:
+                request = _read_request(self)
+                asset = str(request.get("asset") or "")
+                _safe_music_asset(asset)
+                command = [_music_python(), str(_music_runner()), "--create-project", "--asset", asset, "--style", str(request.get("style_id") or "topazioverse-living-worlds"), "--name", str(request.get("name") or "music-project")]
+                if request.get("short_start_ms") is not None:
+                    command.extend(["--short-start-ms", str(int(request["short_start_ms"]))])
+                if request.get("short_end_ms") is not None:
+                    command.extend(["--short-end-ms", str(int(request["short_end_ms"]))])
+                result = subprocess.run(command, cwd=str(FRONTEND_ROOT.parent), check=True, text=True, capture_output=True, env=os.environ.copy())
+                response = json.loads(result.stdout)
+                project = json.loads(Path(response["project"]).read_text(encoding="utf-8"))
+                self._send_json({"project": project}, status=201)
+            except (ValueError, FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
+        if path == "/api/music/export":
+            try:
+                request = _read_request(self)
+                project_path = _music_project_path(str(request.get("project_id") or ""))
+                if not project_path.is_file():
+                    raise FileNotFoundError(project_path)
+                formats = str(request.get("formats") or "both")
+                if formats not in {"full", "short", "both"}:
+                    raise ValueError("formats must be full, short, or both")
+                job_id = _start_music_export(project_path, formats, bool(request.get("overwrite", False)))
+                self._send_json({"job_id": job_id, "state": "running"}, status=202)
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
         if path == "/narrator-mode/generate":
             self._start_narrator_job()
             return
