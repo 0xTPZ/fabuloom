@@ -285,3 +285,10 @@ contains no Santa V5, narrator, captions, lip-sync or Draft characters. Outputs
 and evidence remain outside Git under `workspace\\exports\\music-studio`; see
 `docs/FABULOOM-MUSIC-STUDIO-V1.md`. Commercial rights for Suno-origin music
 must be confirmed before publication.
+
+Mission 036 adds the V1.1 ambient refinement and sequential Book 1 batch runner.
+It removes the artificial purple footer and repeated geometric decoration, derives
+titles from each real source filename, selects a heuristic RMS short range, and
+produces resumable full/vertical pairs under
+`workspace\\exports\\music-studio\\book1-v11`. See
+`docs/FABULOOM-MUSIC-STUDIO-V1.1.md` and the generated `INDEX.json`/`BATCH-REPORT.md`.

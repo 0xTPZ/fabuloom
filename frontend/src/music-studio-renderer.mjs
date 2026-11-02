@@ -1,6 +1,12 @@
 /** Deterministic environmental renderer shared by Music Studio preview/capture. */
 
 export const MUSIC_STUDIO_FORMAT = "fabuloom.music-studio-project/0.1";
+export const MUSIC_STUDIO_STYLE_PALETTES = Object.freeze({
+  "topazioverse-living-worlds": { deep: "#060b1c", mid: "#182c63", accent: "#5478c8", gold: "#e6c77a", mist: "#b7c8ff", fog: "#91b4dd", spark: "#f5d98a", reflection: "#6e9cdd" },
+  "obsidian-void": { deep: "#05040e", mid: "#211347", accent: "#5d4f9e", gold: "#d4b3ff", mist: "#a9a2d4", fog: "#74699d", spark: "#c6b7ff", reflection: "#695aaf" },
+  "crystal-dawn": { deep: "#0b1727", mid: "#26547b", accent: "#4caeca", gold: "#f1d487", mist: "#d3f4ff", fog: "#9ad4d4", spark: "#ffe7a2", reflection: "#7bd3e8" },
+  "gaia-contemplative": { deep: "#071713", mid: "#234a3e", accent: "#5a9b74", gold: "#e8d58a", mist: "#b9d8b1", fog: "#80b79a", spark: "#f3e39e", reflection: "#76b998" },
+});
 
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 
@@ -48,33 +54,114 @@ function rgba(hex, alpha) {
   return `rgba(${number >> 16 & 255},${number >> 8 & 255},${number & 255},${alpha})`;
 }
 
-function drawParticles(context, width, height, timeMs, palette, energy) {
+function paletteColor(palette, key, fallback) {
+  return palette?.[key] || fallback;
+}
+
+function drawParticles(context, width, height, timeMs, palette, energy, vertical, styleId) {
+  const spark = paletteColor(palette, "spark", paletteColor(palette, "gold", "#e6c77a"));
+  const mist = paletteColor(palette, "mist", "#b7c8ff");
+  const count = vertical ? 52 : 64;
   context.save();
-  for (let index = 0; index < 62; index += 1) {
-    const x = (index * 197 + timeMs * (0.012 + index % 3 * 0.004)) % width;
-    const y = (index * 97 + Math.sin(timeMs / 890 + index * 1.73) * height * 0.035 + height * 0.08) % height;
-    const radius = 1 + (index % 4) * 0.55 + energy * 1.4;
-    context.globalAlpha = 0.12 + (index % 5) * 0.025 + energy * 0.18;
-    context.fillStyle = index % 5 === 0 ? palette.gold : palette.mist;
+  context.globalCompositeOperation = "screen";
+  for (let index = 0; index < count; index += 1) {
+    const depth = 0.22 + (index % 7) / 9;
+    const drift = timeMs * (0.004 + depth * 0.009);
+    const x = (index * 197 + drift + Math.sin(timeMs / 1700 + index * 1.73) * width * 0.035) % width;
+    const y = (index * 97 + Math.sin(timeMs / 890 + index * 1.73) * height * 0.055 + height * (0.08 + (index % 5) * 0.15)) % height;
+    const radius = (0.65 + (index % 4) * 0.55) * depth + energy * (1.1 + depth);
+    context.globalAlpha = 0.08 + depth * 0.16 + energy * 0.12;
+    context.fillStyle = index % 6 === 0 || styleId === "crystal-dawn" ? spark : mist;
     context.beginPath(); context.arc(x, y, radius, 0, Math.PI * 2); context.fill();
+    if (index % 11 === 0) {
+      context.globalAlpha *= 0.55;
+      context.strokeStyle = context.fillStyle;
+      context.lineWidth = Math.max(0.5, radius * 0.35);
+      context.beginPath(); context.moveTo(x - radius * 3, y); context.lineTo(x + radius * 3, y); context.moveTo(x, y - radius * 3); context.lineTo(x, y + radius * 3); context.stroke();
+    }
   }
   context.restore();
 }
 
-function drawCrystals(context, width, height, timeMs, palette, energy, vertical) {
-  const baseY = vertical ? height * 0.82 : height * 0.84;
+function drawFog(context, width, height, timeMs, palette, energy, vertical, styleId) {
+  const fog = paletteColor(palette, "fog", paletteColor(palette, "mist", "#b7c8ff"));
+  const secondary = paletteColor(palette, "reflection", paletteColor(palette, "accent", "#7d63ff"));
   context.save();
   context.globalCompositeOperation = "screen";
-  for (let index = 0; index < 9; index += 1) {
-    const x = width * (0.08 + index * 0.115) + Math.sin(timeMs / 1800 + index) * width * 0.012;
-    const h = height * (0.07 + (index % 4) * 0.022) * (1 + energy * 0.24);
-    const glow = context.createRadialGradient(x, baseY - h * 0.4, 0, x, baseY - h * 0.4, h * 2.2);
-    glow.addColorStop(0, rgba(palette.accent, 0.22 + energy * 0.24)); glow.addColorStop(1, rgba(palette.accent, 0));
-    context.fillStyle = glow; context.fillRect(x - h * 2, baseY - h * 2, h * 4, h * 4);
-    context.fillStyle = rgba(palette.accent, 0.22); context.strokeStyle = rgba(palette.mist, 0.22); context.lineWidth = 1;
-    context.beginPath(); context.moveTo(x, baseY - h); context.lineTo(x + h * 0.33, baseY - h * 0.35); context.lineTo(x + h * 0.2, baseY); context.lineTo(x - h * 0.24, baseY); context.lineTo(x - h * 0.34, baseY - h * 0.48); context.closePath(); context.fill(); context.stroke();
+  context.filter = "blur(18px)";
+  for (let index = 0; index < 4; index += 1) {
+    const phase = timeMs / (3400 + index * 420) + index * 1.4;
+    const x = width * (0.16 + index * 0.25) + Math.sin(phase) * width * 0.07;
+    const y = height * (vertical ? 0.58 + index * 0.075 : 0.55 + index * 0.08) + Math.cos(phase * 0.7) * height * 0.035;
+    const radiusX = width * (vertical ? 0.26 : 0.22);
+    const radiusY = height * (vertical ? 0.075 : 0.105);
+    const gradient = context.createRadialGradient(x, y, 0, x, y, Math.max(radiusX, radiusY));
+    gradient.addColorStop(0, rgba(index % 2 === 0 ? fog : secondary, 0.055 + energy * 0.045));
+    gradient.addColorStop(1, rgba(fog, 0));
+    context.fillStyle = gradient;
+    context.beginPath(); context.ellipse(x, y, radiusX, radiusY, Math.sin(phase) * 0.12, 0, Math.PI * 2); context.fill();
   }
   context.restore();
+  if (styleId === "gaia-contemplative") {
+    context.save(); context.globalCompositeOperation = "screen"; context.globalAlpha = 0.08 + energy * 0.04; context.strokeStyle = fog; context.lineWidth = Math.max(1, height * 0.0012);
+    context.beginPath(); context.moveTo(0, height * 0.72); context.bezierCurveTo(width * 0.28, height * 0.64, width * 0.64, height * 0.8, width, height * 0.68); context.stroke(); context.restore();
+  }
+}
+
+function drawReflections(context, width, height, timeMs, palette, energy, vertical) {
+  const reflection = paletteColor(palette, "reflection", paletteColor(palette, "accent", "#7d63ff"));
+  const gold = paletteColor(palette, "gold", "#e6c77a");
+  context.save(); context.globalCompositeOperation = "screen";
+  const originY = height * (vertical ? 0.79 : 0.82);
+  for (let index = 0; index < 8; index += 1) {
+    const y = originY + index * height * (vertical ? 0.018 : 0.022) + Math.sin(timeMs / 900 + index) * height * 0.004;
+    const widthScale = 0.08 + (index % 3) * 0.035 + energy * 0.025;
+    const x = width * (0.16 + (index * 0.12) % 0.68);
+    context.globalAlpha = 0.045 + energy * 0.055;
+    context.strokeStyle = index % 3 === 0 ? gold : reflection;
+    context.lineWidth = Math.max(1, height * 0.0013);
+    context.beginPath(); context.moveTo(x - width * widthScale, y); context.quadraticCurveTo(x, y + Math.sin(timeMs / 680 + index) * height * 0.006, x + width * widthScale, y); context.stroke();
+  }
+  context.restore();
+}
+
+function drawOrganicFragments(context, width, height, timeMs, palette, energy, vertical, styleId) {
+  const accent = paletteColor(palette, "accent", "#7d63ff");
+  const spark = paletteColor(palette, "spark", paletteColor(palette, "gold", "#e6c77a"));
+  context.save(); context.globalCompositeOperation = "screen";
+  for (let index = 0; index < 12; index += 1) {
+    const phase = timeMs / (1700 + index * 95) + index * 1.9;
+    const x = width * (0.08 + ((index * 0.137) % 0.84)) + Math.sin(phase) * width * 0.018;
+    const y = height * (vertical ? 0.15 + (index % 6) * 0.12 : 0.18 + (index % 5) * 0.13) + Math.cos(phase * 0.8) * height * 0.025;
+    const length = Math.max(4, Math.min(width, height) * (0.008 + (index % 4) * 0.003) * (1 + energy * 0.35));
+    context.globalAlpha = 0.07 + (index % 4) * 0.018 + energy * 0.045;
+    context.strokeStyle = index % 4 === 0 || styleId === "crystal-dawn" ? spark : accent;
+    context.lineWidth = Math.max(0.8, length * 0.12);
+    context.beginPath();
+    context.moveTo(x - length, y + length * 0.15);
+    context.quadraticCurveTo(x - length * 0.15, y - length * 0.8, x + length, y);
+    context.quadraticCurveTo(x + length * 0.1, y + length * 0.55, x - length, y + length * 0.15);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function displayTitle(project) {
+  const title = project?.display_title || project?.source?.display_title || project?.source?.filename || project?.title || "Music Studio";
+  return String(title).replace(/\.[^.]+$/, "").replace(/^Music Studio\s*[·:-]\s*/i, "").trim();
+}
+
+function drawTitle(context, title, width, height, vertical) {
+  const maxWidth = width * (vertical ? 0.82 : 0.66);
+  let fontSize = vertical ? 35 : 48;
+  context.font = `650 ${fontSize}px Segoe UI`;
+  while (fontSize > 22 && context.measureText(title).width > maxWidth) { fontSize -= 2; context.font = `650 ${fontSize}px Segoe UI`; }
+  const words = title.split(/\s+/); const lines = []; let line = "";
+  for (const word of words) { const next = line ? `${line} ${word}` : word; if (context.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; }
+  if (line) lines.push(line); if (lines.length > 2) lines.splice(2, lines.length - 2);
+  context.fillStyle = "rgba(255,248,220,.94)"; context.shadowColor = "rgba(0,0,0,.45)"; context.shadowBlur = 12;
+  lines.forEach((item, index) => context.fillText(item, vertical ? width * 0.08 : width * 0.055, vertical ? height * 0.1 + index * fontSize * 1.08 : height * 0.12 + index * fontSize * 1.08));
+  context.shadowBlur = 0;
 }
 
 function drawContainedScene(context, image, width, height, timeMs, scene, vertical) {
@@ -122,13 +209,13 @@ export function drawLivingWorldFrame(context, project, images = {}, timeMs = 0, 
   const vignette = context.createRadialGradient(width * 0.5, height * 0.42, 0, width * 0.5, height * 0.42, Math.max(width, height) * 0.7);
   vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,9,.62)");
   context.fillStyle = vignette; context.fillRect(0, 0, width, height);
-  drawCrystals(context, width, height, timeMs, palette, energy, vertical);
-  drawParticles(context, width, height, timeMs, palette, energy);
-  context.save();
-  const pulse = 0.07 + energy * 0.08;
-  context.fillStyle = `rgba(125,99,255,${pulse})`; context.fillRect(vertical ? width * 0.08 : width * 0.05, vertical ? height * 0.85 : height * 0.8, vertical ? width * 0.84 : width * 0.9, vertical ? height * 0.08 : height * 0.12);
-  context.fillStyle = palette.gold; context.font = `700 ${vertical ? 18 : 22}px Segoe UI`; context.letterSpacing = "2px"; context.fillText("TOPAZIOVERSE · LIVING WORLDS", vertical ? width * 0.08 : width * 0.055, vertical ? height * 0.9 : height * 0.87);
-  if (timeMs < 3600) { context.fillStyle = "rgba(255,248,220,.94)"; context.font = `650 ${vertical ? 35 : 48}px Segoe UI`; context.fillText("O CHAMADO DO VAZIO", vertical ? width * 0.08 : width * 0.055, vertical ? height * 0.1 : height * 0.12); }
-  context.restore();
+  const styleId = project.style?.id || "topazioverse-living-worlds";
+  drawFog(context, width, height, timeMs, palette, energy, vertical, styleId);
+  drawReflections(context, width, height, timeMs, palette, energy, vertical);
+  drawOrganicFragments(context, width, height, timeMs, palette, energy, vertical, styleId);
+  drawParticles(context, width, height, timeMs, palette, energy, vertical, styleId);
+  if (timeMs < 4200 || timeMs > Math.max(4200, timeline.duration_ms - 3200)) {
+    context.save(); drawTitle(context, displayTitle(project), width, height, vertical); context.restore();
+  }
 }
 

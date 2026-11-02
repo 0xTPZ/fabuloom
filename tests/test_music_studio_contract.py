@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from examples.music_studio_demo import PROJECT_FORMAT, analyze_source, create_project, probe_audio
+from examples.music_studio_demo import PROJECT_FORMAT, _short_selection_from_candidate, _style, analyze_source, create_project, discover_music, probe_audio
 
 
 WORKSPACE = Path(__file__).resolve().parents[2]
@@ -39,6 +39,14 @@ class MusicStudioContractTests(unittest.TestCase):
 
     def test_probe_duration_is_positive(self) -> None:
         self.assertGreater(probe_audio(SOURCE)["duration_ms"], 150000)
+
+    def test_book1_inventory_and_short_selection_are_batch_safe(self) -> None:
+        tracks = discover_music(WORKSPACE / "workspace" / "inputs" / "music" / "book1")
+        self.assertEqual(len(tracks), 7)
+        start, end, method = _short_selection_from_candidate(180000, {"start_ms": 120000, "end_ms": 128000}, None, None)
+        self.assertEqual(end - start, 24000)
+        self.assertEqual(method, "highest_rms_candidate_centered_24s")
+        self.assertEqual(_style("gaia-contemplative")["palette"]["fog"], "#80b79a")
 
 
 if __name__ == "__main__":

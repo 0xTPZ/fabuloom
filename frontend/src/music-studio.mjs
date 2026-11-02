@@ -1,4 +1,4 @@
-import { drawLivingWorldFrame, shortRange, validateMusicStudioProject } from "./music-studio-renderer.mjs";
+import { drawLivingWorldFrame, MUSIC_STUDIO_STYLE_PALETTES, shortRange, validateMusicStudioProject } from "./music-studio-renderer.mjs";
 
 export { shortRange, validateMusicStudioProject } from "./music-studio-renderer.mjs";
 
@@ -86,7 +86,7 @@ async function analyzeSelected() {
 function previewProject() {
   if (state.project) return state.project;
   if (!state.analysis) return null;
-  const palette = { deep: "#060b1c", mid: "#182c63", accent: "#7d63ff", gold: "#e6c77a", mist: "#b7c8ff" };
+  const palette = MUSIC_STUDIO_STYLE_PALETTES[$("#music-style-select")?.value] || MUSIC_STUDIO_STYLE_PALETTES["topazioverse-living-worlds"];
   const duration = state.analysis.metadata.duration_ms;
   return { format: "fabuloom.music-studio-project/0.1", id: "preview", source: { filename: state.analysis.source.filename, analysis: state.analysis.metadata }, style: { id: $("#music-style-select").value, palette }, visual_policy: { narrator: null, lip_sync: false, characters: [] }, analysis: { waveform: state.analysis.waveform }, full: { width: 1920, height: 1080, fps: 30, duration_ms: duration, scenes: Array.from({ length: 6 }, (_, index) => ({ id: `preview-${index}`, asset_id: `none-${index}`, start_ms: Math.round(index * duration / 6), end_ms: Math.round((index + 1) * duration / 6), camera: { zoom: 1, pan_x: 0, pan_y: 0 } })) }, short: { width: 1080, height: 1920, fps: 30, duration_ms: 24000, scenes: [{ id: "preview-short", asset_id: "none", start_ms: 0, end_ms: 24000, camera: {} }] }, short_selection: { start_ms: 0, end_ms: 24000 }, assets: [] };
 }
@@ -113,6 +113,7 @@ async function loadImages(project) {
 
 function projectFieldsFrom(project) {
   state.project = validateMusicStudioProject(project);
+  state.selectedAsset = project.source.workspace_relative.replace(/^workspace\/inputs\/music\//, "");
   $("#music-project-name").value = project.id.replace(/^music-studio-v1-/, "");
   $("#music-style-select").value = project.style.id;
   $("#music-short-start").value = (project.short_selection.start_ms / 1000).toFixed(1);
@@ -146,7 +147,7 @@ async function pollJob(jobId) {
   const progress = $("#music-export-progress"); const bar = $("#music-progress-bar"); const label = $("#music-progress-label"); progress.hidden = false;
   for (;;) {
     const job = await apiJSON(`/api/music/jobs/${jobId}`); const value = Number(job.progress?.progress || 0); bar.style.width = `${value}%`; label.textContent = `${job.progress?.stage || job.state} · ${value}%`;
-    if (job.state === "completed") { const root = `/exports/${state.project.asset_root}`; const stem = state.project.source.filename.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); const links = $("#music-export-links"); links.replaceChildren(); ["full", "short"].forEach((mode) => { const anchor = document.createElement("a"); anchor.href = `${root}/videos/fabuloom-music-studio-${stem}-${mode}.mp4`; anchor.target = "_blank"; anchor.rel = "noreferrer"; anchor.textContent = `Abrir MP4 ${mode === "full" ? "16:9" : "9:16"} ↗`; links.appendChild(anchor); }); setStatus("Exportação concluída. FFprobe e decode devem ser conferidos no relatório local."); return; }
+    if (job.state === "completed") { const root = `/exports/${String(job.project || "").replace(/\/project\.json$/, "")}`; const report = await apiJSON(`${root}/reports/technical-report.json`); const links = $("#music-export-links"); links.replaceChildren(); Object.entries(report.outputs || {}).forEach(([mode, output]) => { const anchor = document.createElement("a"); anchor.href = `/exports/${output.video}`; anchor.target = "_blank"; anchor.rel = "noreferrer"; anchor.textContent = `Abrir MP4 ${mode === "full" ? "16:9" : "9:16"} ↗`; links.appendChild(anchor); }); setStatus("Exportação concluída. Links exibem apenas os formatos realmente gerados."); return; }
     if (job.state === "failed") throw new Error(`exportação falhou; log local: ${job.log || "indisponível"}`);
     await new Promise((resolve) => setTimeout(resolve, 800));
   }
@@ -165,6 +166,7 @@ export async function initMusicStudio() {
   source.addEventListener("change", () => void analyzeSelected());
   ["#music-short-start", "#music-short-end"].forEach((selector) => $(selector)?.addEventListener("input", updateRangeReadout));
   $("#music-save")?.addEventListener("click", () => void saveProject());
+  $("#music-style-select")?.addEventListener("change", () => drawPreview());
   $("#music-export-full")?.addEventListener("click", () => void exportFormats("full"));
   $("#music-export-short")?.addEventListener("click", () => void exportFormats("short"));
   $("#music-export-both")?.addEventListener("click", () => void exportFormats("both"));
