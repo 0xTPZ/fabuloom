@@ -96,6 +96,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   five pose captures, transparent PNG output and a deterministic six-second
   frame sequence. The current Canvas renderer remains production; the mesh
   lab is experimental and requires human visual review before any migration.
+- Crônicas de Topázio batch production — Mission 037 added a resumable,
+  sequential runner for Book 1 chapters 05–10, measured `pm_santa` narration,
+  Santa V5 library openings/closings, deterministic Canvas capture, and
+  H.264/AAC validation. Artistic approval, human listening review and Suno
+  commercial-rights confirmation remain required before publication.
 
 ## Later
 
