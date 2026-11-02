@@ -34,8 +34,10 @@ let player = null;
 let manifest = null;
 let sceneRenderer = null;
 let avatarRenderer = null;
-let selectedNarration = narrationForCharacter("santa");
-let activeNarrator = officialNarratorById("santa");
+// Fresh public sessions are neutral: Ponto is visual-only and narration is
+// optional. Persisted project narrators remain authoritative when loaded.
+let selectedNarration = null;
+let activeNarrator = null;
 let loadToken = 0;
 let currentProject = null;
 let selectedSceneId = null;
@@ -568,7 +570,7 @@ function bindPlayback() {
     voiceSelect.appendChild(option);
   });
   voiceSelect.addEventListener("change", () => loadNarration(narrationForUrl(voiceSelect.value)));
-  voiceSelect.value = selectedNarration.url;
+  if (selectedNarration) voiceSelect.value = selectedNarration.url;
 }
 
 function bindNarratorControls() {
@@ -670,14 +672,17 @@ function startRenderer() {
   return new Promise((resolve) => {
     const ready = async () => {
       try {
-        avatarRenderer = new NarratorAvatarRenderer(previewCanvas, { characterId: "santa" });
-        await avatarRenderer.load();
-        sceneRenderer = new NarratorSceneRenderer(previewCanvas, avatarRenderer, {
-          sceneImage,
-          amplitudeAt: () => player?.amplitude() || 0,
-          narratorName: "Santa V5",
-          voiceId: "pm_santa",
-        });
+        characterRig = new LayeredCharacterRig();
+        characterRenderer = new LayeredCharacterRenderer(previewCanvas, characterRig, COMMUNITY_DEMO_PACK, { assetRoot: new URL("./assets/characters/community-demo-v1/", document.baseURI).href });
+        await characterRenderer.load();
+        characterRenderer.setExpression("neutral");
+        previewMode = "character";
+        $("#dock-avatar").textContent = "P";
+        $("#dock-character-name").textContent = "Ponto";
+        $("#dock-character-role").textContent = "Pack comunitário · licença MIT";
+        $("#metric-narrator").textContent = "Ponto";
+        $("#canvas-voice").textContent = "sem voz incluída";
+        $("#studio-preview").setAttribute("aria-label", "Prévia do personagem Ponto");
         resolve(true);
       } catch (error) {
         setStatus(`Preview indisponível: ${error.message}`);
@@ -688,6 +693,15 @@ function startRenderer() {
     else sceneImage.addEventListener("load", () => void ready(), { once: true });
     sceneImage.addEventListener("error", () => void ready(), { once: true });
   });
+}
+
+function applyNeutralFreshCopy() {
+  const hero = document.querySelector('[data-view="dashboard"] .hero-card p');
+  if (hero) hero.textContent = "Crie um projeto, escreva o roteiro, adicione imagens e comece com o personagem demonstrativo Ponto.";
+  const voiceStep = document.querySelector('[data-view="dashboard"] .flow-step:nth-of-type(2) small');
+  if (voiceStep) voiceStep.textContent = "Opcional";
+  const health = document.querySelector('[data-view="dashboard"] .health-list li:nth-child(2) small');
+  if (health) health.textContent = "Ponto e packs locais";
 }
 
 function animationFrame(timeMs) {
@@ -710,7 +724,8 @@ async function init() {
   renderDevLinks();
   await loadHealth();
   await startRenderer();
-  if (!manifest) await loadNarration(selectedNarration);
+  applyNeutralFreshCopy();
+  // Fresh installations do not load or synthesize a narrator automatically.
   renderRoute(location.hash.slice(1) || "dashboard");
   window.__FABULOOM_STUDIO__ = Object.freeze({
     getState: () => Object.freeze({ route: activeRoute, characterId: activeNarrator?.id || "santa", voiceId: manifestVoiceId(manifest), playerState: player?.state || "stopped", durationMs: manifest?.duration_ms || 0 }),
