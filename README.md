@@ -264,3 +264,13 @@ narration and concentrating the voice improvement on ducking and mix
 intelligibility. The vertical MP4, SRT, manifest, storyboard, music-selection
 report and voice-direction report remain outside Git pending human artistic
 review and commercial-rights confirmation. See `docs/CRONICAS-BREVES-033.md`.
+
+Mission 034 adds BT-001, `Por Trás das Crônicas de Topázio`, as a horizontal
+behind-the-scenes pilot. It uses the approved editorial script, measured
+Kokoro `pm_santa` narration, real Atlas Literário captures, authentic Fabuloom
+Studio captures, approved CB-001/002/003 material, the official Santa V5
+renderer and the owner-supplied Topázio theme with voice-priority ducking.
+The 1920x1080 H.264/AAC export, SRT, manifest, storyboard and reports remain
+outside Git under `workspace\exports\bastidores\bt-001-por-tras-das-cronicas`.
+Commercial music rights and final human artistic approval remain pending. See
+`docs/BASTIDORES-BT-001.md`.
