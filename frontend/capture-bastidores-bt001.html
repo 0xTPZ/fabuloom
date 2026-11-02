@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Fabuloom · BT-001 capture</title>
+    <style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#status{display:none}</style>
+  </head>
+  <body>
+    <canvas id="capture-canvas"></canvas>
+    <pre id="status">initializing</pre>
+    <script type="module">
+      import { NarratorAvatarRenderer, NARRATOR_FACE_CROP, createNarratorTimeline, validateNarratorManifest, segmentAt } from "./src/narrator-mode.mjs";
+      import { decodeMonoPcm16Wav, composePcmSegments, createRmsReader } from "./src/cinematic-audio.mjs";
+
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session");
+      const timelineUrl = params.get("timeline");
+      const fps = Number(params.get("fps") || 10);
+      const canvas = document.querySelector("#capture-canvas");
+      canvas.width = 1920; canvas.height = 1080;
+      const context = canvas.getContext("2d");
+      const WIDTH = canvas.width, HEIGHT = canvas.height;
+      const status = document.querySelector("#status");
+      const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+      const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
+
+      async function readPcm16Wav(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`audio request failed: ${response.status}`);
+        return decodeMonoPcm16Wav(await response.arrayBuffer());
+      }
+
+      function exportUrl(value) {
+        const normalized = decodeURIComponent(String(value)).replaceAll("\\", "/");
+        const marker = "/workspace/exports/";
+        const index = normalized.toLowerCase().indexOf(marker);
+        if (index < 0) throw new Error(`asset outside workspace exports: ${value}`);
+        const relative = normalized.slice(index + marker.length).replace(/^\/+/, "");
+        const parts = relative.split("/");
+        if (!relative || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe audio asset: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function relativeExport(value) {
+        const parts = String(value).split("/");
+        if (!value || parts.some((part) => !part || part === "." || part === "..")) throw new Error(`unsafe image asset: ${value}`);
+        return `/exports/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
+      }
+
+      function progress(timeMs, scene) { return clamp((timeMs - scene.start_ms) / Math.max(1, scene.end_ms - scene.start_ms)); }
+
+      function drawParticles(timeMs, count = 32, color = "#d9f4ff", alpha = 0.45) {
+        context.save(); context.globalAlpha = alpha; context.fillStyle = color;
+        for (let index = 0; index < count; index += 1) {
+          const x = (index * 173 + timeMs * (0.018 + (index % 4) * 0.002)) % WIDTH;
+          const y = (index * 83 + Math.sin(timeMs / 790 + index * 1.31) * 34 + 45) % HEIGHT;
+          context.beginPath(); context.arc(x, y, 1.1 + (index % 3) * 0.6, 0, Math.PI * 2); context.fill();
+        }
+        context.restore();
+      }
+
+      function drawBackdrop(timeMs, mode = "navy") {
+        const gradient = context.createLinearGradient(0, 0, WIDTH, HEIGHT);
+        if (mode === "gold") { gradient.addColorStop(0, "#162e49"); gradient.addColorStop(0.58, "#4d3522"); gradient.addColorStop(1, "#080e19"); }
+        else { gradient.addColorStop(0, "#071426"); gradient.addColorStop(0.58, "#123a58"); gradient.addColorStop(1, "#020812"); }
+        context.fillStyle = gradient; context.fillRect(0, 0, WIDTH, HEIGHT);
+        const glow = context.createRadialGradient(1400, 220, 10, 1400, 220, 640);
+        glow.addColorStop(0, `rgba(247,210,122,${0.17 + Math.sin(timeMs / 950) * 0.025})`); glow.addColorStop(1, "rgba(247,210,122,0)");
+        context.fillStyle = glow; context.fillRect(0, 0, WIDTH, HEIGHT); drawParticles(timeMs);
+      }
+
+      function drawCover(image, timeMs, scene) {
+        const p = progress(timeMs, scene), base = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+        const zoom = Number(scene.camera?.zoom || 1) + p * 0.028;
+        const width = image.naturalWidth * base * zoom, height = image.naturalHeight * base * zoom;
+        const panX = Number(scene.camera?.pan_x || 0) + Math.sin(p * Math.PI) * 0.012;
+        const panY = Number(scene.camera?.pan_y || 0) + Math.cos(p * Math.PI) * 0.008;
+        context.drawImage(image, (WIDTH - width) / 2 + panX * Math.max(0, width - WIDTH), (HEIGHT - height) / 2 + panY * Math.max(0, height - HEIGHT), width, height);
+      }
+
+      function drawContain(image, x, y, width, height) {
+        const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+        const w = image.naturalWidth * scale, h = image.naturalHeight * scale;
+        context.save(); context.shadowColor = "rgba(0,0,0,.48)"; context.shadowBlur = 26; context.shadowOffsetY = 12;
+        context.drawImage(image, x + (width - w) / 2, y + (height - h) / 2, w, h); context.restore();
+      }
+
+      function drawHostStage(timeMs) {
+        drawBackdrop(timeMs, "gold");
+        context.fillStyle = "rgba(3,10,22,.72)"; context.fillRect(0, 830, WIDTH, 250);
+        for (let shelf = 0; shelf < 3; shelf += 1) { const y = 170 + shelf * 210; context.fillStyle = "rgba(247,210,122,.18)"; context.fillRect(0, y, WIDTH, 5); }
+        context.textAlign = "left"; context.fillStyle = "#f7d27a"; context.font = "700 34px Segoe UI"; context.fillText("POR TRÁS DAS CRÔNICAS DE TOPÁZIO", 90, 122);
+        context.fillStyle = "#fff7dc"; context.font = "500 27px Segoe UI"; context.fillText("um livro, um estúdio e um mundo em construção", 94, 166);
+      }
+
+      function drawPortalBadge() {
+        context.save(); context.fillStyle = "rgba(4,15,31,.88)"; context.strokeStyle = "rgba(247,210,122,.9)"; context.lineWidth = 2;
+        context.roundRect(72, 850, 500, 94, 18, 18); context.fill(); context.stroke();
+        context.fillStyle = "#f7d27a"; context.font = "700 22px Segoe UI"; context.fillText("ATLAS LITERÁRIO", 100, 886);
+        context.fillStyle = "#d9efff"; context.font = "500 21px Segoe UI"; context.fillText("leitura gratuita · sem cadastro", 100, 918); context.restore();
+      }
+
+      function drawScene(scene, image, timeMs) {
+        const visual = scene.visual;
+        if (visual === "host") drawHostStage(timeMs);
+        else if (visual === "cta") {
+          const gradient = context.createRadialGradient(960, 430, 20, 960, 430, 920); gradient.addColorStop(0, "#1f5680"); gradient.addColorStop(1, "#030814"); context.fillStyle = gradient; context.fillRect(0, 0, WIDTH, HEIGHT); drawParticles(timeMs, 52, "#d9f4ff", .62);
+          context.textAlign = "center"; context.fillStyle = "#f7d27a"; context.font = "700 68px Segoe UI"; context.fillText("CRÔNICAS DE TOPÁZIO", WIDTH / 2, 360);
+          context.fillStyle = "#fff7dc"; context.font = "600 38px Segoe UI"; context.fillText("TOPÁZIO: O DESPERTAR DOS CRISTAIS", WIDTH / 2, 448);
+          context.fillStyle = "#9ddcff"; context.font = "700 44px Segoe UI"; context.fillText("LEITURA GRATUITA", WIDTH / 2, 560);
+          context.fillStyle = "#ffffff"; context.font = "600 34px Segoe UI"; context.fillText("atlasliterario.duckdns.org", WIDTH / 2, 640);
+          context.fillStyle = "#d9efff"; context.font = "500 26px Segoe UI"; context.fillText("CRÔNICAS DE TOPÁZIO · até breve, Guardião", WIDTH / 2, 742);
+        } else if (image) {
+          if (visual === "portal" || visual === "ui" || visual === "episode") { context.fillStyle = "#06111f"; context.fillRect(0, 0, WIDTH, HEIGHT); drawContain(image, 90, 100, 1740, 760); }
+          else { context.fillStyle = "#06111f"; context.fillRect(0, 0, WIDTH, HEIGHT); drawCover(image, timeMs, scene); }
+          context.fillStyle = "rgba(4,12,26,.55)"; context.fillRect(0, 0, WIDTH, 86);
+          context.fillStyle = "#f7d27a"; context.font = "700 27px Segoe UI"; context.textAlign = "left"; context.fillText(scene.label, 76, 54);
+        } else { drawBackdrop(timeMs); }
+        if (scene.portal_badge) drawPortalBadge();
+      }
+
+      function drawAvatar(avatar, timeMs, amplitude, visual) {
+        const values = visual === "host" ? { x: 1470, y: 235, size: 430 } : visual === "cta" ? { x: 1510, y: 720, size: 270 } : { x: 1515, y: 725, size: 270 };
+        context.save(); context.fillStyle = "rgba(3,10,24,.84)"; context.beginPath(); context.arc(values.x + values.size / 2, values.y + values.size / 2, values.size / 2 + 18, 0, Math.PI * 2); context.fill(); context.strokeStyle = "rgba(247,210,122,.95)"; context.lineWidth = 4; context.beginPath(); context.arc(values.x + values.size / 2, values.y + values.size / 2, values.size / 2 + 12, 0, Math.PI * 2); context.stroke(); context.restore();
+        avatar.renderTo(context, { x: values.x, y: values.y, size: values.size, timeMs, speechAmplitude: amplitude, isPlaying: true, crop: NARRATOR_FACE_CROP });
+      }
+
+      function drawSubtitle(segment) {
+        if (!segment) return;
+        const width = 1450, x = WIDTH / 2, y = 930, fontSize = 30;
+        context.font = `600 ${fontSize}px Segoe UI`; const lines = []; let line = "";
+        for (const word of String(segment.text).split(/\s+/)) { const candidate = line ? `${line} ${word}` : word; if (line && context.measureText(candidate).width > width - 80) { lines.push(line); line = word; } else line = candidate; }
+        if (line) lines.push(line); const height = lines.length * (fontSize + 11) + 34;
+        context.save(); context.fillStyle = "rgba(3,12,28,.92)"; context.fillRect(x - width / 2, y - 26, width, height); context.strokeStyle = "rgba(247,210,122,.86)"; context.lineWidth = 2; context.strokeRect(x - width / 2, y - 26, width, height); context.fillStyle = "#fff7dc"; context.textAlign = "center"; context.textBaseline = "top"; lines.forEach((entry, index) => context.fillText(entry, x, y + index * (fontSize + 11))); context.restore();
+      }
+
+      function sendFrame(index, timeMs) {
+        return new Promise((resolve, reject) => canvas.toBlob(async (blob) => { if (!blob) { reject(new Error("JPEG encoding failed")); return; } try { const response = await fetch(`/capture/${encodeURIComponent(session)}/src-${String(index).padStart(6, "0")}.jpg`, { method: "POST", headers: { "Content-Type": "image/jpeg", "X-Frame-Time-Ms": String(timeMs) }, body: blob }); if (!response.ok) throw new Error(`frame upload failed: ${response.status}`); resolve(); } catch (error) { reject(error); } }, "image/jpeg", 0.84));
+      }
+
+      async function main() {
+        if (!session || !timelineUrl) fail("session and timeline are required");
+        const planResponse = await fetch(timelineUrl); if (!planResponse.ok) fail(`timeline request failed: ${planResponse.status}`);
+        const plan = await planResponse.json(); const manifestResponse = await fetch(`/exports/${plan.manifest}`); if (!manifestResponse.ok) fail(`manifest request failed: ${manifestResponse.status}`);
+        const manifest = await manifestResponse.json(); validateNarratorManifest(manifest);
+        const wavs = await Promise.all(manifest.segments.map((segment) => readPcm16Wav(exportUrl(segment.audio_uri))));
+        const sampleRate = wavs[0].sampleRate, amplitudeAt = createRmsReader(composePcmSegments(manifest, wavs, sampleRate), sampleRate);
+        const images = {};
+        for (const scene of plan.scenes) if (scene.asset_path) { const image = document.createElement("img"); image.src = relativeExport(scene.asset_path); await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`image failed: ${scene.asset_path}`)); }); images[scene.id] = image; }
+        const avatar = new NarratorAvatarRenderer(canvas, { assetRoot: new URL("./", location.href).href }); await avatar.load();
+        const measuredTimeline = createNarratorTimeline(manifest), frameCount = Math.ceil(plan.program_duration_ms / 1000 * fps), pending = new Set();
+        for (let index = 0; index < frameCount; index += 1) {
+          const timeMs = Math.round(index * 1000 / fps); context.clearRect(0, 0, WIDTH, HEIGHT);
+          let active = null; for (const scene of plan.scenes) if (timeMs >= scene.start_ms && timeMs < scene.end_ms) { active = scene; break; }
+          if (!active) active = plan.scenes[plan.scenes.length - 1];
+          drawScene(active, images[active.id], timeMs);
+          drawAvatar(avatar, timeMs, timeMs < manifest.duration_ms ? amplitudeAt(timeMs) : 0, active.visual);
+          drawSubtitle(timeMs < manifest.duration_ms ? segmentAt(measuredTimeline, timeMs) : null);
+          const upload = sendFrame(index, timeMs); pending.add(upload); upload.then(() => pending.delete(upload), () => pending.delete(upload)); if (pending.size >= 10) await Promise.race(pending);
+        }
+        await Promise.all(pending);
+        const completion = { mode: "bastidores-bt001", duration_ms: plan.program_duration_ms, narration_duration_ms: manifest.duration_ms, sample_rate: sampleRate, canvas: { width: WIDTH, height: HEIGHT }, fps, frame_count: frameCount, output_fps: 30, timing_source: "measured_kokoro_wav_segments", mouth_source: "pcm16_rms_envelope", word_phoneme_viseme_timing: "unavailable", portal_source: "verified_live_capture" };
+        const complete = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) }); if (!complete.ok) fail(`completion upload failed: ${complete.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
+      }
+      main().catch((error) => { console.error(error); status.textContent = `error: ${error.message}`; document.title = `error: ${error.message}`; if (session) fetch(`/capture/${encodeURIComponent(session)}/error.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: String(error.message || error), stack: String(error.stack || "") }) }).catch(() => {}); });
+    </script>
+  </body>
+</html>
