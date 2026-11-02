@@ -349,13 +349,19 @@ def _load_checkpoints(root: Path) -> dict:
 
 def _stage_done(root: Path, stage: str, fingerprint: str, required: tuple[Path, ...]) -> bool:
     checkpoints = _load_checkpoints(root)
-    return checkpoints.get("fingerprint") == fingerprint and checkpoints.get("stages", {}).get(stage, {}).get("status") == "DONE" and all(path.is_file() for path in required)
+    entry = checkpoints.get("stages", {}).get(stage, {})
+    return (
+        checkpoints.get("fingerprint") == fingerprint
+        and entry.get("fingerprint") == fingerprint
+        and entry.get("status") == "DONE"
+        and all(path.is_file() for path in required)
+    )
 
 
 def _mark_stage(root: Path, stage: str, fingerprint: str, artifacts: tuple[Path, ...], **extra: object) -> None:
     checkpoints = _load_checkpoints(root)
     checkpoints["fingerprint"] = fingerprint
-    checkpoints.setdefault("stages", {})[stage] = {"status": "DONE", "completed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "artifacts": [str(path) for path in artifacts], **extra}
+    checkpoints.setdefault("stages", {})[stage] = {"status": "DONE", "fingerprint": fingerprint, "completed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "artifacts": [str(path) for path in artifacts], **extra}
     _write_json(root / "checkpoints.json", checkpoints)
 
 
