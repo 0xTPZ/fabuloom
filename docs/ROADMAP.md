@@ -1,5 +1,11 @@
 # Roadmap
 
+- CTV-001 vertical cinema — dez episódios completos e dez teasers verticais
+  determinísticos do Livro 1, com Santa V5, ambientes aprovados, cue sheets,
+  ducking voz-prioridade e retomada por checkpoints implementados no worktree
+  isolado. Direitos comerciais das trilhas e aprovação artística permanecem
+  pendentes.
+
 - Narrator Mode V1: horizontal facial-presenter export is implemented as an
   isolated sibling of Character Stage. Future work includes richer scene
   presets, word-level timing when a provider supplies it, and optional mesh
