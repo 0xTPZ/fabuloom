@@ -25,6 +25,7 @@ def tool_definitions() -> list[dict[str, object]]:
     return [
         {"name": "fabuloom_status", "description": "Read shared engine status.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_doctor", "description": "Check dependencies, storage and mounted library state.", "inputSchema": {"type": "object", "properties": {}}},
+        {"name": "fabuloom_cinematic_diagnose", "description": "Audit the approved Crônicas cinematic pipeline without writing media.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_capabilities", "description": "Discover implemented operations, schemas, jobs and limits.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_profiles_list", "description": "List versioned production profiles and readiness.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_projects_list", "description": "List persisted Fabuloom projects.", "inputSchema": {"type": "object", "properties": {}}},
@@ -32,11 +33,12 @@ def tool_definitions() -> list[dict[str, object]]:
         {"name": "fabuloom_project_create", "description": "Create a project in the shared project store.", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "project_id": {"type": "string"}, "metadata": {"type": "object"}}}},
         {"name": "fabuloom_project_update", "description": "Update a project with optional optimistic revision checking.", "inputSchema": {"type": "object", "required": ["project_id", "payload"], "properties": {"project_id": {"type": "string"}, "payload": {"type": "object"}, "expected_revision": {"type": "integer"}}}},
         {"name": "fabuloom_library_search", "description": "Search the configured private asset catalog without copying media.", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "kind": {"type": "string"}, "missing": {"type": "boolean"}}}},
-        {"name": "fabuloom_job_create", "description": "Start a supported shared-engine job.", "inputSchema": {"type": "object", "required": ["kind"], "properties": {"kind": {"type": "string", "enum": ["validate-project", "catalog-scan", "render-demo", "library-migration"]}, "payload": {"type": "object"}}}},
+        {"name": "fabuloom_job_create", "description": "Start a supported shared-engine job.", "inputSchema": {"type": "object", "required": ["kind"], "properties": {"kind": {"type": "string", "enum": ["validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"]}, "payload": {"type": "object"}}}},
         {"name": "fabuloom_job_get", "description": "Read a persistent job record.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
         {"name": "fabuloom_job_cancel", "description": "Request cancellation of a shared-engine job.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
         {"name": "fabuloom_render_dry_run", "description": "Plan a shared production without writing media.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}}}},
         {"name": "fabuloom_render_demo", "description": "Start the shared demo production job through the same engine used by Desktop and CLI.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}, "text": {"type": "string"}, "output_id": {"type": "string"}, "music_path": {"type": "string"}, "music_asset_id": {"type": "string"}, "capture_fps": {"type": "integer", "enum": [5, 24, 30]}, "output_fps": {"type": "integer", "enum": [24, 30]}, "audio_sample_rate": {"type": "integer"}, "audio_channels": {"type": "integer", "enum": [1, 2]}}}},
+        {"name": "fabuloom_render_cinematic", "description": "Plan or validate a Crônicas cinematic production through the guarded compatibility adapter.", "inputSchema": {"type": "object", "properties": {"chapter": {"type": "integer"}, "chapter_title": {"type": "string"}, "source_document": {"type": "string"}, "voice_id": {"type": "string"}, "language": {"type": "string"}, "output_variants": {"type": "array", "items": {"type": "string", "enum": ["horizontal", "vertical"]}}, "mode": {"type": "string", "enum": ["plan", "validate-reference", "execute"]}, "decode": {"type": "boolean"}}}},
         {"name": "fabuloom_library_migration", "description": "Create a checkpointed library migration job; dry-run is the default.", "inputSchema": {"type": "object", "properties": {"source_root": {"type": "string"}, "target_root": {"type": "string"}, "dry_run": {"type": "boolean"}, "migration_id": {"type": "string"}}}},
     ]
 
@@ -56,6 +58,8 @@ def dispatch_tool(engine: EngineService, name: str, arguments: dict[str, Any] | 
         return engine.status()
     if name == "fabuloom_doctor":
         return engine.doctor()
+    if name == "fabuloom_cinematic_diagnose":
+        return engine.cinematic_diagnostics()
     if name == "fabuloom_capabilities":
         return engine.capabilities()
     if name == "fabuloom_profiles_list":
@@ -102,6 +106,10 @@ def dispatch_tool(engine: EngineService, name: str, arguments: dict[str, Any] | 
     if name == "fabuloom_render_demo":
         payload = {key: args[key] for key in ("profile", "provider", "voice_id", "text", "output_id", "music_path", "music_asset_id", "capture_fps", "output_fps", "audio_sample_rate", "audio_channels") if key in args}
         return engine.create_job("render-demo", payload)
+    if name == "fabuloom_render_cinematic":
+        keys = ("chapter", "chapter_title", "source_document", "voice_id", "language", "output_variants", "mode", "decode", "runner", "music_asset_id")
+        payload = {key: args[key] for key in keys if key in args}
+        return engine.create_job("render-cinematic", payload)
     if name == "fabuloom_library_migration":
         payload = {key: args[key] for key in ("source_root", "target_root", "dry_run", "migration_id") if key in args}
         return engine.create_job("library-migration", payload)

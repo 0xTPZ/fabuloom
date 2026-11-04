@@ -13,6 +13,8 @@ $fabRoot = 'E:\Fabuloom'
 python -B -m fabuloom_core.cli --root $fabRoot doctor
 python -B -m fabuloom_core.cli --root $fabRoot capabilities
 python -B -m fabuloom_core.cli --root $fabRoot profiles list
+# diagnóstico do shell Desktop, sem abrir uma janela
+python -B desktop/fabuloom_desktop.py --root $fabRoot --check
 ```
 
 O preflight confirma FFmpeg, FFprobe, navegador Canvas, Kokoro opcional,
@@ -63,6 +65,15 @@ python -B -m fabuloom_core.cli --root $fabRoot project update demo-local --json-
 
 O Desktop e o agente devem editar o mesmo `project.json` através desse
 contrato, sem manter cópias paralelas em memória.
+
+Para iniciar a interface gráfica depois do preflight:
+
+```powershell
+python -B desktop/fabuloom_desktop.py --root $fabRoot
+```
+
+Fechar a janela não interrompe jobs já executados pelo motor headless; consulte
+`job list` ou `/api/v1/jobs` para acompanhar o estado.
 
 ## 4. Preview, narração e render
 
@@ -117,9 +128,9 @@ API loopback:
 python -B -m fabuloom_core.cli --root $fabRoot api --port 8790
 ```
 
-Endpoints implementados: `/api/v1/status`, `/api/v1/doctor`,
+Endpoints implementados: `/api/v1/status`, `/api/v1/doctor`, `/api/v1/cinematic`,
 `/api/v1/capabilities`, `/api/v1/profiles`, `/api/v1/projects`,
-`/api/v1/library`, `/api/v1/jobs`, `/api/v1/render` e
+`/api/v1/library`, `/api/v1/jobs`, `/api/v1/render`, `/api/v1/render/cinematic` e
 `/api/v1/library/migration`.
 
 MCP local por stdio:
@@ -148,7 +159,34 @@ python -B -m fabuloom_core.cli --root $fabRoot job show JOB_ID
 Jobs `queued`/`running` encontrados após encerramento de processo são marcados
 como `interrupted`; trabalho arbitrário não é retomado silenciosamente.
 
-## 7. Limites atuais
+## 7. Linha cinematográfica de Crônicas de Topázio
+
+O diagnóstico cinematográfico é separado do demo genérico:
+
+```powershell
+python -B -m fabuloom_core.cli --root $fabRoot doctor
+python -B -m fabuloom_core.cli --root $fabRoot render cinematic --mode plan --chapter 11 --chapter-title 'O eco que não morre'
+python -B -m fabuloom_core.cli --root $fabRoot render cinematic --mode validate-reference --chapter 11 --chapter-title 'O eco que não morre' --decode
+```
+
+O perfil `cronicas-cinematic-production` exige fonte DOCX, segmentos Kokoro
+medidos, Santa V5 aprovado, cenas por IDs, música autorizada, ducking,
+transições, SRT, checkpoints e QA dos dois formatos. A validação do capítulo
+11 R2 reutiliza os masters existentes sem ressíntese ou recaptura.
+
+Os runners da PR #56 permanecem a referência legada. Eles só podem ser
+executados pelo adaptador quando `FABULOOM_CINEMATIC_RUNNER` selecionar um
+runner que declare saída isolada (`--output-root` ou equivalente). Runners com
+caminhos fixos são reportados, mas recusados para evitar sobrescrever capítulos
+aprovados.
+
+Para o próximo capítulo, produza primeiro um plano e storyboard, valide fonte
+e direitos, selecione output novo e só então execute o runner parametrizado.
+`technical_qa=PASS` não equivale a aprovação artística. Para Shorts, use
+`cronicas-shorts-production`; o storyboard e a aprovação artística continuam
+obrigatórios.
+
+## 8. Limites atuais
 
 - O editor visual completo ainda não está integrado ao armazenamento de
   projetos; o Desktop é uma superfície de controle funcional e o Stage é uma

@@ -1,0 +1,25 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "cronicas-cinematic-production",
+  "version": "0.1.0",
+  "status": "review_required",
+  "duration_policy": "source DOCX and measured Kokoro WAVs; editorial pauses are explicit timeline events",
+  "cut_rhythm": "18-45 seconds per environmental shot; never cut inside a sentence",
+  "narration": "integral approved manuscript; segment boundaries come from measured WAVs",
+  "safe_area": {"horizontal": "8% margins", "vertical": "10% margins plus platform UI exclusion zones"},
+  "voice": "Kokoro pm_santa / pt-BR; Santa V5 only",
+  "music": "owner-approved project track with smooth fades, voice-priority ducking and limiter",
+  "effects": "subtle atmospheric and transition effects below narration and music",
+  "medallion": "approved Santa V5 during narrative blocks when declared by the project",
+  "transitions": "deterministic page/crystal dissolve or crossfade, 400-1200ms, no black frames",
+  "canonical_asset_sources": ["project asset IDs", "approved private library catalog records", "legacy cinematic runner through compatibility adapter"],
+  "review_criteria": ["technical QA", "editorial continuity", "source fidelity", "human artistic approval", "music rights confirmation"],
+  "contract": {
+    "format": "fabuloom.cronicas-cinematic-production/0.1",
+    "required_blocks": ["HOST_INTRO", "STORY_CHAPTER", "HOST_OUTRO"],
+    "required_outputs": ["manifest", "timeline", "srt", "checkpoints", "technical report", "horizontal MP4", "vertical MP4"],
+    "audio_policy": "external cinematic video audio is never used; voice remains Kokoro",
+    "timing_policy": "measured audio duration only; word/phoneme/viseme timing is not invented"
+  },
+  "adapter_status": "reference_validation_only_until_parameterized_legacy_runner_is_available"
+}

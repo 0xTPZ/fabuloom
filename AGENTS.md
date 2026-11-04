@@ -25,6 +25,7 @@ espaço livre antes de executar jobs pesados.
   `src/fabuloom_core/mcp.py`.
 - Perfis: `profiles/*.json`.
 - Procedimento operacional: `docs/AGENT-OPERATIONS.md`.
+- Compatibilidade cinematográfica: `docs/FAB-ARCH-003-COMPATIBILITY.md`.
 
 Desktop, CLI, API, MCP e o Stage devem usar os mesmos serviços. Não crie uma
 segunda implementação de TTS, timeline, renderização ou catálogo.
@@ -41,6 +42,18 @@ segunda implementação de TTS, timeline, renderização ou catálogo.
   checkpoint e hash verificado. Nunca remova a fonte.
 - QA técnico não é aprovação artística. Entregas ficam `REVIEW_REQUIRED` até
   revisão humana.
+
+## Operação cinematográfica
+
+Crônicas de Topázio usa o contrato `cronicas-cinematic-production`. Preserve
+manuscrito integral, Kokoro `pm_santa`/pt-BR, Santa V5 aprovado, medalhão,
+abertura/despedida, música com ducking, legendas medidas, transições,
+checkpoints e masters horizontal/vertical. Não promova personagens DRAFT.
+
+O capítulo 11 R2 é referência de validação. O adaptador cinematográfico deve
+ser usado para diagnóstico e planejamento até que um runner parametrizado
+consiga escrever em um output novo. Nunca execute runner com saída fixa de
+capítulo aprovado através do EngineService.
 
 ## Worktrees e histórico
 

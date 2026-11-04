@@ -89,8 +89,9 @@ class ArchitectureFoundationTests(unittest.TestCase):
             self.assertEqual(engine.capabilities()["format"], "fabuloom.capabilities/0.1")
             self.assertIn("render.demo", engine.capabilities()["operations"])
             self.assertIn("audio.mix", engine.capabilities()["operations"])
-            self.assertEqual({item["id"] for item in engine.list_profiles()}, {"cinematic-chapter", "cinematic-short", "music-visualizer", "cinematic-trailer"})
+            self.assertEqual({item["id"] for item in engine.list_profiles()}, {"cinematic-chapter", "cinematic-short", "music-visualizer", "cinematic-trailer", "cronicas-cinematic-production", "cronicas-shorts-production"})
             self.assertIn("storage", engine.doctor())
+            self.assertIn("cinematic", engine.doctor())
             self.assertEqual(ProductionService(FabuloomPaths(Path(directory))).dry_run()["format"], "fabuloom.render-plan/0.1")
 
     def test_export_modes_distinguish_economy_and_real_canvas_capture(self) -> None:

@@ -1,0 +1,19 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "cronicas-shorts-production",
+  "version": "0.1.0",
+  "status": "review_required",
+  "duration_policy": "measured narration with explicit 25-45 second editorial target",
+  "cut_rhythm": "storyboard-driven hook, development and closing beat",
+  "narration": "approved source text only; no summary without editorial approval",
+  "safe_area": {"horizontal": "not applicable", "vertical": "TikTok/Shorts controls excluded from lower and side zones"},
+  "voice": "project-selected approved narrator; pm_santa for Crônicas when requested",
+  "music": "project-selected owner-approved track with voice-priority ducking",
+  "effects": "subtle, deterministic effects only",
+  "medallion": "Santa V5 only when editorially requested",
+  "transitions": "deterministic crossfade or dissolve, storyboard-approved",
+  "canonical_asset_sources": ["approved project asset IDs", "private library catalog records"],
+  "review_criteria": ["storyboard justification", "technical QA", "human artistic approval", "rights confirmation"],
+  "contract": {"format": "fabuloom.cronicas-shorts-production/0.1", "requires_storyboard": true, "artistic_gate_separate": true},
+  "quality_reference": "FBS-SHORT-001 is regression evidence only and not an artistic reference"
+}
