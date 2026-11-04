@@ -24,6 +24,7 @@ import time
 from typing import Any, Callable
 
 from .paths import FabuloomPaths
+from .process_identity import process_identity, process_is_alive
 from .scene_assets import SceneAssetError, SceneAssetRegistry, SceneAssetNotFound
 
 
@@ -485,21 +486,15 @@ class CinematicCompatibility:
         raise CinematicCompatibilityError("unable to allocate a non-overwriting cinematic output root")
 
     @staticmethod
-    def _pid_alive(pid: object) -> bool:
-        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-            return False
-        try:
-            os.kill(pid, 0)
-        except (OSError, ProcessLookupError):
-            return False
-        return True
+    def _pid_alive(pid: object, expected_identity: dict[str, object] | None = None) -> bool:
+        return process_is_alive(pid, expected_identity)
 
     @contextmanager
     def _output_lock(self, output_root: Path, request_fingerprint: str):
         """Prevent two engine processes from rendering the same output root."""
 
         lock_path = output_root / ".engine-render.lock"
-        record = {"pid": os.getpid(), "started_at": time.time(), "request_fingerprint": request_fingerprint}
+        record = {"pid": os.getpid(), "process_identity": process_identity(os.getpid()), "started_at": time.time(), "request_fingerprint": request_fingerprint}
         for attempt in range(2):
             try:
                 with lock_path.open("x", encoding="utf-8") as handle:
@@ -510,7 +505,7 @@ class CinematicCompatibility:
                     existing = json.loads(lock_path.read_text(encoding="utf-8"))
                 except (OSError, ValueError, json.JSONDecodeError):
                     existing = {}
-                if self._pid_alive(existing.get("pid")):
+                if self._pid_alive(existing.get("pid"), existing.get("process_identity") if isinstance(existing.get("process_identity"), dict) else None):
                     raise CinematicCompatibilityError(f"output root is already being rendered: {output_root}") from exc
                 if attempt == 0:
                     lock_path.unlink(missing_ok=True)
@@ -527,9 +522,13 @@ class CinematicCompatibility:
                 lock_path.unlink(missing_ok=True)
 
     @staticmethod
-    def stop_runner_pid(pid: int) -> None:
-        """Terminate a registered runner process and its descendants."""
+    def stop_runner_pid(pid: int, expected_identity: dict[str, object] | None = None) -> bool:
+        """Terminate a registered runner tree only after identity validation."""
 
+        if expected_identity is None:
+            return False
+        if not process_is_alive(pid, expected_identity):
+            return False
         if os.name == "nt":
             subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True, check=False)
         else:
@@ -540,12 +539,13 @@ class CinematicCompatibility:
                     os.kill(pid, 15)
                 except (ProcessLookupError, OSError):
                     pass
+        return True
 
     @classmethod
-    def _stop_process_tree(cls, process: subprocess.Popen[str]) -> None:
+    def _stop_process_tree(cls, process: subprocess.Popen[str], expected_identity: dict[str, object] | None = None) -> bool:
         if process.poll() is not None:
-            return
-        cls.stop_runner_pid(process.pid)
+            return False
+        return cls.stop_runner_pid(process.pid, expected_identity)
 
     def execute(self, request: CinematicRequest, *, progress: Callable[[str, float, dict[str, object] | None], None] | None = None, cancel: threading.Event | None = None) -> dict[str, object]:
         """Execute only a hash-registered runner with a workspace output root."""
@@ -602,10 +602,11 @@ class CinematicCompatibility:
             else:
                 popen_kwargs["start_new_session"] = True
             process = subprocess.Popen(command, **popen_kwargs)
+            runner_identity = process_identity(process.pid)
             runner_state_path = output_root / "runner-process.json"
-            runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "running", "started_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            runner_state_path.write_text(json.dumps({"pid": process.pid, "process_identity": runner_identity, "state": "running", "started_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             if progress:
-                progress("cinematic-runner-started", 0.09, {"runner": runner_id, "output_root": str(output_root), "pid": process.pid, "request_fingerprint": request_fingerprint, "scene_contract": scene_contract})
+                progress("cinematic-runner-started", 0.09, {"runner": runner_id, "output_root": str(output_root), "pid": process.pid, "process_identity": runner_identity, "request_fingerprint": request_fingerprint, "scene_contract": scene_contract})
             lines: list[str] = []
             def consume() -> None:
                 assert process.stdout is not None
@@ -617,20 +618,24 @@ class CinematicCompatibility:
             reader.start()
             while process.poll() is None:
                 if cancel and cancel.is_set():
-                    self._stop_process_tree(process)
+                    stopped = self._stop_process_tree(process, runner_identity)
                     try:
                         process.wait(timeout=8)
                     except subprocess.TimeoutExpired:
-                        self._stop_process_tree(process)
-                        process.kill()
-                    runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "cancelled", "finished_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                        if not stopped or not self._stop_process_tree(process, runner_identity):
+                            raise CinematicCompatibilityError("runner cancellation was refused because process identity could not be validated")
+                        try:
+                            process.wait(timeout=8)
+                        except subprocess.TimeoutExpired as exc:
+                            raise CinematicCompatibilityError("runner tree did not exit after validated cancellation") from exc
+                    runner_state_path.write_text(json.dumps({"pid": process.pid, "process_identity": runner_identity, "state": "cancelled", "finished_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                     raise InterruptedError("cinematic runner cancelled")
                 if progress:
                     progress("cinematic-runner", 0.10, {"runner": runner_id, "output_root": str(output_root), "checkpoint": str(output_root / "CHECKPOINT.json")})
                 time.sleep(0.5)
             reader.join(timeout=5)
             return_code = process.returncode
-            runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "completed" if return_code == 0 else "failed", "finished_at": time.time(), "return_code": return_code, "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            runner_state_path.write_text(json.dumps({"pid": process.pid, "process_identity": runner_identity, "state": "completed" if return_code == 0 else "failed", "finished_at": time.time(), "return_code": return_code, "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         if return_code != 0:
             tail = "\n".join(lines[-20:])
             raise CinematicCompatibilityError(f"registered cinematic runner failed with exit code {return_code}: {tail}")

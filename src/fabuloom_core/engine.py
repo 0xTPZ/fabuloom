@@ -15,6 +15,7 @@ from .asset_catalog import AssetCatalog
 from .cinematic import CinematicCompatibility, CinematicRequest
 from .migration import LibraryMigration
 from .paths import FabuloomPaths, PathConfigurationError
+from .process_identity import process_is_alive
 from .profiles import ProfileRegistry
 from .production import ProductionService
 from .project_store import ProjectNotFound, ProjectStore
@@ -188,14 +189,8 @@ class EngineService:
                 self._reconcile_job(job, after_restart=True)
 
     @staticmethod
-    def _pid_alive(pid: object) -> bool:
-        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-            return False
-        try:
-            os.kill(pid, 0)
-        except (OSError, ProcessLookupError):
-            return False
-        return True
+    def _pid_alive(pid: object, expected_identity: dict[str, object] | None = None) -> bool:
+        return process_is_alive(pid, expected_identity)
 
     def _reconcile_job(self, job: dict[str, object], *, after_restart: bool = False) -> dict[str, object]:
         """Reconcile persisted cinematic state with its child process/checkpoint."""
@@ -229,8 +224,9 @@ class EngineService:
                     state = json.loads(runner_state.read_text(encoding="utf-8"))
                 except (OSError, ValueError, json.JSONDecodeError):
                     state = {}
-                if self._pid_alive(state.get("pid")):
-                    job.update({"state": "running", "updated_at": _now(), "recovery": "runner-still-alive-after-engine-restart", "stage_details": {**details, "pid": state.get("pid"), "output_root": str(root)}})
+                identity = state.get("process_identity") if isinstance(state.get("process_identity"), dict) else None
+                if identity is not None and self._pid_alive(state.get("pid"), identity):
+                    job.update({"state": "running", "updated_at": _now(), "recovery": "runner-still-alive-after-engine-restart", "stage_details": {**details, "pid": state.get("pid"), "process_identity": identity, "output_root": str(root)}})
                     self._write_job(job)
                     return job
         if thread and thread.is_alive() and not after_restart:
@@ -387,8 +383,9 @@ class EngineService:
         if job.get("state") in {"queued", "running"} and not event:
             details = job.get("stage_details") if isinstance(job.get("stage_details"), dict) else {}
             pid = details.get("pid") if isinstance(details, dict) else None
-            if self._pid_alive(pid):
-                self.cinematic.stop_runner_pid(int(pid))
+            identity = details.get("process_identity") if isinstance(details, dict) and isinstance(details.get("process_identity"), dict) else None
+            if identity is not None and self._pid_alive(pid, identity):
+                self.cinematic.stop_runner_pid(int(pid), identity)
                 job.update({"state": "cancelled", "error": "orphaned runner tree terminated after cancellation request", "finished_at": _now(), "updated_at": _now(), "recovery": "orphaned-runner-cancelled"})
             else:
                 job.update({"state": "cancel-requested", "updated_at": _now()})

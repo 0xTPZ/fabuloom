@@ -50,3 +50,25 @@ storyboard, paths de saída e contrato de host permanecem isolados.
 
 A produção aprovada em `workspace/exports/cronicas-book1-capitulo12-cinematic-production-attempt-2`
 não é entrada de escrita desta revisão.
+
+## R2 — identidade segura de processos no Windows
+
+O hotfix R2 substitui qualquer consulta Windows baseada em `os.kill(pid, 0)`
+por uma consulta somente leitura com `OpenProcess` usando
+`PROCESS_QUERY_LIMITED_INFORMATION`, `GetExitCodeProcess`, `GetProcessTimes` e
+`QueryFullProcessImageNameW`. O handle é fechado em `finally`; nenhuma dessas
+APIs envia sinal ao processo.
+
+Locks e arquivos `runner-process.json` agora registram PID, token de criação e
+nome da imagem. Um PID reutilizado não é tratado como o runner original. O
+EngineService só encerra um runner órfão durante uma solicitação explícita de
+cancelamento e somente quando a identidade persistida ainda coincide. Se a
+identidade não puder ser validada, a operação não chama `taskkill` nem
+`os.kill` e informa a condição ao job; um estado persistido antigo sem token
+também não é considerado um runner vivo durante a recuperação.
+
+Unix continua usando `os.kill(pid, 0)` apenas no ramo não-Windows, com token de
+início de `/proc` quando disponível. O teste controlado inicia um processo
+temporário, consulta sua identidade várias vezes, confirma que ele permanece
+vivo durante as consultas, verifica rejeição de identidade incorreta e só o
+encerra explicitamente no teardown do teste.
