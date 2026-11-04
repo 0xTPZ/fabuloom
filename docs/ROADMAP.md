@@ -6,6 +6,12 @@
   isolado. Direitos comerciais das trilhas e aprovação artística permanecem
   pendentes.
 
+- Crônicas Capítulo 11 cinematic — abertura e despedida cinematográficas com
+  Santa `pm_santa`, narrativa integral em Santa V5 no medalhão, música Alba com
+  ducking, saídas horizontal/vertical e validação técnica concluídas em branch
+  isolada. Direitos dos clipes/música e aprovação artística permanecem
+  pendentes.
+
 - Narrator Mode V1: horizontal facial-presenter export is implemented as an
   isolated sibling of Character Stage. Future work includes richer scene
   presets, word-level timing when a provider supplies it, and optional mesh
