@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import shutil
 
 
 class PathConfigurationError(ValueError):
@@ -48,6 +49,22 @@ class FabuloomPaths:
     @property
     def library(self) -> Path:
         return self.private / "library"
+
+    @property
+    def legacy_inputs(self) -> Path:
+        """Legacy owner library used for read-only inventory before migration."""
+
+        return self.workspace / "inputs"
+
+    @property
+    def library_source(self) -> Path:
+        """Select the mounted library without falling back to a system folder."""
+
+        if self.library.is_dir():
+            return self.library
+        if self.legacy_inputs.is_dir():
+            return self.legacy_inputs
+        return self.library
 
     @property
     def productions(self) -> Path:
@@ -91,6 +108,8 @@ class FabuloomPaths:
             "private": self.private,
             "workspace": self.workspace,
             "library": self.library,
+            "legacy_inputs": self.legacy_inputs,
+            "library_source": self.library_source,
             "projects": self.projects,
             "jobs": self.jobs,
             "staging": self.staging,
@@ -114,6 +133,41 @@ class FabuloomPaths:
     def as_dict(self) -> dict[str, str]:
         return {name: str(path) for name, path in self.all_managed_roots().items()}
 
+    def storage_report(self) -> dict[str, object]:
+        """Return drive/path capacity without creating large temporary files."""
+
+        root = self.root if self.root.exists() else self.root.parent
+        usage = shutil.disk_usage(root)
+        drives: dict[str, dict[str, int | str]] = {}
+        for candidate in (Path("C:/"), Path("E:/")):
+            if candidate.exists():
+                candidate_usage = shutil.disk_usage(candidate)
+                drives[str(candidate.drive or candidate)] = {
+                    "total_bytes": candidate_usage.total,
+                    "used_bytes": candidate_usage.used,
+                    "free_bytes": candidate_usage.free,
+                }
+        return {
+            "configured_root": str(self.root),
+            "configured_drive": root.drive or str(root.anchor),
+            "configured_free_bytes": usage.free,
+            "configured_total_bytes": usage.total,
+            "drives": drives,
+            "fallback_to_system_temp": False,
+        }
+
+    def require_free_space(self, minimum_bytes: int, *, operation: str = "operation") -> dict[str, object]:
+        if isinstance(minimum_bytes, bool) or not isinstance(minimum_bytes, int) or minimum_bytes < 0:
+            raise ValueError("minimum_bytes must be a non-negative integer")
+        report = self.storage_report()
+        free_bytes = int(report["configured_free_bytes"])
+        if free_bytes < minimum_bytes:
+            raise RuntimeError(
+                f"insufficient space for {operation}: {free_bytes} bytes available on {report['configured_drive']}, "
+                f"{minimum_bytes} required; no system-drive fallback is allowed"
+            )
+        return report
+
     @classmethod
     def discover(cls, product_root: Path | None = None, configured_root: str | None = None) -> "FabuloomPaths":
         if configured_root:
@@ -136,7 +190,8 @@ class FabuloomPaths:
             else:
                 root = (Path.home() / "Fabuloom").resolve()
         else:
-            root = (Path.home() / "Fabuloom").resolve()
+            windows_root = Path("E:/Fabuloom")
+            root = windows_root.resolve() if windows_root.is_dir() else (Path.home() / "Fabuloom").resolve()
         return cls(root=root)
 
 

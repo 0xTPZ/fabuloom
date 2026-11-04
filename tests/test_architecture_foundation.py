@@ -8,8 +8,10 @@ import unittest
 
 from fabuloom_core.asset_catalog import AssetCatalog
 from fabuloom_core.engine import EngineService
+from fabuloom_core.migration import LibraryMigration
 from fabuloom_core.mcp import dispatch_tool, handle_message, tool_definitions
 from fabuloom_core.paths import FabuloomPaths, PathConfigurationError
+from fabuloom_core.production import ProductionService
 from fabuloom_core.plugins import PluginRegistry
 from fabuloom_core.project_store import ProjectConflict
 
@@ -44,6 +46,7 @@ class ArchitectureFoundationTests(unittest.TestCase):
             self.assertTrue(catalog.database_path.is_file())
             self.assertEqual(len(catalog.duplicate_groups()), 1)
             self.assertEqual(catalog.search("a")[0]["relative_path"], "a.txt")
+            self.assertEqual(catalog.get(records[0].stable_id)["relative_path"], records[0].relative_path)
 
     def test_plugins_are_discovered_but_activation_is_explicit(self) -> None:
         root = Path(__file__).resolve().parents[1] / "plugins"
@@ -76,6 +79,52 @@ class ArchitectureFoundationTests(unittest.TestCase):
             response = handle_message(engine, {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "fabuloom_projects_list", "arguments": {}}})
             self.assertEqual(response["result"]["structuredContent"]["projects"][0]["id"], "mcp-project")
             self.assertIn("fabuloom_project_update", {tool["name"] for tool in tool_definitions()})
+            self.assertIn("fabuloom_render_demo", {tool["name"] for tool in tool_definitions()})
+
+    def test_capabilities_profiles_and_storage_doctor_are_machine_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            engine = EngineService(FabuloomPaths(Path(directory)))
+            self.assertEqual(engine.capabilities()["format"], "fabuloom.capabilities/0.1")
+            self.assertIn("render.demo", engine.capabilities()["operations"])
+            self.assertIn("audio.mix", engine.capabilities()["operations"])
+            self.assertEqual({item["id"] for item in engine.list_profiles()}, {"cinematic-chapter", "cinematic-short", "music-visualizer", "cinematic-trailer"})
+            self.assertIn("storage", engine.doctor())
+            self.assertEqual(ProductionService(FabuloomPaths(Path(directory))).dry_run()["format"], "fabuloom.render-plan/0.1")
+
+    def test_library_migration_is_checkpointed_reversible_and_preserves_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "legacy"; target = root / "private" / "library"; checkpoints = root / "workspace" / "migrations"
+            source.mkdir(parents=True)
+            original = source / "scene.txt"; original.write_text("approved", encoding="utf-8")
+            migration = LibraryMigration(source, target, checkpoints)
+            plan = migration.create_plan("test-migration")
+            self.assertEqual(migration.simulate(plan)["files"], 1)
+            result = migration.execute(plan)
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual((target / "scene.txt").read_text(encoding="utf-8"), "approved")
+            self.assertTrue(original.is_file())
+            self.assertEqual(migration.rollback(plan)["removed"], 1)
+            self.assertFalse((target / "scene.txt").exists())
+
+    def test_catalog_rescan_preserves_editorial_and_rights_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "library"; root.mkdir()
+            asset = root / "scene.txt"; asset.write_text("v1", encoding="utf-8")
+            catalog = AssetCatalog(root, Path(directory) / "catalog.sqlite3")
+            catalog.scan(category="environment", origin="owner", rights_status="confirmed", approval_status="APPROVED")
+            connection = catalog.connect()
+            try:
+                connection.execute("UPDATE assets SET tags_json = ?, project_refs_json = ?", ('["hero"]', '["book-1"]'))
+                connection.commit()
+            finally:
+                connection.close()
+            catalog.scan(category="unclassified", origin="rescan", rights_status="review_required", approval_status="unreviewed")
+            record = catalog.search("scene")[0]
+            self.assertEqual(record["tags"], ["hero"])
+            self.assertEqual(record["project_refs"], ["book-1"])
+            self.assertEqual(record["approval_status"], "APPROVED")
+            self.assertEqual(record["rights_status"], "confirmed")
 
 
 if __name__ == "__main__":

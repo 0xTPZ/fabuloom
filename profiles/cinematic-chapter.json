@@ -1,0 +1,17 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "cinematic-chapter",
+  "version": "0.1.0",
+  "status": "ready_for_technical_test",
+  "duration_policy": "audio_measured; editorial pauses are explicit timeline events",
+  "cut_rhythm": "18-45 seconds per environmental shot; avoid cuts inside a sentence",
+  "narration": "primary voice track; segment boundaries come from measured WAVs",
+  "safe_area": {"horizontal": "title and captions inside 8% margins", "vertical": "caption and medallion inside 10% safe margins"},
+  "voice": "provider-selected; Kokoro PT-BR when available",
+  "music": "optional owner-approved track; duck below narration with smooth fades",
+  "effects": "subtle atmospheric effects only; never mask dialogue",
+  "medallion": "official approved narrator asset only when the project declares one",
+  "transitions": "deterministic crossfade or light dissolve, 400-1200ms",
+  "canonical_asset_sources": ["project asset IDs", "approved library catalog records"],
+  "review_criteria": ["technical QA", "editorial continuity", "human artistic approval"]
+}

@@ -1,0 +1,17 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "music-visualizer",
+  "version": "0.1.0",
+  "status": "ready_for_technical_test",
+  "duration_policy": "full track or explicit 15-30 second short range measured from source audio",
+  "cut_rhythm": "audio-reactive continuous movement; no narration cuts",
+  "narration": "disabled by contract",
+  "safe_area": {"horizontal": "title inside 8% margins", "vertical": "title and controls-safe composition"},
+  "voice": "not applicable",
+  "music": "source audio preserved; no speed or pitch changes",
+  "effects": "fog, particles, reflections and fragments from Music Studio Canvas renderer",
+  "medallion": "forbidden",
+  "transitions": "continuous deterministic effects; no external character layers",
+  "canonical_asset_sources": ["owner-approved music asset IDs", "environment-only visual assets"],
+  "review_criteria": ["technical QA", "audio continuity", "rights confirmation", "human artistic approval"]
+}

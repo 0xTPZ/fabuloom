@@ -16,6 +16,7 @@ from typing import Any, Callable, Iterable
 import wave
 
 from .tts import SynthesisRequest, SynthesisResult, TTSError
+from .paths import FabuloomPaths
 
 
 KOKORO_MODEL_ID = "hexgrad/Kokoro-82M"
@@ -73,7 +74,7 @@ class KokoroTTSProvider:
         self.output_dir = (
             Path(output_dir)
             if output_dir is not None
-            else Path(__file__).resolve().parents[3] / "workspace" / "exports"
+            else FabuloomPaths.discover(product_root=Path(__file__).resolve().parents[2]).exports
         )
         self._pipeline_factory = pipeline_factory
         self._audio_writer = audio_writer or _write_wav

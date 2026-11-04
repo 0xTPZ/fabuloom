@@ -51,6 +51,12 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/v1/status":
                 self._send(self.engine.status())
+            elif path == "/api/v1/capabilities":
+                self._send(self.engine.capabilities())
+            elif path == "/api/v1/doctor":
+                self._send(self.engine.doctor())
+            elif path == "/api/v1/profiles":
+                self._send({"format": "fabuloom.production-profiles/0.1", "profiles": self.engine.list_profiles()})
             elif path == "/api/v1/projects":
                 self._send({"format": "fabuloom.projects/0.1", "projects": self.engine.list_projects()})
             elif path.startswith("/api/v1/projects/"):
@@ -79,6 +85,12 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 self._send(project, 201)
             elif path == "/api/v1/jobs":
                 job = self.engine.create_job(str(payload.get("kind", "")), payload.get("payload") if isinstance(payload.get("payload"), dict) else {})
+                self._send(job, 202)
+            elif path == "/api/v1/render":
+                job = self.engine.create_job("render-demo", payload)
+                self._send(job, 202)
+            elif path == "/api/v1/library/migration":
+                job = self.engine.create_job("library-migration", payload)
                 self._send(job, 202)
             elif path.startswith("/api/v1/jobs/") and path.endswith("/cancel"):
                 job_id = path.removeprefix("/api/v1/jobs/").removesuffix("/cancel").strip("/")

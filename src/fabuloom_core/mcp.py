@@ -24,14 +24,20 @@ def tool_definitions() -> list[dict[str, object]]:
 
     return [
         {"name": "fabuloom_status", "description": "Read shared engine status.", "inputSchema": {"type": "object", "properties": {}}},
+        {"name": "fabuloom_doctor", "description": "Check dependencies, storage and mounted library state.", "inputSchema": {"type": "object", "properties": {}}},
+        {"name": "fabuloom_capabilities", "description": "Discover implemented operations, schemas, jobs and limits.", "inputSchema": {"type": "object", "properties": {}}},
+        {"name": "fabuloom_profiles_list", "description": "List versioned production profiles and readiness.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_projects_list", "description": "List persisted Fabuloom projects.", "inputSchema": {"type": "object", "properties": {}}},
         {"name": "fabuloom_project_get", "description": "Read one project by stable ID.", "inputSchema": {"type": "object", "required": ["project_id"], "properties": {"project_id": {"type": "string"}}}},
         {"name": "fabuloom_project_create", "description": "Create a project in the shared project store.", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "project_id": {"type": "string"}, "metadata": {"type": "object"}}}},
         {"name": "fabuloom_project_update", "description": "Update a project with optional optimistic revision checking.", "inputSchema": {"type": "object", "required": ["project_id", "payload"], "properties": {"project_id": {"type": "string"}, "payload": {"type": "object"}, "expected_revision": {"type": "integer"}}}},
         {"name": "fabuloom_library_search", "description": "Search the configured private asset catalog without copying media.", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "kind": {"type": "string"}, "missing": {"type": "boolean"}}}},
-        {"name": "fabuloom_job_create", "description": "Start a supported shared-engine job.", "inputSchema": {"type": "object", "required": ["kind"], "properties": {"kind": {"type": "string", "enum": ["validate-project", "catalog-scan"]}, "payload": {"type": "object"}}}},
+        {"name": "fabuloom_job_create", "description": "Start a supported shared-engine job.", "inputSchema": {"type": "object", "required": ["kind"], "properties": {"kind": {"type": "string", "enum": ["validate-project", "catalog-scan", "render-demo", "library-migration"]}, "payload": {"type": "object"}}}},
         {"name": "fabuloom_job_get", "description": "Read a persistent job record.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
         {"name": "fabuloom_job_cancel", "description": "Request cancellation of a shared-engine job.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
+        {"name": "fabuloom_render_dry_run", "description": "Plan a shared production without writing media.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}}}},
+        {"name": "fabuloom_render_demo", "description": "Start the shared demo production job through the same engine used by Desktop and CLI.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}, "text": {"type": "string"}, "output_id": {"type": "string"}, "music_path": {"type": "string"}, "music_asset_id": {"type": "string"}}}},
+        {"name": "fabuloom_library_migration", "description": "Create a checkpointed library migration job; dry-run is the default.", "inputSchema": {"type": "object", "properties": {"source_root": {"type": "string"}, "target_root": {"type": "string"}, "dry_run": {"type": "boolean"}, "migration_id": {"type": "string"}}}},
     ]
 
 
@@ -48,6 +54,12 @@ def dispatch_tool(engine: EngineService, name: str, arguments: dict[str, Any] | 
     args = arguments or {}
     if name == "fabuloom_status":
         return engine.status()
+    if name == "fabuloom_doctor":
+        return engine.doctor()
+    if name == "fabuloom_capabilities":
+        return engine.capabilities()
+    if name == "fabuloom_profiles_list":
+        return {"format": "fabuloom.production-profiles/0.1", "profiles": engine.list_profiles()}
     if name == "fabuloom_projects_list":
         return {"format": "fabuloom.projects/0.1", "projects": engine.list_projects()}
     if name == "fabuloom_project_get":
@@ -84,6 +96,15 @@ def dispatch_tool(engine: EngineService, name: str, arguments: dict[str, Any] | 
         return engine.get_job(_string(args, "job_id"))
     if name == "fabuloom_job_cancel":
         return engine.cancel_job(_string(args, "job_id"))
+    if name == "fabuloom_render_dry_run":
+        payload = {key: args[key] for key in ("profile", "provider", "voice_id") if key in args}
+        return engine.production.dry_run(payload)
+    if name == "fabuloom_render_demo":
+        payload = {key: args[key] for key in ("profile", "provider", "voice_id", "text", "output_id", "music_path", "music_asset_id") if key in args}
+        return engine.create_job("render-demo", payload)
+    if name == "fabuloom_library_migration":
+        payload = {key: args[key] for key in ("source_root", "target_root", "dry_run", "migration_id") if key in args}
+        return engine.create_job("library-migration", payload)
     raise ValueError(f"unknown tool: {name}")
 
 

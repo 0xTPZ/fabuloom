@@ -1,0 +1,17 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "cinematic-short",
+  "version": "0.1.0",
+  "status": "ready_for_technical_test",
+  "duration_policy": "10-60 seconds; audio duration is authoritative",
+  "cut_rhythm": "2-8 seconds per beat; preserve the hook and final payoff",
+  "narration": "one continuous measured narration or approved excerpt",
+  "safe_area": {"horizontal": "8% margins", "vertical": "TikTok/Shorts controls excluded from 12% lower and side zones"},
+  "voice": "provider-selected; simulated provider permitted for generic smoke tests",
+  "music": "optional; ducking and limiter required when present",
+  "effects": "Canvas particles, fog and light accents from the shared renderer",
+  "medallion": "not required for generic profile; explicit in project if used",
+  "transitions": "soft deterministic dissolve; no black frames",
+  "canonical_asset_sources": ["generic redistributable demo assets", "approved library catalog records"],
+  "review_criteria": ["technical QA", "safe-area board", "human artistic approval"]
+}
