@@ -578,20 +578,21 @@ silent C: fallback is allowed.
 ### FAB-ARCH-003 cinematic compatibility boundary
 
 The approved Crônicas de Topázio line is represented by the versioned
-`cronicas-cinematic-production` profile. `CinematicCompatibility` is a guarded
-adapter over the existing Chapter 11 R2 runners: it discovers components,
-plans requests and validates existing horizontal/vertical masters with the
-same manifest, timeline, Canvas and FFmpeg contracts. It does not duplicate
-the NarratorAvatarRenderer or rewrite the legacy cinematic compositor.
+`cronicas-cinematic-production` profile. `CinematicCompatibility` is the
+shared-engine boundary over the existing Chapter 11 R2 renderer: it discovers
+components, plans requests, validates existing horizontal/vertical masters and
+executes only a registered runner with the same manifest, timeline, Canvas and
+FFmpeg contracts. It does not duplicate the NarratorAvatarRenderer or rewrite
+the cinematic compositor.
 
-The current Chapter 11 runner has a fixed output root. The shared engine
-therefore exposes `cinematic-audit`, `render-cinematic --mode plan` and
-`--mode validate-reference`, but refuses execution until a runner explicitly
-declares an isolated output parameter. This is a deliberate compatibility
-state, not an equivalence claim. The legacy runner remains the production
-path for already specified episodes, while the shared engine remains the
-single control surface for diagnosis, projects, jobs, catalog and future
-parameterized production.
+`profiles/registries/cinematic-runners.json` is the trust boundary. Each runner
+is product-relative, name-validated, SHA-256 pinned and required to accept a
+request file containing a child `output_root` under `workspace/exports`. The
+engine persists that request, refuses to mix requests or overwrite completed
+outputs, forwards cancellation, and relies on the runner's checkpoint for
+resumption. The `cronicas.chapter` runner is the validated implementation for
+the Chapter 12 production. The Desktop, CLI, loopback API and MCP therefore
+share one execution path.
 
 The same boundary distinguishes `technical_qa=PASS` from
 `artistic_qa=REVIEW_REQUIRED`, keeps Santa V5 and private media outside the

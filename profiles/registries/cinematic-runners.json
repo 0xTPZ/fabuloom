@@ -1,0 +1,21 @@
+{
+  "format": "fabuloom.cinematic-runner-registry/0.1",
+  "runners": [
+    {
+      "id": "cronicas.chapter",
+      "script": "examples/cronicas_cinematic_production.py",
+      "sha256": "f405a7c4d6af16cb0ce9c93eaddcf9eac053390d62151fecf319522d269c668e",
+      "capabilities": [
+        "chapter-source-extraction",
+        "kokoro-pm-santa",
+        "narrator-avatar-canvas",
+        "environment-only-scenes",
+        "voice-priority-ducking",
+        "horizontal",
+        "vertical",
+        "checkpointed-resume"
+      ],
+      "contract": "--request JSON with isolated output_root"
+    }
+  ]
+}

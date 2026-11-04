@@ -50,10 +50,17 @@ manuscrito integral, Kokoro `pm_santa`/pt-BR, Santa V5 aprovado, medalhão,
 abertura/despedida, música com ducking, legendas medidas, transições,
 checkpoints e masters horizontal/vertical. Não promova personagens DRAFT.
 
-O capítulo 11 R2 é referência de validação. O adaptador cinematográfico deve
-ser usado para diagnóstico e planejamento até que um runner parametrizado
-consiga escrever em um output novo. Nunca execute runner com saída fixa de
-capítulo aprovado através do EngineService.
+O capítulo 11 R2 é referência de validação. A produção pelo motor usa somente
+runners registrados em `profiles/registries/cinematic-runners.json`, com
+SHA-256 verificado, contrato `--request` e `output_root` isolado. Runners com
+caminhos fixos são reportados, mas recusados para evitar sobrescrever capítulos
+aprovados. O runner `cronicas.chapter` é a implementação validada para a
+produção parametrizada do capítulo 12.
+
+Para executar uma produção, use `render cinematic --mode execute` ou o job/API/
+MCP equivalente. O motor escolhe ou valida um diretório filho de
+`workspace/exports`, grava a requisição, acompanha `CHECKPOINT.json` e preserva
+saídas completas. O mesmo pedido não pode ser reutilizado em outro output.
 
 ## Worktrees e histórico
 

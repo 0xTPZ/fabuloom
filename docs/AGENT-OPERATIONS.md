@@ -174,14 +174,17 @@ medidos, Santa V5 aprovado, cenas por IDs, música autorizada, ducking,
 transições, SRT, checkpoints e QA dos dois formatos. A validação do capítulo
 11 R2 reutiliza os masters existentes sem ressíntese ou recaptura.
 
-Os runners da PR #56 permanecem a referência legada. Eles só podem ser
-executados pelo adaptador quando `FABULOOM_CINEMATIC_RUNNER` selecionar um
-runner que declare saída isolada (`--output-root` ou equivalente). Runners com
-caminhos fixos são reportados, mas recusados para evitar sobrescrever capítulos
-aprovados.
+Os runners da PR #56 permanecem a referência legada. A execução pelo motor usa
+somente runners registrados em `profiles/registries/cinematic-runners.json`,
+com SHA-256 verificado, contrato `--request` e `output_root` isolado. Runners
+com caminhos fixos são reportados, mas recusados para evitar sobrescrever
+capítulos aprovados. O runner `cronicas.chapter` é a implementação validada
+para a produção parametrizada do capítulo 12.
 
-Para o próximo capítulo, produza primeiro um plano e storyboard, valide fonte
-e direitos, selecione output novo e só então execute o runner parametrizado.
+Para um próximo capítulo, produza primeiro um plano e storyboard, valide fonte
+e direitos, selecione output novo e só então execute `render cinematic --mode
+execute` (ou o job/API/MCP equivalente). O motor grava a requisição, acompanha
+`CHECKPOINT.json`, recusa sobrescrita e permite retomada da mesma solicitação.
 `technical_qa=PASS` não equivale a aprovação artística. Para Shorts, use
 `cronicas-shorts-production`; o storyboard e a aprovação artística continuam
 obrigatórios.
