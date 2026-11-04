@@ -2,6 +2,12 @@
 
 Fabuloom Studio is an open-source foundation for turning stories and scripts into narrated videos with animated characters.
 
+The product is designed as one local application with a shared engine:
+Desktop, headless CLI, loopback API, browser views and the local MCP adapter use
+the same projects, asset catalog, timelines and jobs. Private creative
+libraries remain configurable external roots and are never bundled into the
+public source tree.
+
 The project is being designed as an independent application by 0xTPZ. It is intentionally separate from TopazioReader and Card Game Studio. Those projects are references only; no source code, models, environments, personal audio, or private context is published here.
 
 ## Vision

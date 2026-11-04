@@ -505,3 +505,47 @@ reason for hiding the redundant pixels. Debug-only pack options can reveal the
 hidden neck/beard pixels in the face lab; they are not used by export. The
 production render path remains the same shared `LayeredCharacterRenderer` and
 the MP4 exporter still consumes deterministic frames from that path.
+
+### FAB-ARCH-001 professional application foundation
+
+The application boundary is one Fabuloom Studio product, not separate Desktop
+and automation implementations. `EngineService` is the shared orchestration
+boundary for paths, project persistence, the asset catalog, plugins and
+persistent jobs. The native Tkinter Desktop shell, the headless CLI, the
+loopback HTTP API and the existing browser Stage all call that boundary.
+
+```text
+Desktop UI ─┐
+Headless CLI ├──> EngineService ──> ProjectStore / AssetCatalog / JobStore
+Local API ───┘          │
+Browser Stage ──────────┘
+                           ├── provider/export plugin registry
+                           └── configurable private-library roots
+```
+
+Projects use `fabuloom.project/0.1`, stable identifiers, atomic JSON writes,
+cooperative per-project locks, optimistic revisions and bounded operation
+history. Jobs use `fabuloom.job/0.1`, persist state/progress/result, support
+cancel requests and recover stale queued/running records as interrupted. The
+current built-in jobs are validation and catalog scanning; render, TTS and
+editor orchestration remain explicit plugin/service work rather than hidden
+Desktop-only behavior.
+
+`AssetCatalog` indexes the configured private library without copying or
+deleting source files. It records paths relative to the configured root,
+SHA-256, media metadata, tags, project references and duplicate groups. The
+public repository contains no private media, model weights, generated videos
+or personal audio. The current migration keeps the legacy workspace inputs in
+place and makes physical relocation a future checkpointed operation.
+
+Plugins are discovered only from explicit local manifests; unknown entry
+points are not executed. The loopback API is intentionally local-only. The
+stdio MCP adapter is a thin JSON-RPC translation layer over the same
+`EngineService`; it exposes status, project, catalog and job tools without
+duplicating business logic or opening a network listener.
+
+The initial Desktop shell is a functional control surface, not a complete
+editor. Existing Stage and Music Studio browser views are launched as
+compatibility views while their project controls are progressively connected
+to the shared project/job contracts. This avoids a broad rewrite and keeps the
+private library separate from the commercializable Studio source.

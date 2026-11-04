@@ -13,5 +13,9 @@ kokoro = [
     "soundfile==0.14.0",
 ]
 
+[project.scripts]
+fabuloom = "fabuloom_core.cli:main"
+fabuloom-mcp = "fabuloom_core.mcp:main"
+
 [tool.fabuloom]
 format-version = "0.1.0"

@@ -1,0 +1,11 @@
+{
+  "format": "fabuloom.plugin/0.1",
+  "id": "fabuloom.export.ffmpeg",
+  "name": "FFmpeg export boundary",
+  "version": "0.1.0",
+  "api_version": "0.1",
+  "capabilities": ["video.export", "audio.mix"],
+  "entry_point": null,
+  "source": "builtin",
+  "enabled": true
+}

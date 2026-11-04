@@ -17,6 +17,9 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 
 FRONTEND_ROOT = Path(__file__).resolve().parent
+SRC_ROOT = FRONTEND_ROOT.parent / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 
 def workspace_root_for(frontend_root: Path, configured: str | None = None) -> Path:
@@ -43,6 +46,10 @@ def export_root_for(workspace_root: Path, configured: str | None = None) -> Path
 
 WORKSPACE_ROOT = workspace_root_for(FRONTEND_ROOT, os.environ.get("FABULOOM_WORKSPACE_ROOT"))
 EXPORT_ROOT = export_root_for(WORKSPACE_ROOT, os.environ.get("FABULOOM_EXPORT_ROOT"))
+from fabuloom_core.engine import EngineService
+from fabuloom_core.paths import FabuloomPaths
+
+ENGINE = EngineService(FabuloomPaths.discover(product_root=FRONTEND_ROOT.parent, configured_root=str(WORKSPACE_ROOT)))
 CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
@@ -155,6 +162,18 @@ class StageHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = unquote(urlsplit(self.path).path)
         query = parse_qs(urlsplit(self.path).query)
+        if path == "/api/v1/status":
+            self._send_json(ENGINE.status())
+            return
+        if path == "/api/v1/projects":
+            self._send_json({"format": "fabuloom.projects/0.1", "projects": ENGINE.list_projects()})
+            return
+        if path == "/api/v1/jobs":
+            self._send_json({"format": "fabuloom.jobs/0.1", "jobs": ENGINE.list_jobs()})
+            return
+        if path == "/api/v1/library":
+            self._send_json({"format": "fabuloom.library-search/0.1", "assets": ENGINE.search_library()})
+            return
         if path == "/api/music/catalog":
             self._send_json({"format": "fabuloom.music-catalog/0.1", "assets": _music_catalog()})
             return
@@ -235,6 +254,22 @@ class StageHandler(BaseHTTPRequestHandler):
             self.send_error(403, "capture accepts loopback requests only")
             return
         path = unquote(urlsplit(self.path).path)
+        if path == "/api/v1/projects":
+            try:
+                request = _read_request(self)
+                project = ENGINE.create_project(str(request.get("name", "")), project_id=request.get("id") if isinstance(request.get("id"), str) else None, metadata=request.get("metadata") if isinstance(request.get("metadata"), dict) else None)
+                self._send_json(project, status=201)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
+        if path == "/api/v1/jobs":
+            try:
+                request = _read_request(self)
+                job = ENGINE.create_job(str(request.get("kind", "")), request.get("payload") if isinstance(request.get("payload"), dict) else {})
+                self._send_json(job, status=202)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            return
         if path == "/api/music/project":
             try:
                 request = _read_request(self)
