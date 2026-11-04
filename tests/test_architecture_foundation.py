@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from fabuloom_core.asset_catalog import AssetCatalog
 from fabuloom_core.engine import EngineService
 from fabuloom_core.migration import LibraryMigration
 from fabuloom_core.mcp import dispatch_tool, handle_message, tool_definitions
 from fabuloom_core.paths import FabuloomPaths, PathConfigurationError
-from fabuloom_core.production import ProductionService
+from fabuloom_core.production import ProductionError, ProductionService
 from fabuloom_core.plugins import PluginRegistry
 from fabuloom_core.project_store import ProjectConflict
 
@@ -90,6 +92,32 @@ class ArchitectureFoundationTests(unittest.TestCase):
             self.assertEqual({item["id"] for item in engine.list_profiles()}, {"cinematic-chapter", "cinematic-short", "music-visualizer", "cinematic-trailer"})
             self.assertIn("storage", engine.doctor())
             self.assertEqual(ProductionService(FabuloomPaths(Path(directory))).dry_run()["format"], "fabuloom.render-plan/0.1")
+
+    def test_export_modes_distinguish_economy_and_real_canvas_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            service = ProductionService(FabuloomPaths(Path(directory)))
+            profile = service.profiles.get("cinematic-short")
+            economy = service._export_settings(profile, {})
+            real = service._export_settings(profile, {"capture_fps": 30, "output_fps": 30, "audio_sample_rate": 48000, "audio_channels": 2})
+            self.assertEqual(economy["capture_quality"], "economy")
+            self.assertEqual(economy["capture_fps"], 5)
+            self.assertEqual(economy["audio_sample_rate"], 48000)
+            self.assertEqual(real["capture_quality"], "real_canvas_capture")
+            self.assertEqual(real["capture_fps"], 30)
+            with self.assertRaises(ProductionError):
+                service._export_settings(profile, {"capture_fps": True})
+
+    def test_runtime_root_refuses_environment_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            active = Path(directory) / "active"
+            configured = Path(directory) / "configured"
+            paths = FabuloomPaths(active)
+            with patch.dict(os.environ, {"FABULOOM_ROOT": str(configured)}):
+                with self.assertRaises(PathConfigurationError):
+                    paths.validate_runtime_root()
+                doctor = EngineService(paths).doctor()
+                self.assertEqual(doctor["status"], "blocked")
+                self.assertIn("validation_error", doctor["storage"])
 
     def test_library_migration_is_checkpointed_reversible_and_preserves_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

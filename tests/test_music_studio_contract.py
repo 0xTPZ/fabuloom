@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
 
 from examples.music_studio_demo import PROJECT_FORMAT, _short_selection_from_candidate, _style, analyze_source, create_project, discover_music, probe_audio
+from fabuloom_core.paths import FabuloomPaths
 
 
-WORKSPACE = Path(__file__).resolve().parents[2]
+WORKSPACE = FabuloomPaths.discover(
+    product_root=Path(__file__).resolve().parents[1],
+    configured_root=os.environ.get("FABULOOM_ROOT") or os.environ.get("FABULOOM_WORKSPACE_ROOT"),
+).root
 SOURCE = WORKSPACE / "workspace" / "inputs" / "music" / "book1" / "O Chamado do Vazio.mp3"
 
 

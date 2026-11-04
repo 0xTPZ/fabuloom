@@ -12,6 +12,14 @@
   "effects": "Canvas particles, fog and light accents from the shared renderer",
   "medallion": "not required for generic profile; explicit in project if used",
   "transitions": "soft deterministic dissolve; no black frames",
+  "export": {
+    "video_fps": 30,
+    "capture_fps": 5,
+    "audio_codec": "aac",
+    "audio_sample_rate": 48000,
+    "audio_channels": 2,
+    "capture_policy": "economy_default; real_canvas_capture_at_24_or_30_fps_available"
+  },
   "canonical_asset_sources": ["generic redistributable demo assets", "approved library catalog records"],
   "review_criteria": ["technical QA", "safe-area board", "human artistic approval"]
 }

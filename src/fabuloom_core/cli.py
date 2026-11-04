@@ -73,6 +73,10 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--text")
     demo.add_argument("--output-id", default="fab-arch-002-cold-demo")
     demo.add_argument("--music-path", help="optional audio path inside the configured Fabuloom root")
+    demo.add_argument("--capture-fps", type=int, choices=[5, 24, 30], help="Canvas capture rate; 5 keeps the economical demo mode, 24/30 capture real frames")
+    demo.add_argument("--output-fps", type=int, choices=[24, 30], help="encoded video frame rate")
+    demo.add_argument("--audio-sample-rate", type=int, help="encoded AAC sample rate; Kokoro source WAV remains native")
+    demo.add_argument("--audio-channels", type=int, choices=[1, 2], help="encoded AAC channel count")
     demo.add_argument("--dry-run", action="store_true")
     demo.add_argument("--no-wait", action="store_true")
     return parser
@@ -140,6 +144,10 @@ def main(argv: list[str] | None = None) -> int:
                 payload["text"] = args.text
             if args.music_path:
                 payload["music_path"] = args.music_path
+            for name in ("capture_fps", "output_fps", "audio_sample_rate", "audio_channels"):
+                value = getattr(args, name)
+                if value is not None:
+                    payload[name] = value
             if args.dry_run:
                 _json(engine.production.dry_run(payload))
             else:

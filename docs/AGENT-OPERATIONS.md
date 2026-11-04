@@ -72,14 +72,29 @@ Antes do render, planejar sem escrever mídia:
 python -B -m fabuloom_core.cli --root $fabRoot render demo --dry-run
 ```
 
-O render genérico validado usa o perfil `cinematic-short`, a captura real de
+O render genérico validado usa o perfil `cinematic-short`, a captura de
 `frontend/capture-music-studio.html` e `frontend/src/music-studio-renderer.mjs`,
 gera manifesto de narração, WAV, SRT, frames, MP4, prancha, checkpoint e QA.
+O perfil mantém `capture_fps=5` como modo econômico de demonstração, mas aceita
+`capture_fps=24` ou `30` para capturar quadros reais do Canvas. O QA registra a
+quantidade de quadros capturados, quadros únicos, mudanças adjacentes e deixa
+explícito quando a fluidez não foi comprovada. A taxa do vídeo pode ser 24 ou
+30 fps, independentemente da taxa de captura.
+O áudio dos provedores permanece na taxa nativa durante a composição; a
+exportação AAC padrão é estéreo a 48 kHz (`audio_sample_rate=48000`,
+`audio_channels=2`).
 Para a produção de aceitação sem acervo privado:
 
 ```powershell
 python -B -m fabuloom_core.cli --root $fabRoot render demo --provider simulated-audio --output-id cold-demo
 python -B -m fabuloom_core.cli --root $fabRoot job list
+```
+
+Para validar fluidez real em uma saída nova, use um identificador novo e uma
+captura de 30 fps:
+
+```powershell
+python -B -m fabuloom_core.cli --root $fabRoot render demo --provider simulated-audio --capture-fps 30 --output-fps 30 --audio-sample-rate 48000 --audio-channels 2 --output-id real-canvas-30fps-r1
 ```
 
 O áudio `simulated-audio` é um tom determinístico audível para teste de
@@ -144,3 +159,8 @@ como `interrupted`; trabalho arbitrário não é retomado silenciosamente.
 - Alinhamento de palavras, fonemas e visemas continua indisponível quando o
   provedor não o fornece.
 - Nenhum QA técnico substitui aprovação artística humana.
+- O teste `tools/cold_agent_session.py` inicia um subprocesso limpo sem
+  histórico de conversa, lê somente os documentos versionados, descobre
+  capacidades e seleciona um perfil renderizável. Ele não é um agente LLM
+  autônomo; quando não há runtime de agente disponível, essa limitação fica
+  registrada no relatório em vez de ser mascarada como autonomia.

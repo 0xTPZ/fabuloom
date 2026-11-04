@@ -10,6 +10,7 @@
       const projectUrl = params.get("project");
       const mode = params.get("mode") === "short" ? "short" : "full";
       const fps = Number(params.get("fps") || 5);
+      const outputFps = Number(params.get("output_fps") || 30);
       const canvas = document.querySelector("#capture-canvas");
       canvas.width = mode === "short" ? 1080 : 1920; canvas.height = mode === "short" ? 1920 : 1080;
       const context = canvas.getContext("2d");
@@ -41,7 +42,7 @@
           if (pending.size >= 8) await Promise.race(pending);
         }
         await Promise.all(pending);
-        const completion = { mode: `music-studio-${mode}`, duration_ms: timeline.duration_ms, canvas: { width: canvas.width, height: canvas.height }, fps, frame_count: frameCount, output_fps: 30, timing_source: "source_music_duration_and_rms_envelope", music_source: project.source.filename, no_narrator: true, no_characters: true, no_lip_sync: true };
+        const completion = { mode: `music-studio-${mode}`, duration_ms: timeline.duration_ms, canvas: { width: canvas.width, height: canvas.height }, fps, frame_count: frameCount, output_fps: outputFps, timing_source: "source_music_duration_and_rms_envelope", music_source: project.source.filename, no_narrator: true, no_characters: true, no_lip_sync: true };
         const done = await fetch(`/capture/${encodeURIComponent(session)}/complete.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(completion) });
         if (!done.ok) fail(`completion upload failed: ${done.status}`); status.textContent = JSON.stringify(completion); document.title = "completed";
       }

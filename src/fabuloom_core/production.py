@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from array import array
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -35,6 +36,11 @@ from .tts import SynthesisRequest, SynthesisResult, TTSError
 
 
 PRODUCTION_FORMAT = "fabuloom.production-project/0.1"
+ECONOMY_CAPTURE_FPS = 5
+REAL_CAPTURE_FPS = (24, 30)
+DEFAULT_OUTPUT_FPS = 30
+DEFAULT_AUDIO_SAMPLE_RATE = 48_000
+DEFAULT_AUDIO_CHANNELS = 2
 DEMO_TEXT = (
     "Esta é uma demonstração pública do Fabuloom Studio. "
     "O mesmo motor organiza o projeto, prepara a narração e controla a linha do tempo. "
@@ -114,6 +120,7 @@ class ProductionService:
         request = payload or {}
         profile_id = str(request.get("profile") or "cinematic-short")
         profile = self.profiles.get(profile_id)
+        export_settings = self._export_settings(profile, request)
         dependencies = self._dependency_report()
         return {
             "format": "fabuloom.render-plan/0.1",
@@ -121,7 +128,8 @@ class ProductionService:
             "profile": {"id": profile["id"], "version": profile["version"], "status": profile["status"]},
             "provider": str(request.get("provider") or "simulated-audio"),
             "canvas": {"renderer": "frontend/src/music-studio-renderer.mjs", "capture": "frontend/capture-music-studio.html"},
-            "audio": {"manifest": "fabuloom.audio-manifest/0.1", "subtitles": "SRT from measured segment boundaries", "mix": "optional FFmpeg voice-priority ducking when music_path is supplied"},
+            "audio": {"manifest": "fabuloom.audio-manifest/0.1", "subtitles": "SRT from measured segment boundaries", "mix": "optional FFmpeg voice-priority ducking when music_path is supplied", "export_sample_rate": export_settings["audio_sample_rate"], "export_channels": export_settings["audio_channels"], "source_rate_policy": "preserve native provider WAV until FFmpeg export"},
+            "export": export_settings,
             "dependencies": dependencies,
             "storage": self.paths.storage_report(),
             "limits": ["generic acceptance audio is synthetic tone bed", "human artistic review remains required"],
@@ -133,6 +141,9 @@ class ProductionService:
         profile = self.profiles.get(profile_id)
         if profile["status"] != "ready_for_technical_test":
             raise ProductionError(f"profile is not technically ready: {profile_id}")
+        self.paths.validate_runtime_root()
+        self.paths.ensure_runtime_directories()
+        export_settings = self._export_settings(profile, request)
         self.paths.require_free_space(64 * 1024 * 1024, operation="generic production render")
         output_id = str(request.get("output_id") or "fab-arch-002-cold-demo")
         if not output_id or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for character in output_id):
@@ -142,7 +153,7 @@ class ProductionService:
         root.mkdir(parents=True, exist_ok=True)
         checkpoint_path = root / "CHECKPOINT.json"
         music_path = self._resolve_music_path(request.get("music_path"))
-        fingerprint_payload: dict[str, object] = {"text": str(request.get("text") or DEMO_TEXT), "profile": profile_id, "provider": str(request.get("provider") or "simulated-audio"), "duration_policy": "synthetic-segment-minimum-3700ms"}
+        fingerprint_payload: dict[str, object] = {"text": str(request.get("text") or DEMO_TEXT), "profile": profile_id, "provider": str(request.get("provider") or "simulated-audio"), "duration_policy": "synthetic-segment-minimum-3700ms", "capture_fps": export_settings["capture_fps"], "output_fps": export_settings["output_fps"], "audio_sample_rate": export_settings["audio_sample_rate"], "audio_channels": export_settings["audio_channels"]}
         if music_path is not None:
             fingerprint_payload["music_path"] = str(music_path)
             fingerprint_payload["music_sha256"] = self._sha256(music_path)
@@ -192,19 +203,23 @@ class ProductionService:
         if not voice_path.is_file():
             self._compose_audio(manifest, voice_path)
         mix_info = self._prepare_audio(voice_path, audio_path, music_path, duration_ms, mark)
-        project = self._write_canvas_project(project_path, output_id, root, manifest, duration_ms, profile_id)
+        project = self._write_canvas_project(project_path, output_id, root, manifest, duration_ms, profile_id, output_fps=int(export_settings["output_fps"]), audio_sample_rate=int(export_settings["audio_sample_rate"]), audio_channels=int(export_settings["audio_channels"]))
         mark("timeline", 0.28, duration_ms=duration_ms, segments=len(manifest.get("segments", [])))
 
+        capture_summary: dict[str, object]
         if not video_path.is_file():
-            mark("canvas-capture", 0.35, renderer="frontend/src/music-studio-renderer.mjs")
-            frames, completion = self._capture_canvas(root, duration_ms)
-            mark("canvas-captured", 0.62, frame_count=completion["frame_count"])
-            self._render_mp4(frames, audio_path, captions_path, video_path, duration_ms)
+            mark("canvas-capture", 0.35, renderer="frontend/src/music-studio-renderer.mjs", capture_fps=export_settings["capture_fps"], output_fps=export_settings["output_fps"])
+            frames, capture_summary = self._capture_canvas(root, duration_ms, capture_fps=int(export_settings["capture_fps"]), output_fps=int(export_settings["output_fps"]))
+            mark("canvas-captured", 0.62, **capture_summary)
+            self._render_mp4(frames, audio_path, captions_path, video_path, duration_ms, output_fps=int(export_settings["output_fps"]), audio_sample_rate=int(export_settings["audio_sample_rate"]), audio_channels=int(export_settings["audio_channels"]))
             mark("encoded", 0.82, video=str(video_path))
-            self._make_board(video_path, board_path, duration_ms)
+            self._make_board(video_path, board_path, duration_ms, output_fps=int(export_settings["output_fps"]))
         else:
             mark("encode-reused", 0.82, video=str(video_path))
-        qa = self._validate_output(video_path, duration_ms)
+            capture_summary = dict(checkpoint.get("stages", {}).get("canvas-captured", {}))
+        qa = self._validate_output(video_path, duration_ms, expected_fps=int(export_settings["output_fps"]), expected_audio_sample_rate=int(export_settings["audio_sample_rate"]), expected_audio_channels=int(export_settings["audio_channels"]))
+        qa["capture"] = capture_summary
+        qa["fluency_claim"] = "real_canvas_capture_validated" if capture_summary.get("real_capture_validated") else "economy_capture_or_reused_output_requires_motion_review"
         self._write_json(root / "technical-qa.json", qa)
         report = {
             "format": "fabuloom.production-report/0.1",
@@ -217,6 +232,7 @@ class ProductionService:
             "profile": profile_id,
             "provider": provider_name,
             "audio_mix": mix_info,
+            "export": export_settings,
             "duration_ms": duration_ms,
             "backend": "Canvas music-studio-renderer + FFmpeg",
             "technical_qa": qa,
@@ -288,13 +304,47 @@ class ProductionService:
         edge = self._find_edge(required=False)
         return {"ffmpeg": bool(shutil.which("ffmpeg")), "ffprobe": bool(shutil.which("ffprobe")), "canvas_browser": bool(edge), "kokoro_import": self._module_available("kokoro")}
 
+    @classmethod
+    def _export_settings(cls, profile: dict[str, object], request: dict[str, object]) -> dict[str, object]:
+        configured = profile.get("export") if isinstance(profile.get("export"), dict) else {}
+        configured = configured if isinstance(configured, dict) else {}
+        capture_fps = cls._positive_int(request.get("capture_fps", configured.get("capture_fps", ECONOMY_CAPTURE_FPS)), "capture_fps", allowed={ECONOMY_CAPTURE_FPS, *REAL_CAPTURE_FPS})
+        output_fps = cls._positive_int(request.get("output_fps", configured.get("video_fps", DEFAULT_OUTPUT_FPS)), "output_fps", allowed={24, 30})
+        audio_sample_rate = cls._positive_int(request.get("audio_sample_rate", configured.get("audio_sample_rate", DEFAULT_AUDIO_SAMPLE_RATE)), "audio_sample_rate", minimum=8_000, maximum=192_000)
+        audio_channels = cls._positive_int(request.get("audio_channels", configured.get("audio_channels", DEFAULT_AUDIO_CHANNELS)), "audio_channels", allowed={1, 2})
+        return {
+            "capture_fps": capture_fps,
+            "output_fps": output_fps,
+            "audio_sample_rate": audio_sample_rate,
+            "audio_channels": audio_channels,
+            "audio_codec": "aac",
+            "capture_quality": "economy" if capture_fps == ECONOMY_CAPTURE_FPS else "real_canvas_capture",
+        }
+
+    @staticmethod
+    def _positive_int(value: object, name: str, *, minimum: int = 1, maximum: int | None = None, allowed: set[int] | None = None) -> int:
+        if isinstance(value, bool):
+            raise ProductionError(f"{name} must be an integer, not a boolean")
+        if isinstance(value, float) and not value.is_integer():
+            raise ProductionError(f"{name} must be an integer")
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ProductionError(f"{name} must be an integer") from exc
+        if parsed < minimum or (maximum is not None and parsed > maximum):
+            raise ProductionError(f"{name} must be between {minimum} and {maximum or 'unbounded'}")
+        if allowed is not None and parsed not in allowed:
+            choices = ", ".join(str(item) for item in sorted(allowed))
+            raise ProductionError(f"{name} must be one of: {choices}")
+        return parsed
+
     @staticmethod
     def _module_available(name: str) -> bool:
-        try:
-            __import__(name)
-            return True
-        except ImportError:
-            return False
+        # Discovery must not import optional runtimes merely to render a
+        # doctor/capabilities response. Importing Kokoro can initialize torch,
+        # loguru and asyncio on Windows; actual provider initialization remains
+        # responsible for reporting dependency/runtime failures.
+        return importlib.util.find_spec(name) is not None
 
     @staticmethod
     def _find_edge(*, required: bool = True) -> str | None:
@@ -312,7 +362,9 @@ class ProductionService:
             raise ProductionError("Microsoft Edge is required for the shared Canvas capture path")
         return None
 
-    def _capture_canvas(self, project_root: Path, duration_ms: int) -> tuple[Path, dict[str, object]]:
+    def _capture_canvas(self, project_root: Path, duration_ms: int, *, capture_fps: int = ECONOMY_CAPTURE_FPS, output_fps: int = DEFAULT_OUTPUT_FPS) -> tuple[Path, dict[str, object]]:
+        capture_fps = self._positive_int(capture_fps, "capture_fps", allowed={ECONOMY_CAPTURE_FPS, *REAL_CAPTURE_FPS})
+        output_fps = self._positive_int(output_fps, "output_fps", allowed={24, 30})
         edge = self._find_edge()
         capture_root = project_root / "captures"
         capture_root.mkdir(parents=True, exist_ok=True)
@@ -328,11 +380,16 @@ class ProductionService:
         try:
             self._wait_http(f"http://127.0.0.1:{port}/capture-music-studio.html", 25)
             relative = project_root.relative_to(self.paths.exports).as_posix()
-            url = f"http://127.0.0.1:{port}/capture-music-studio.html?session={session}&project=/exports/{relative}/project.json&mode=short&fps=5"
+            url = f"http://127.0.0.1:{port}/capture-music-studio.html?session={session}&project=/exports/{relative}/project.json&mode=short&fps={capture_fps}&output_fps={output_fps}"
             browser = subprocess.Popen([edge, "--headless=new", "--disable-gpu", "--disable-gpu-compositing", "--disable-background-networking", "--hide-scrollbars", "--window-size=1080,1920", f"--user-data-dir={profile}", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             complete = session_root / "complete.json"
             error = session_root / "error.json"
-            deadline = time.monotonic() + 180
+            # Uploading a full-resolution JPEG per Canvas frame is deliberately
+            # conservative. Keep the economical mode bounded, but give real
+            # 24/30 fps captures a budget proportional to their frame count so
+            # a slow local browser cannot be mistaken for a render failure.
+            capture_timeout_seconds = max(180.0, min(900.0, duration_ms / 1000 * capture_fps * 0.75 + 60.0))
+            deadline = time.monotonic() + capture_timeout_seconds
             while not complete.exists() and not error.exists() and time.monotonic() < deadline:
                 time.sleep(0.2)
             if error.exists():
@@ -343,16 +400,45 @@ class ProductionService:
             source_frames = sorted(session_root.glob("src-*.jpg"))
             if len(source_frames) != int(completion["frame_count"]):
                 raise ProductionError("Canvas capture frame count mismatch")
-            output_count = max(1, math.ceil(duration_ms * 30 / 1000))
+            expected_source_count = max(1, math.ceil(duration_ms * capture_fps / 1000))
+            if len(source_frames) != expected_source_count:
+                raise ProductionError(f"Canvas capture produced {len(source_frames)} source frames; expected {expected_source_count} at {capture_fps} fps")
+            source_hashes = [self._sha256(frame) for frame in source_frames]
+            unique_source_hashes = len(set(source_hashes))
+            output_count = max(1, math.ceil(duration_ms * output_fps / 1000))
+            output_hashes: list[str] = []
             for index in range(output_count):
-                source_index = min(len(source_frames) - 1, round(index * 5 / 30))
+                source_index = min(len(source_frames) - 1, round(index * capture_fps / output_fps))
                 target = session_root / f"{index:06d}.jpg"
                 if not target.exists():
                     try:
                         os.link(session_root / f"src-{source_index:06d}.jpg", target)
                     except OSError:
                         shutil.copyfile(session_root / f"src-{source_index:06d}.jpg", target)
-            return session_root, completion
+                output_hashes.append(source_hashes[source_index])
+            adjacent_source_changes = sum(1 for previous, current in zip(source_hashes, source_hashes[1:]) if previous != current)
+            unique_output_hashes = len(set(output_hashes))
+            real_capture_validated = capture_fps in REAL_CAPTURE_FPS and unique_source_hashes >= 2 and adjacent_source_changes > 0
+            completion.update({"capture_fps": capture_fps, "output_fps": output_fps, "source_frame_count": len(source_frames), "unique_source_frame_count": unique_source_hashes, "output_frame_count": output_count, "unique_output_frame_count": unique_output_hashes})
+            return session_root, {
+                "frame_count": len(source_frames),
+                "fps": capture_fps,
+                "duration_ms": duration_ms,
+                "capture_fps": capture_fps,
+                "output_fps": output_fps,
+                "source_frame_count": len(source_frames),
+                "expected_source_frame_count": expected_source_count,
+                "unique_capture_frame_count": unique_source_hashes,
+                "output_frame_count": output_count,
+                "unique_output_frame_count": unique_output_hashes,
+                "duplicate_output_frame_count": output_count - unique_output_hashes,
+                "unique_capture_frame_ratio": round(unique_source_hashes / max(1, len(source_frames)), 4),
+                "adjacent_source_changes": adjacent_source_changes,
+                "continuity_validated": len(source_frames) == expected_source_count and adjacent_source_changes > 0,
+                "real_capture_validated": real_capture_validated,
+                "quality": "real_canvas_capture" if capture_fps in REAL_CAPTURE_FPS else "economy_repeated_frames",
+                "timing_source": "Canvas frame timestamps from deterministic browser capture",
+            }
         finally:
             if browser is not None and browser.poll() is None:
                 browser.terminate()
@@ -380,24 +466,24 @@ class ProductionService:
         raise ProductionError(f"local HTTP endpoint did not start: {url}")
 
     @staticmethod
-    def _render_mp4(frames: Path, audio: Path, captions: Path, output: Path, duration_ms: int) -> None:
+    def _render_mp4(frames: Path, audio: Path, captions: Path, output: Path, duration_ms: int, *, output_fps: int = DEFAULT_OUTPUT_FPS, audio_sample_rate: int = DEFAULT_AUDIO_SAMPLE_RATE, audio_channels: int = DEFAULT_AUDIO_CHANNELS) -> None:
         output.parent.mkdir(parents=True, exist_ok=True)
         duration = duration_ms / 1000
         subtitle = captions.name.replace("'", "\\'")
         filter_graph = f"subtitles='{subtitle}':force_style='FontName=Arial,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=2,Alignment=2,MarginV=100'"
-        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-framerate", "30", "-i", str(frames / "%06d.jpg"), "-i", str(audio), "-vf", filter_graph, "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duration:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "128k", "-ar", "24000", "-ac", "2", "-movflags", "+faststart", str(output)]
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-framerate", str(output_fps), "-i", str(frames / "%06d.jpg"), "-i", str(audio), "-vf", filter_graph, "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duration:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p", "-r", str(output_fps), "-c:a", "aac", "-b:a", "128k", "-ar", str(audio_sample_rate), "-ac", str(audio_channels), "-movflags", "+faststart", str(output)]
         subprocess.run(command, check=True, cwd=str(output.parent), capture_output=True, text=True)
 
     @staticmethod
-    def _make_board(video: Path, output: Path, duration_ms: int) -> None:
+    def _make_board(video: Path, output: Path, duration_ms: int, *, output_fps: int = DEFAULT_OUTPUT_FPS) -> None:
         duration = max(0.1, duration_ms / 1000)
         times = [0.05 * duration, 0.33 * duration, 0.66 * duration, 0.92 * duration]
-        select = "+".join(f"eq(n,{round(time_value * 30)})" for time_value in times)
+        select = "+".join(f"eq(n,{round(time_value * output_fps)})" for time_value in times)
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(video), "-vf", f"select='{select}',scale=270:480,tile=2x2", "-frames:v", "1", str(output)], check=True, capture_output=True, text=True)
 
     @staticmethod
-    def _validate_output(video: Path, duration_ms: int) -> dict[str, object]:
-        probe_run = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration,size:stream=codec_name,codec_type,width,height,r_frame_rate,channels,sample_rate", "-of", "json", str(video)], check=True, capture_output=True, text=True)
+    def _validate_output(video: Path, duration_ms: int, *, expected_fps: int = DEFAULT_OUTPUT_FPS, expected_audio_sample_rate: int = DEFAULT_AUDIO_SAMPLE_RATE, expected_audio_channels: int = DEFAULT_AUDIO_CHANNELS) -> dict[str, object]:
+        probe_run = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration,size:stream=codec_name,codec_type,width,height,r_frame_rate,channels,channel_layout,sample_rate", "-of", "json", str(video)], check=True, capture_output=True, text=True)
         probe = json.loads(probe_run.stdout)
         decode = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(video), "-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"], capture_output=True, text=True)
         black = subprocess.run(["ffmpeg", "-hide_banner", "-vf", "blackdetect=d=0.15:pic_th=0.98", "-an", "-i", str(video), "-f", "null", "-"], capture_output=True, text=True)
@@ -405,6 +491,14 @@ class ProductionService:
         video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), {})
         audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), {})
         actual_ms = round(float(probe.get("format", {}).get("duration") or 0) * 1000)
+        frame_rate = video_stream.get("r_frame_rate") or "0/1"
+        try:
+            numerator, denominator = frame_rate.split("/", 1)
+            actual_fps = float(numerator) / float(denominator)
+        except (ValueError, ZeroDivisionError):
+            actual_fps = 0.0
+        audio_sample_rate = int(audio_stream.get("sample_rate") or 0)
+        audio_channels = int(audio_stream.get("channels") or 0)
         return {
             "ffprobe_ok": True,
             "decode_ok": decode.returncode == 0,
@@ -413,9 +507,16 @@ class ProductionService:
             "duration_delta_ms": actual_ms - duration_ms,
             "resolution": [video_stream.get("width"), video_stream.get("height")],
             "video_codec": video_stream.get("codec_name"),
+            "video_fps": actual_fps,
+            "video_fps_expected": expected_fps,
+            "video_fps_ok": abs(actual_fps - expected_fps) < 0.01,
             "audio_codec": audio_stream.get("codec_name"),
-            "audio_sample_rate": audio_stream.get("sample_rate"),
-            "audio_channels": audio_stream.get("channels"),
+            "audio_sample_rate": audio_sample_rate,
+            "audio_sample_rate_expected": expected_audio_sample_rate,
+            "audio_sample_rate_ok": audio_sample_rate == expected_audio_sample_rate,
+            "audio_channels": audio_channels,
+            "audio_channels_expected": expected_audio_channels,
+            "audio_channels_ok": audio_channels == expected_audio_channels,
             "audio_channel_layout": audio_stream.get("channel_layout"),
             "file_size_bytes": video.stat().st_size,
         }
@@ -474,7 +575,7 @@ class ProductionService:
         path.write_text("""<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1600\" height=\"900\" viewBox=\"0 0 1600 900\"><defs><linearGradient id=\"sky\" x2=\"0\" y2=\"1\"><stop stop-color=\"#07152f\"/><stop offset=\"1\" stop-color=\"#183e62\"/></linearGradient><radialGradient id=\"orb\"><stop stop-color=\"#f6d98b\" stop-opacity=\".9\"/><stop offset=\"1\" stop-color=\"#6aa9d8\" stop-opacity=\"0\"/></radialGradient></defs><rect width=\"1600\" height=\"900\" fill=\"url(#sky)\"/><circle cx=\"1190\" cy=\"220\" r=\"210\" fill=\"url(#orb)\"/><path d=\"M0 700 Q300 540 580 690 T1100 640 T1600 680 V900 H0Z\" fill=\"#071226\"/><path d=\"M0 770 Q330 650 680 760 T1300 730 T1600 760\" fill=\"none\" stroke=\"#e6c77a\" stroke-opacity=\".35\" stroke-width=\"5\"/><g fill=\"#f5d98a\" opacity=\".8\"><circle cx=\"170\" cy=\"160\" r=\"4\"/><circle cx=\"390\" cy=\"250\" r=\"3\"/><circle cx=\"720\" cy=\"130\" r=\"5\"/><circle cx=\"960\" cy=\"300\" r=\"3\"/><circle cx=\"1410\" cy=\"120\" r=\"4\"/></g></svg>""", encoding="utf-8")
 
     @staticmethod
-    def _write_canvas_project(path: Path, output_id: str, root: Path, manifest: dict[str, object], duration_ms: int, profile_id: str) -> dict[str, object]:
+    def _write_canvas_project(path: Path, output_id: str, root: Path, manifest: dict[str, object], duration_ms: int, profile_id: str, *, output_fps: int = DEFAULT_OUTPUT_FPS, audio_sample_rate: int = DEFAULT_AUDIO_SAMPLE_RATE, audio_channels: int = DEFAULT_AUDIO_CHANNELS) -> dict[str, object]:
         project = {
             "format": "fabuloom.music-studio-project/0.1",
             "id": output_id,
@@ -487,8 +588,9 @@ class ProductionService:
             "analysis": {"waveform": {"values": [0.35 + 0.2 * math.sin(index / 7) for index in range(120)], "bars": 120}},
             "visual_policy": {"mode": "generic-redistributable", "narrator": None, "characters": [], "narration": "simulated-audio", "lip_sync": False, "captions": True, "assets_are_environmental_only": True},
             "assets": [{"id": "generic-scene", "path": "assets/generic-scene.svg"}],
-            "full": {"width": 1920, "height": 1080, "fps": 30, "duration_ms": duration_ms, "audio_start_ms": 0, "audio_end_ms": duration_ms, "scenes": [{"id": "scene-01", "asset_id": "generic-scene", "start_ms": 0, "end_ms": duration_ms, "camera": {"zoom": 1.0, "pan_x": 0, "pan_y": 0}}]},
-            "short": {"width": 1080, "height": 1920, "fps": 30, "duration_ms": duration_ms, "audio_start_ms": 0, "audio_end_ms": duration_ms, "scenes": [{"id": "scene-01", "asset_id": "generic-scene", "start_ms": 0, "end_ms": duration_ms, "camera": {"zoom": 1.0, "pan_x": 0, "pan_y": 0}}]},
+            "export": {"video_fps": output_fps, "audio_codec": "aac", "audio_sample_rate": audio_sample_rate, "audio_channels": audio_channels, "source_audio_policy": "preserve_native_Kokoro_rate_until_export"},
+            "full": {"width": 1920, "height": 1080, "fps": output_fps, "duration_ms": duration_ms, "audio_start_ms": 0, "audio_end_ms": duration_ms, "scenes": [{"id": "scene-01", "asset_id": "generic-scene", "start_ms": 0, "end_ms": duration_ms, "camera": {"zoom": 1.0, "pan_x": 0, "pan_y": 0}}]},
+            "short": {"width": 1080, "height": 1920, "fps": output_fps, "duration_ms": duration_ms, "audio_start_ms": 0, "audio_end_ms": duration_ms, "scenes": [{"id": "scene-01", "asset_id": "generic-scene", "start_ms": 0, "end_ms": duration_ms, "camera": {"zoom": 1.0, "pan_x": 0, "pan_y": 0}}]},
             "short_selection": {"start_ms": 0, "end_ms": duration_ms, "duration_ms": duration_ms},
             "production_profile": profile_id,
             "narration_manifest": "narration.json",
@@ -524,7 +626,10 @@ class ProductionService:
             f"- Duration: `{report['duration_ms']} ms`",
             f"- Resolution: `{qa['resolution']}`",
             f"- Codecs: video `{qa['video_codec']}`, audio `{qa['audio_codec']}`",
+            f"- Video rate: `{qa['video_fps']} fps` (expected `{qa['video_fps_expected']}`, verified `{qa['video_fps_ok']}`)",
+            f"- Audio export: `{qa['audio_sample_rate']} Hz`, `{qa['audio_channels']} channels` (rate verified `{qa['audio_sample_rate_ok']}`)",
             f"- Technical QA: decode `{qa['decode_ok']}`, blackdetect `{qa['no_black_frames']}`, duration delta `{qa['duration_delta_ms']} ms`",
+            f"- Capture QA: `{qa.get('fluency_claim')}`, unique source frames `{qa.get('capture', {}).get('unique_capture_frame_count')}`",
             f"- Artistic QA: `{artistic['status']}`; human approval remains pending.",
             "- This acceptance production uses generated generic SVG and deterministic synthetic audio; it contains no private Topazioverse material.",
             "",

@@ -13,7 +13,7 @@ import uuid
 
 from .asset_catalog import AssetCatalog
 from .migration import LibraryMigration
-from .paths import FabuloomPaths
+from .paths import FabuloomPaths, PathConfigurationError
 from .profiles import ProfileRegistry
 from .production import ProductionService
 from .project_store import ProjectNotFound, ProjectStore
@@ -85,7 +85,7 @@ class EngineService:
                 "assets.search": {"status": "implemented", "parameters": {"query": "string", "kind": "optional string", "missing": "optional boolean"}},
                 "projects.list": {"status": "implemented", "parameters": {}},
                 "render.dry_run": {"status": "implemented", "parameters": {"profile": "optional string", "provider": "optional string"}},
-                "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string"}},
+                "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string", "capture_fps": "5 economy or 24/30 real Canvas", "output_fps": "24|30", "audio_sample_rate": "integer; 48000 recommended", "audio_channels": "1|2"}},
                 "audio.mix": {"status": "implemented", "parameters": {"music_path": "optional configured-root audio path", "music_asset_id": "optional catalog stable ID", "ducking": "voice-priority sidechain"}},
                 "library.migration": {"status": "implemented", "parameters": {"dry_run": "boolean", "checkpoint": "optional path"}},
                 "mcp.adapter": {"status": "implemented", "parameters": {"transport": "stdio"}},
@@ -94,17 +94,24 @@ class EngineService:
             "dependencies": self.production._dependency_report(),
             "mounted_library": {"source": str(self.paths.library_source), "private_target": str(self.paths.library), "present": self.paths.library_source.is_dir()},
             "jobs": sorted({"validate-project", "catalog-scan", "render-demo", "library-migration"}),
-            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
+            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
         }
 
     def doctor(self) -> dict[str, object]:
         dependencies = self.production._dependency_report()
         profiles = self.profiles.capabilities()
+        try:
+            storage = self.paths.validate_runtime_root()
+            storage_valid = True
+        except PathConfigurationError as exc:
+            storage = self.paths.storage_report()
+            storage["validation_error"] = str(exc)
+            storage_valid = False
         return {
             "format": "fabuloom.doctor/0.1",
-            "status": "ready" if dependencies["ffmpeg"] and dependencies["ffprobe"] and self.paths.storage_report()["configured_free_bytes"] > 64 * 1024 * 1024 else "blocked",
+            "status": "ready" if storage_valid and dependencies["ffmpeg"] and dependencies["ffprobe"] and storage["configured_free_bytes"] > 64 * 1024 * 1024 else "blocked",
             "dependencies": dependencies,
-            "storage": self.paths.storage_report(),
+            "storage": storage,
             "profiles": profiles,
             "library_source": str(self.paths.library_source),
             "library_target": str(self.paths.library),

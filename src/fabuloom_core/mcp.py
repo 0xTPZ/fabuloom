@@ -36,7 +36,7 @@ def tool_definitions() -> list[dict[str, object]]:
         {"name": "fabuloom_job_get", "description": "Read a persistent job record.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
         {"name": "fabuloom_job_cancel", "description": "Request cancellation of a shared-engine job.", "inputSchema": {"type": "object", "required": ["job_id"], "properties": {"job_id": {"type": "string"}}}},
         {"name": "fabuloom_render_dry_run", "description": "Plan a shared production without writing media.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}}}},
-        {"name": "fabuloom_render_demo", "description": "Start the shared demo production job through the same engine used by Desktop and CLI.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}, "text": {"type": "string"}, "output_id": {"type": "string"}, "music_path": {"type": "string"}, "music_asset_id": {"type": "string"}}}},
+        {"name": "fabuloom_render_demo", "description": "Start the shared demo production job through the same engine used by Desktop and CLI.", "inputSchema": {"type": "object", "properties": {"profile": {"type": "string"}, "provider": {"type": "string"}, "voice_id": {"type": "string"}, "text": {"type": "string"}, "output_id": {"type": "string"}, "music_path": {"type": "string"}, "music_asset_id": {"type": "string"}, "capture_fps": {"type": "integer", "enum": [5, 24, 30]}, "output_fps": {"type": "integer", "enum": [24, 30]}, "audio_sample_rate": {"type": "integer"}, "audio_channels": {"type": "integer", "enum": [1, 2]}}}},
         {"name": "fabuloom_library_migration", "description": "Create a checkpointed library migration job; dry-run is the default.", "inputSchema": {"type": "object", "properties": {"source_root": {"type": "string"}, "target_root": {"type": "string"}, "dry_run": {"type": "boolean"}, "migration_id": {"type": "string"}}}},
     ]
 
@@ -100,7 +100,7 @@ def dispatch_tool(engine: EngineService, name: str, arguments: dict[str, Any] | 
         payload = {key: args[key] for key in ("profile", "provider", "voice_id") if key in args}
         return engine.production.dry_run(payload)
     if name == "fabuloom_render_demo":
-        payload = {key: args[key] for key in ("profile", "provider", "voice_id", "text", "output_id", "music_path", "music_asset_id") if key in args}
+        payload = {key: args[key] for key in ("profile", "provider", "voice_id", "text", "output_id", "music_path", "music_asset_id", "capture_fps", "output_fps", "audio_sample_rate", "audio_channels") if key in args}
         return engine.create_job("render-demo", payload)
     if name == "fabuloom_library_migration":
         payload = {key: args[key] for key in ("source_root", "target_root", "dry_run", "migration_id") if key in args}
