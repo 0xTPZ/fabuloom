@@ -6,6 +6,12 @@
   isolado. Direitos comerciais das trilhas e aprovação artística permanecem
   pendentes.
 
+- Crônicas Capítulo 11 cinematic — abertura e despedida cinematográficas com
+  Santa `pm_santa`, narrativa integral em Santa V5 no medalhão, música Alba com
+  ducking, saídas horizontal/vertical e validação técnica concluídas em branch
+  isolada. Direitos dos clipes/música e aprovação artística permanecem
+  pendentes.
+
 - Narrator Mode V1: horizontal facial-presenter export is implemented as an
   isolated sibling of Character Stage. Future work includes richer scene
   presets, word-level timing when a provider supplies it, and optional mesh
@@ -107,6 +113,11 @@ Deferred from V0.1: TypeScript shell and SQLite index.
   Santa V5 library openings/closings, deterministic Canvas capture, and
   H.264/AAC validation. Artistic approval, human listening review and Suno
   commercial-rights confirmation remain required before publication.
+- Chapter 11 cinematic revision R2 — preserved the PR #56 production and added
+  measured 1.0 s / 1.2 s editorial pauses, deterministic crystal-page
+  dissolves, Alba-continuity ducked mixing, revised manifests/SRT and separate
+  horizontal/vertical H.264/AAC outputs. Human listening, artistic approval
+  and rights confirmation remain required.
 
 ## Later
 
