@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import os
@@ -187,8 +187,29 @@ class AssetCatalog:
         if not dry_run:
             connection = self.connect()
             try:
+                existing_rows = {
+                    row["stable_id"]: row
+                    for row in connection.execute(
+                        "SELECT stable_id, category, tags_json, project_refs_json, approval_status, origin, rights_status FROM assets"
+                    ).fetchall()
+                }
                 connection.execute("UPDATE assets SET missing = 1")
                 for record in records:
+                    existing = existing_rows.get(record.stable_id)
+                    if existing is not None:
+                        # A rescan refreshes physical facts only. Editorial
+                        # tags, project links, approval and licensing state
+                        # are preserved until an explicit editorial operation
+                        # changes them.
+                        record = replace(
+                            record,
+                            category=existing["category"],
+                            tags=json.loads(existing["tags_json"]),
+                            project_refs=json.loads(existing["project_refs_json"]),
+                            approval_status=existing["approval_status"],
+                            origin=existing["origin"],
+                            rights_status=existing["rights_status"],
+                        )
                     connection.execute(
                         """INSERT INTO assets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
                            ON CONFLICT(stable_id) DO UPDATE SET name=excluded.name, relative_path=excluded.relative_path,
@@ -224,6 +245,16 @@ class AssetCatalog:
         finally:
             connection.close()
         return [self._row_to_dict(row) for row in rows]
+
+    def get(self, stable_id: str) -> dict[str, object] | None:
+        """Return one catalog record by stable ID without touching its media."""
+
+        connection = self.connect(initialize=False)
+        try:
+            row = connection.execute("SELECT * FROM assets WHERE stable_id = ?", (stable_id,)).fetchone()
+        finally:
+            connection.close()
+        return self._row_to_dict(row) if row is not None else None
 
     @staticmethod
     def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:

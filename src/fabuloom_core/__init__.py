@@ -59,6 +59,9 @@ from .asset_catalog import AssetCatalog, AssetRecord, CATALOG_FORMAT
 from .engine import EngineService
 from .paths import FabuloomPaths, PathConfigurationError
 from .project_store import PROJECT_FORMAT, ProjectConflict, ProjectLocked, ProjectNotFound, ProjectStore, ProjectStoreError
+from .migration import LibraryMigration, MIGRATION_FORMAT
+from .profiles import PROFILE_FORMAT, ProfileError, ProfileRegistry
+from .production import DEMO_TEXT, DeterministicAudioProvider, ProductionError, ProductionService, PRODUCTION_FORMAT
 
 __all__ = [
     "MODEL_FORMAT_VERSION",
@@ -119,4 +122,14 @@ __all__ = [
     "ProjectNotFound",
     "ProjectStore",
     "ProjectStoreError",
+    "LibraryMigration",
+    "MIGRATION_FORMAT",
+    "PROFILE_FORMAT",
+    "ProfileError",
+    "ProfileRegistry",
+    "DEMO_TEXT",
+    "DeterministicAudioProvider",
+    "ProductionError",
+    "ProductionService",
+    "PRODUCTION_FORMAT",
 ]

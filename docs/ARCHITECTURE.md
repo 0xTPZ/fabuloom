@@ -527,9 +527,12 @@ Projects use `fabuloom.project/0.1`, stable identifiers, atomic JSON writes,
 cooperative per-project locks, optimistic revisions and bounded operation
 history. Jobs use `fabuloom.job/0.1`, persist state/progress/result, support
 cancel requests and recover stale queued/running records as interrupted. The
-current built-in jobs are validation and catalog scanning; render, TTS and
-editor orchestration remain explicit plugin/service work rather than hidden
-Desktop-only behavior.
+current built-in jobs include validation, catalog scanning, checkpointed
+library migration and a shared demo production. The production job composes
+the provider-neutral narration manifest, measured WAV, optional voice-priority
+music mix, existing Canvas capture, subtitles, FFmpeg export and technical QA
+under one checkpoint. Kokoro is an optional real provider; the redistributable
+acceptance path uses deterministic synthetic audio when it is unavailable.
 
 `AssetCatalog` indexes the configured private library without copying or
 deleting source files. It records paths relative to the configured root,
@@ -549,3 +552,25 @@ editor. Existing Stage and Music Studio browser views are launched as
 compatibility views while their project controls are progressively connected
 to the shared project/job contracts. This avoids a broad rewrite and keeps the
 private library separate from the commercializable Studio source.
+
+### FAB-ARCH-002 real integration boundary
+
+Desktop, CLI, loopback API and stdio MCP now create the same `render-demo` and
+`library-migration` jobs. A render job creates or reuses a stable
+`ProjectStore` project, writes the relative artifact root into its revisioned
+metadata, and exposes progress/checkpoint state through the same job record
+regardless of the caller.
+
+The production adapter reuses `frontend/capture-music-studio.html` and
+`frontend/src/music-studio-renderer.mjs`; it does not implement a second Canvas
+renderer. Audio is composed from measured manifest segments. When a configured
+music path or catalog stable ID is supplied, FFmpeg applies voice-priority
+sidechain ducking, fades and a limiter without changing the music speed or
+pitch. Source music remains outside the repository and is never overwritten.
+
+The library boundary is metadata-first: scans refresh hashes and physical
+facts while preserving editorial tags, project references, approval and rights
+fields. Migration starts with a dry-run checkpoint, verifies SHA-256 after each
+copy, preserves the source, and only permits rollback of unchanged targets.
+The configured root is checked for free space before heavy operations and no
+silent C: fallback is allowed.

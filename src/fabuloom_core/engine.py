@@ -12,8 +12,11 @@ import threading
 import uuid
 
 from .asset_catalog import AssetCatalog
-from .paths import FabuloomPaths
-from .project_store import ProjectStore
+from .migration import LibraryMigration
+from .paths import FabuloomPaths, PathConfigurationError
+from .profiles import ProfileRegistry
+from .production import ProductionService
+from .project_store import ProjectNotFound, ProjectStore
 
 
 def _now() -> str:
@@ -23,16 +26,19 @@ def _now() -> str:
 class EngineService:
     """One service object for Desktop, CLI and loopback API callers."""
 
-    def __init__(self, paths: FabuloomPaths, *, initialize: bool = True):
+    def __init__(self, paths: FabuloomPaths, *, initialize: bool = True, recover_stale: bool = True):
         self.paths = paths
         if initialize:
             self.paths.ensure_runtime_directories()
         self.projects = ProjectStore(self.paths.projects)
-        self.catalog = AssetCatalog(self.paths.library, self.paths.catalog_db)
+        self.catalog = AssetCatalog(self.paths.library_source, self.paths.catalog_db)
+        self.production = ProductionService(paths, product_root=Path(__file__).resolve().parents[2])
+        self.profiles = ProfileRegistry(Path(__file__).resolve().parents[2] / "profiles")
         self._job_threads: dict[str, threading.Thread] = {}
         self._job_cancel: dict[str, threading.Event] = {}
         self._job_lock = threading.RLock()
-        self.recover_stale_jobs()
+        if recover_stale:
+            self.recover_stale_jobs()
 
     def status(self) -> dict[str, object]:
         jobs = self.list_jobs()
@@ -41,7 +47,8 @@ class EngineService:
             "engine": "fabuloom-engine",
             "mode": "local-first",
             "paths": self.paths.as_dict(),
-            "private_library_present": self.paths.library.is_dir(),
+            "storage": self.paths.storage_report(),
+            "private_library_present": self.paths.library_source.is_dir(),
             "projects": len(self.projects.list()),
             "jobs": {"total": len(jobs), "running": sum(job["state"] == "running" for job in jobs), "queued": sum(job["state"] == "queued" for job in jobs)},
             "network": {"default_binding": "loopback-only"},
@@ -63,6 +70,56 @@ class EngineService:
         if not self.paths.catalog_db.is_file():
             return []
         return self.catalog.search(query, kind=kind, missing=missing)
+
+    def capabilities(self) -> dict[str, object]:
+        """Return machine-readable operations, dependencies and limits."""
+
+        return {
+            "format": "fabuloom.capabilities/0.1",
+            "engine": "fabuloom-engine",
+            "version": "0.1.0",
+            "interfaces": ["desktop", "cli", "http-loopback", "mcp-stdio"],
+            "operations": {
+                "doctor": {"status": "implemented", "parameters": {"root": "optional string"}},
+                "profiles.list": {"status": "implemented", "parameters": {}},
+                "assets.search": {"status": "implemented", "parameters": {"query": "string", "kind": "optional string", "missing": "optional boolean"}},
+                "projects.list": {"status": "implemented", "parameters": {}},
+                "render.dry_run": {"status": "implemented", "parameters": {"profile": "optional string", "provider": "optional string"}},
+                "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string", "capture_fps": "5 economy or 24/30 real Canvas", "output_fps": "24|30", "audio_sample_rate": "integer; 48000 recommended", "audio_channels": "1|2"}},
+                "audio.mix": {"status": "implemented", "parameters": {"music_path": "optional configured-root audio path", "music_asset_id": "optional catalog stable ID", "ducking": "voice-priority sidechain"}},
+                "library.migration": {"status": "implemented", "parameters": {"dry_run": "boolean", "checkpoint": "optional path"}},
+                "mcp.adapter": {"status": "implemented", "parameters": {"transport": "stdio"}},
+                "word_phoneme_viseme_alignment": {"status": "not_implemented", "parameters": {}},
+            },
+            "dependencies": self.production._dependency_report(),
+            "mounted_library": {"source": str(self.paths.library_source), "private_target": str(self.paths.library), "present": self.paths.library_source.is_dir()},
+            "jobs": sorted({"validate-project", "catalog-scan", "render-demo", "library-migration"}),
+            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
+        }
+
+    def doctor(self) -> dict[str, object]:
+        dependencies = self.production._dependency_report()
+        profiles = self.profiles.capabilities()
+        try:
+            storage = self.paths.validate_runtime_root()
+            storage_valid = True
+        except PathConfigurationError as exc:
+            storage = self.paths.storage_report()
+            storage["validation_error"] = str(exc)
+            storage_valid = False
+        return {
+            "format": "fabuloom.doctor/0.1",
+            "status": "ready" if storage_valid and dependencies["ffmpeg"] and dependencies["ffprobe"] and storage["configured_free_bytes"] > 64 * 1024 * 1024 else "blocked",
+            "dependencies": dependencies,
+            "storage": storage,
+            "profiles": profiles,
+            "library_source": str(self.paths.library_source),
+            "library_target": str(self.paths.library),
+            "no_c_fallback": str(self.paths.root).upper().startswith("E:") or not os.name == "nt",
+        }
+
+    def list_profiles(self) -> list[dict[str, object]]:
+        return self.profiles.capabilities()
 
     def validate_project(self, project_id: str) -> dict[str, object]:
         project = self.projects.load(project_id)
@@ -112,7 +169,7 @@ class EngineService:
                 self._write_job(job)
 
     def create_job(self, kind: str, payload: dict[str, object] | None = None) -> dict[str, object]:
-        if kind not in {"validate-project", "catalog-scan"}:
+        if kind not in {"validate-project", "catalog-scan", "render-demo", "library-migration"}:
             raise ValueError(f"unsupported job kind: {kind}")
         job = {"format": "fabuloom.job/0.1", "id": f"job-{uuid.uuid4().hex[:16]}", "kind": kind, "payload": payload or {}, "state": "queued", "progress": 0, "created_at": _now(), "updated_at": _now()}
         self._write_job(job)
@@ -126,6 +183,11 @@ class EngineService:
 
     def _run_job(self, job: dict[str, object], cancel: threading.Event) -> None:
         job_id = str(job["id"])
+        def progress(stage: str, value: float, extra: dict[str, object] | None = None) -> None:
+            job.update({"stage": stage, "progress": value, "updated_at": _now()})
+            if extra:
+                job["stage_details"] = extra
+            self._write_job(job)
         try:
             job.update({"state": "running", "progress": 0.05, "started_at": _now(), "updated_at": _now()})
             self._write_job(job)
@@ -133,12 +195,62 @@ class EngineService:
                 raise InterruptedError("cancelled before start")
             if job["kind"] == "validate-project":
                 result = self.validate_project(str(job["payload"].get("project_id", "")))
-            else:
-                if not self.paths.library.is_dir():
+            elif job["kind"] == "catalog-scan":
+                if not self.paths.library_source.is_dir():
                     result = {"records": 0, "library_present": False}
                 else:
                     records = self.catalog.scan(dry_run=False)
                     result = {"records": len(records), "library_present": True}
+            elif job["kind"] == "render-demo":
+                payload = dict(job["payload"])
+                project_id = str(payload.get("project_id") or payload.get("output_id") or "")
+                if project_id:
+                    try:
+                        project = self.get_project(project_id)
+                    except ProjectNotFound:
+                        project = self.create_project(
+                            str(payload.get("title") or "Fabuloom production"),
+                            project_id=project_id,
+                            metadata={"production_profile": str(payload.get("profile") or "cinematic-short"), "private_assets_used": False},
+                        )
+                    payload["project_id"] = project_id
+                music_asset_id = payload.get("music_asset_id")
+                if music_asset_id:
+                    record = self.catalog.get(str(music_asset_id))
+                    if record is None or bool(record.get("missing")):
+                        raise ValueError(f"music asset is not available in the catalog: {music_asset_id}")
+                    if str(record.get("approval_status")) in {"draft", "rejected"}:
+                        raise ValueError("draft or rejected assets cannot be used for production")
+                    payload["music_path"] = str(self.paths.library_source / str(record["relative_path"]))
+                result = self.production.render_demo(payload, progress=progress)
+                if project_id:
+                    current = self.get_project(project_id)
+                    metadata = dict(current.get("metadata") or {})
+                    metadata["last_render"] = {
+                        "profile": result.get("profile"),
+                        "status": "technical_qa_complete",
+                        "review_status": result.get("artistic_qa", {}).get("status"),
+                        "artifact_root": str(Path(str(result["project"])).parent.relative_to(self.paths.exports)),
+                    }
+                    self.update_project(project_id, {"name": current["name"], "metadata": metadata, "books": current.get("books", [])}, expected_revision=int(current.get("revision", 0)), operation="render-complete")
+            else:
+                payload = job["payload"]
+                source_root = Path(str(payload.get("source_root") or self.paths.legacy_inputs)).resolve()
+                target_root = Path(str(payload.get("target_root") or self.paths.library)).resolve()
+                source_root.relative_to(self.paths.root.resolve())
+                target_root.relative_to(self.paths.root.resolve())
+                migration = LibraryMigration(source_root, target_root, self.paths.workspace / "migrations")
+                checkpoint = Path(str(payload.get("checkpoint") or migration.create_plan(payload.get("migration_id") if isinstance(payload.get("migration_id"), str) else None)))
+                checkpoint.relative_to((self.paths.workspace / "migrations").resolve())
+                if bool(payload.get("dry_run", True)):
+                    result = migration.simulate(checkpoint)
+                elif bool(payload.get("rollback", False)):
+                    result = migration.rollback(checkpoint)
+                else:
+                    plan = json.loads(checkpoint.read_text(encoding="utf-8"))
+                    required_bytes = sum(int(entry.get("size_bytes", 0)) for entry in plan.get("entries", []))
+                    self.paths.require_free_space(required_bytes, operation="library migration")
+                    result = migration.execute(checkpoint, progress=lambda current, total: progress("library-migration", current / max(1, total), {"current": current, "total": total}))
             if cancel.is_set():
                 raise InterruptedError("cancelled")
             job.update({"state": "completed", "progress": 1.0, "result": result, "finished_at": _now(), "updated_at": _now()})

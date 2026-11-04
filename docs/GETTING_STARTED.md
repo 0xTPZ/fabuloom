@@ -79,6 +79,23 @@ The repository does not contain model weights, WAVs, manifestos or caches. See
 capability limits. The optional real-model test remains skipped unless the
 user explicitly enables it.
 
+## Shared production job
+
+The first end-to-end acceptance production is deliberately generic and uses
+only a generated SVG plus deterministic synthetic audio when Kokoro is not
+available. It still exercises the shared manifest, timeline, Canvas capture,
+captions, checkpoint and FFmpeg export:
+
+```powershell
+python -B -m fabuloom_core.cli --root E:\Fabuloom render demo --output-id local-demo
+```
+
+The same operation is available as `POST /api/v1/render` and the MCP tool
+`fabuloom_render_demo`. To add local music without copying or changing the
+source, pass `--music-path` under the configured root; the shared service
+applies voice-priority sidechain ducking, fades and a limiter. Human listening
+and artistic review remain required.
+
 ## Browser Stage and local workspace
 
 The frontend has no `package.json` because it intentionally runs without a

@@ -24,8 +24,17 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 
+SRC_ROOT = Path(__file__).resolve().parent.parent / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+from fabuloom_core.paths import FabuloomPaths
+
+
 STUDIO_ROOT = Path(__file__).resolve().parent.parent
-WORKSPACE_ROOT = Path(os.environ.get("FABULOOM_WORKSPACE_ROOT", STUDIO_ROOT.parent)).resolve()
+WORKSPACE_ROOT = FabuloomPaths.discover(
+    product_root=STUDIO_ROOT,
+    configured_root=os.environ.get("FABULOOM_ROOT") or os.environ.get("FABULOOM_WORKSPACE_ROOT"),
+).root
 EXPORT_ROOT = Path(os.environ.get("FABULOOM_EXPORT_ROOT", WORKSPACE_ROOT / "workspace" / "exports")).resolve()
 MUSIC_ROOT = (WORKSPACE_ROOT / "workspace" / "inputs" / "music").resolve()
 PROJECT_FORMAT = "fabuloom.music-studio-project/0.1"

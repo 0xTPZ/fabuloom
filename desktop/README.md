@@ -14,7 +14,9 @@ python .\desktop\fabuloom_desktop.py
 
 O botão `Abrir Stage` inicia o servidor local já existente em loopback e abre
 a interface web. O botão `Music Studio` abre a mesma aplicação no módulo de
-música. A API estruturada compartilhada pode ser iniciada sem interface:
+música. `Executar demo` cria o mesmo job `render-demo` usado pela CLI, API e
+MCP; `Diagnóstico` consulta dependências, armazenamento e perfis pelo mesmo
+`EngineService`. A API estruturada compartilhada pode ser iniciada sem interface:
 
 ```powershell
 python -m fabuloom_core.cli api --port 8790

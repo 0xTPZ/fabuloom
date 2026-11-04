@@ -24,6 +24,8 @@ if str(SRC_ROOT) not in sys.path:
 
 def workspace_root_for(frontend_root: Path, configured: str | None = None) -> Path:
     """Resolve the local workspace without requiring the developer's drive layout."""
+    if os.environ.get("FABULOOM_ROOT"):
+        return Path(os.environ["FABULOOM_ROOT"]).expanduser().resolve()
     if configured:
         return Path(configured).expanduser().resolve()
     project_root = frontend_root.parent
@@ -49,7 +51,10 @@ EXPORT_ROOT = export_root_for(WORKSPACE_ROOT, os.environ.get("FABULOOM_EXPORT_RO
 from fabuloom_core.engine import EngineService
 from fabuloom_core.paths import FabuloomPaths
 
-ENGINE = EngineService(FabuloomPaths.discover(product_root=FRONTEND_ROOT.parent, configured_root=str(WORKSPACE_ROOT)))
+ENGINE = EngineService(
+    FabuloomPaths.discover(product_root=FRONTEND_ROOT.parent, configured_root=str(WORKSPACE_ROOT)),
+    recover_stale=os.environ.get("FABULOOM_NO_JOB_RECOVERY") != "1",
+)
 CAPTURE_ROOT = None
 MAX_CAPTURE_BYTES = 10 * 1024 * 1024
 NARRATOR_JOB = None
@@ -165,11 +170,28 @@ class StageHandler(BaseHTTPRequestHandler):
         if path == "/api/v1/status":
             self._send_json(ENGINE.status())
             return
+        if path == "/api/v1/capabilities":
+            self._send_json(ENGINE.capabilities())
+            return
+        if path == "/api/v1/doctor":
+            self._send_json(ENGINE.doctor())
+            return
+        if path == "/api/v1/profiles":
+            self._send_json({"format": "fabuloom.production-profiles/0.1", "profiles": ENGINE.list_profiles()})
+            return
         if path == "/api/v1/projects":
             self._send_json({"format": "fabuloom.projects/0.1", "projects": ENGINE.list_projects()})
             return
         if path == "/api/v1/jobs":
             self._send_json({"format": "fabuloom.jobs/0.1", "jobs": ENGINE.list_jobs()})
+            return
+        if path == "/api/v1/render":
+            try:
+                request = _read_request(self)
+                job = ENGINE.create_job("render-demo", request)
+                self._send_json(job, status=202)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=400)
             return
         if path == "/api/v1/library":
             self._send_json({"format": "fabuloom.library-search/0.1", "assets": ENGINE.search_library()})

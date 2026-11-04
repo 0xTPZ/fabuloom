@@ -63,7 +63,7 @@ class FabuloomDesktop:
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
         tk.Label(sidebar, text="Workspace", fg="#f3f6fb", bg="#182438", font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 12))
-        for label, callback in (("Dashboard", self.refresh), ("Novo projeto", self.new_project), ("Abrir Stage", self.open_stage), ("Music Studio", self.open_music), ("Atualizar catálogo", self.catalog_scan)):
+        for label, callback in (("Dashboard", self.refresh), ("Novo projeto", self.new_project), ("Executar demo", self.render_demo), ("Diagnóstico", self.show_doctor), ("Abrir Stage", self.open_stage), ("Music Studio", self.open_music), ("Atualizar catálogo", self.catalog_scan)):
             ttk.Button(sidebar, text=label, command=callback).pack(fill="x", pady=4)
         ttk.Separator(sidebar).pack(fill="x", pady=16)
         tk.Label(sidebar, text="Motor compartilhado", fg="#f7d27a", bg="#182438", font=("Segoe UI", 10, "bold")).pack(anchor="w")
@@ -127,6 +127,26 @@ class FabuloomDesktop:
         job = self.engine.create_job("catalog-scan")
         self.status_var.set(f"Catálogo iniciado: {job['id']}")
         self.root.after(500, self.refresh)
+
+    def render_demo(self) -> None:
+        try:
+            plan = self.engine.production.dry_run({"profile": "cinematic-short", "provider": "simulated-audio"})
+            if plan.get("status") != "ready":
+                messagebox.showwarning("Render", json.dumps(plan, ensure_ascii=False, indent=2), parent=self.root)
+                return
+            job = self.engine.create_job("render-demo", {"profile": "cinematic-short", "provider": "simulated-audio", "voice_id": "sim-narrator", "output_id": "fab-arch-002-desktop-demo"})
+            self.status_var.set(f"Render iniciado: {job['id']}")
+            self.root.after(700, self._refresh_until_done)
+        except Exception as exc:
+            messagebox.showerror("Render", str(exc), parent=self.root)
+
+    def _refresh_until_done(self) -> None:
+        self.refresh()
+        if any(job.get("state") in {"queued", "running"} for job in self.engine.list_jobs()):
+            self.root.after(700, self._refresh_until_done)
+
+    def show_doctor(self) -> None:
+        messagebox.showinfo("Diagnóstico Fabuloom", json.dumps(self.engine.doctor(), ensure_ascii=False, indent=2), parent=self.root)
 
     def _start_stage_server(self) -> None:
         if self.stage_process and self.stage_process.poll() is None:

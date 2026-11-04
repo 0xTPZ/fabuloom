@@ -16,6 +16,10 @@
 
 - One `EngineService` shared by Desktop, CLI, loopback API and browser views —
   implemented on the isolated development branch.
+- Shared render job through narration manifest, Canvas capture, optional
+  voice-priority music ducking, captions, FFmpeg and persistent checkpoints —
+  implemented for the generic acceptance profile; full chapter authoring and
+  private-asset orchestration remain follow-up work.
 - Configurable product/private-library/workspace roots and read-only asset
   catalog with duplicate reporting — implemented; no media was moved or
   deleted.
@@ -24,9 +28,10 @@
 - Persistent validation/catalog jobs with progress, cancellation and stale-job
   recovery — implemented for the initial job kinds.
 - Explicit plugin manifests and a Tkinter Desktop control shell — implemented.
-- Full project editor integration, render/TTS job plugins and physical library
-  migration — intentionally deferred. A local stdio MCP adapter is included
-  as a thin structured gateway over the shared engine.
+- Full visual project editor integration and production-specific private asset
+  profiles remain follow-up work. The checkpointed library migration is
+  available as a dry-run-first service, and the local stdio MCP adapter remains
+  a thin structured gateway over the shared engine.
 
 ## Version 0.1 — completed in Mission 004
 

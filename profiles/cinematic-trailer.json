@@ -1,0 +1,17 @@
+{
+  "format": "fabuloom.production-profile/0.1",
+  "id": "cinematic-trailer",
+  "version": "0.1.0",
+  "status": "review_required",
+  "duration_policy": "15-90 seconds; editorial beats must be explicitly authored",
+  "cut_rhythm": "hook in first 2 seconds; escalating beats with no arbitrary speed-up",
+  "narration": "requires approved script and measured segments",
+  "safe_area": {"horizontal": "8% margins", "vertical": "platform-specific safe-area manifest required"},
+  "voice": "approved narrator only; no unregistered voice substitution",
+  "music": "approved source only; ducking, limiter and rights status required",
+  "effects": "profile is not production-ready until an authored effects plan exists",
+  "medallion": "optional, only through approved character identity",
+  "transitions": "authored per beat; generic defaults are not sufficient for release",
+  "canonical_asset_sources": ["approved project asset IDs only"],
+  "review_criteria": ["technical QA", "editorial QA", "human artistic approval", "rights review"]
+}
