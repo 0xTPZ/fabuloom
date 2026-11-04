@@ -90,6 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
     cinematic.add_argument("--mode", choices=["plan", "validate-reference", "execute"], default="plan")
     cinematic.add_argument("--decode", action="store_true")
     cinematic.add_argument("--runner")
+    cinematic.add_argument("--output-root")
     cinematic.add_argument("--no-wait", action="store_true")
     return parser
 
@@ -180,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
                 payload["music_asset_id"] = args.music_asset_id
             if args.runner:
                 payload["runner"] = args.runner
+            if args.output_root:
+                payload["output_root"] = args.output_root
             created = engine.create_job("render-cinematic", payload)
             _json(created if args.no_wait else engine.wait_for_job(str(created["id"])))
         return 0

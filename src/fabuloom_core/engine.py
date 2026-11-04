@@ -94,8 +94,9 @@ class EngineService:
                 "projects.list": {"status": "implemented", "parameters": {}},
                 "render.dry_run": {"status": "implemented", "parameters": {"profile": "optional string", "provider": "optional string"}},
                 "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string", "capture_fps": "5 economy or 24/30 real Canvas", "output_fps": "24|30", "audio_sample_rate": "integer; 48000 recommended", "audio_channels": "1|2"}},
-                "render.cinematic.plan": {"status": "implemented", "parameters": {"chapter": "positive integer", "chapter_title": "string", "source_document": "workspace-relative string", "voice_id": "pm_santa", "language": "pt-BR", "output_variants": "horizontal|vertical"}},
+                "render.cinematic.plan": {"status": "implemented", "parameters": {"chapter": "positive integer", "chapter_title": "string", "source_document": "workspace-relative string", "voice_id": "pm_santa", "language": "pt-BR", "output_variants": "horizontal|vertical", "runner": "optional registered runner ID", "output_root": "optional child of workspace/exports"}},
                 "render.cinematic.validate_reference": {"status": "implemented", "parameters": {"decode": "boolean"}},
+                "render.cinematic.execute": {"status": "implemented", "parameters": {"runner": "registered runner ID", "output_root": "optional child of workspace/exports", "music_asset_id": "optional catalog stable ID", "output_variants": "horizontal|vertical"}},
                 "audio.mix": {"status": "implemented", "parameters": {"music_path": "optional configured-root audio path", "music_asset_id": "optional catalog stable ID", "ducking": "voice-priority sidechain"}},
                 "library.migration": {"status": "implemented", "parameters": {"dry_run": "boolean", "checkpoint": "optional path"}},
                 "mcp.adapter": {"status": "implemented", "parameters": {"transport": "stdio"}},
@@ -104,7 +105,7 @@ class EngineService:
             "dependencies": self.production._dependency_report(),
             "mounted_library": {"source": str(self.paths.library_source), "private_target": str(self.paths.library), "present": self.paths.library_source.is_dir()},
             "jobs": sorted({"validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"}),
-            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "cinematic production uses a guarded adapter over the approved legacy runner until isolated output parameters are available", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
+            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "cinematic production uses a hash-registered request-boundary runner with isolated, checkpointed output", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval", "word, phoneme and viseme timing remains unavailable when the provider does not supply it"],
         }
 
     def doctor(self) -> dict[str, object]:
@@ -270,13 +271,18 @@ class EngineService:
                     output_variants=tuple(str(value) for value in variants),
                     mode=str(payload.get("mode", "plan")),
                     runner=str(payload["runner"]) if payload.get("runner") else None,
+                    output_root=str(payload["output_root"]) if payload.get("output_root") else None,
                 )
                 if request.mode == "plan":
                     result = self.cinematic.plan(request)
                 elif request.mode == "validate-reference":
                     result = self.cinematic.validate_reference(decode=bool(payload.get("decode", False)), progress=lambda stage: progress("cinematic-qa", 0.5, {"stage": stage}))
                 else:
-                    result = self.cinematic.execute(request)
+                    result = self.cinematic.execute(
+                        request,
+                        progress=lambda stage, value, extra=None: progress(stage, value, extra),
+                        cancel=cancel,
+                    )
             else:
                 payload = job["payload"]
                 source_root = Path(str(payload.get("source_root") or self.paths.legacy_inputs)).resolve()

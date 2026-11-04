@@ -4,8 +4,9 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+import json
 
-from fabuloom_core.cinematic import CINEMATIC_FORMAT, CinematicCompatibility, CinematicRequest
+from fabuloom_core.cinematic import CINEMATIC_FORMAT, CinematicCompatibility, CinematicCompatibilityError, CinematicRequest
 from fabuloom_core.engine import EngineService
 from fabuloom_core.mcp import dispatch_tool, tool_definitions
 from fabuloom_core.paths import FabuloomPaths
@@ -19,6 +20,24 @@ class CinematicCompatibilityTests(unittest.TestCase):
             CinematicRequest(11, "title", "book.docx", voice_id="pf_dora").validate()
         with self.assertRaises(ValueError):
             CinematicRequest(11, "title", "book.docx", output_variants=("square",)).validate()
+        with self.assertRaises(ValueError):
+            CinematicRequest(11, "title", "book.docx", output_root="   ").validate()
+
+    def test_registered_runner_is_hash_pinned_and_request_bound(self) -> None:
+        product_root = Path(__file__).resolve().parents[1]
+        compatibility = CinematicCompatibility(FabuloomPaths(product_root / "test-runtime"), product_root=product_root)
+        runner = compatibility._registered_runner("cronicas.chapter")
+        self.assertEqual(runner["id"], "cronicas.chapter")
+        self.assertEqual(len(str(runner["sha256"])), 64)
+        self.assertIn("--request", json.loads((product_root / "profiles" / "registries" / "cinematic-runners.json").read_text(encoding="utf-8"))["runners"][0]["contract"])
+
+    def test_output_root_must_be_child_of_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            compatibility = CinematicCompatibility(FabuloomPaths(root), product_root=Path(__file__).resolve().parents[1])
+            request = CinematicRequest(12, "A floresta que escolhe", "book.docx", mode="execute", output_root=str(root / "workspace" / "exports"))
+            with self.assertRaisesRegex(CinematicCompatibilityError, "child of workspace/exports"):
+                compatibility._choose_output_root(request)
 
     def test_audit_is_read_only_and_distinguishes_reference_from_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -34,6 +53,8 @@ class CinematicCompatibilityTests(unittest.TestCase):
             engine = EngineService(FabuloomPaths(Path(directory)))
             plan = engine.cinematic.plan(CinematicRequest(11, "O eco que não morre", "workspace/inputs/book1/book.docx"))
             self.assertEqual(plan["format"], "fabuloom.cinematic-production-plan/0.1")
+            self.assertEqual(plan["request"]["runner"], "cronicas.chapter")
+            self.assertIn("render.cinematic.execute", engine.capabilities()["operations"])
             job = engine.create_job("render-cinematic", {"mode": "plan", "chapter": 11, "chapter_title": "O eco que não morre"})
             deadline = time.monotonic() + 2
             current = engine.get_job(job["id"])

@@ -10,13 +10,13 @@ Desktop, a CLI, a API loopback e o MCP chamam o mesmo `EngineService`.
 | --- | --- | --- | --- |
 | Kokoro `pm_santa` / pt-BR | Sim, WAV medido | Sim no `render-demo` quando disponível | Contrato compatível; referência validada |
 | Santa V5 + RMS | Sim, `NarratorAvatarRenderer` | Canvas genérico compartilhado | Adaptador de referência; sem duplicar renderer |
-| DOCX integral | Sim, limites de capítulo | Não | Requisito do runner legado; capítulo 12 fica `ready_to_plan` |
+| DOCX integral | Sim, limites de capítulo | Sim no runner registrado | Capítulo 12 executado com validação dos limites do DOCX |
 | Medalhão e abertura/despedida | Sim, PR #56 R2 | Não no demo genérico | Preservados pelo runner legado |
 | Música e ducking | Sim, sidechain e limiter | Sim no mix genérico | Contratos compatíveis; direitos pendentes |
 | Transições mágicas | Sim, determinísticas | Não no demo genérico | Validadas nos masters R2 |
 | Legendas medidas | Sim, SRT por segmentos | Sim no demo | Contrato de manifesto reutilizado |
 | Horizontal/vertical | Sim, 1920×1080 e 1080×1920 | Sim no demo | Dois masters R2 validados |
-| Checkpoints/retomada | Sim, `BATCH-STATUS.json` | Sim, jobs/checkpoints | Adaptador ainda somente leitura |
+| Checkpoints/retomada | Sim, `BATCH-STATUS.json` | Sim, jobs/checkpoints | Runner registrado retoma etapas válidas por `CHECKPOINT.json` |
 | Biblioteca privada | IDs, hashes e direitos | Catálogo SQLite/migração dry-run | Externa ao produto; sem migração destrutiva |
 
 Os estados são deliberadamente separados: `legacy_validated`,
@@ -36,17 +36,16 @@ continuam bloqueados.
 
 ## Segurança do adaptador
 
-`fabuloom_core.cinematic.CinematicCompatibility` faz descoberta, planejamento
-e validação. Ele localiza runners da PR #56 como evidência somente leitura e
-valida os masters R2 com FFprobe, codec, dimensão, áudio, relatório de voz,
-ducking, decode e blackdetect.
+`fabuloom_core.cinematic.CinematicCompatibility` faz descoberta, planejamento,
+validação e execução controlada. Ele valida os masters R2 com FFprobe, codec,
+dimensão, áudio, relatório de voz, ducking, decode e blackdetect.
 
-Execução só será habilitada quando houver seleção explícita por
-`FABULOOM_CINEMATIC_RUNNER`, runner dentro da raiz runtime, nome compatível,
-parâmetro de saída isolada (`--output-root` ou equivalente) e output novo.
-Os runners atuais do capítulo 11 usam diretórios fixos e não satisfazem esse
-contrato. Por isso não são executados pelo novo motor e não há alegação de
-equivalência cinematográfica. PR #56, R1/R2 e fontes permanecem preservados.
+Execução só é habilitada para um runner registrado em
+`profiles/registries/cinematic-runners.json`, com SHA-256, contrato `--request`
+e output novo dentro de `workspace/exports`. O runner `cronicas.chapter` foi
+validado na produção independente do capítulo 12. Runners legados com caminhos
+fixos continuam somente como evidência e não podem sobrescrever capítulos
+aprovados. PR #56, R1/R2 e fontes permanecem preservados.
 
 ## Diagnóstico
 
@@ -79,10 +78,9 @@ virtuais permanecem preservados.
 
 ## Próximo capítulo e Shorts
 
-O ambiente fica `ready_to_plan` quando DOCX, catálogo de Santa V5 e perfil
-estão presentes. Antes do capítulo 12: executar `doctor`, gerar o plano,
-conferir storyboard/cenas/trilha por IDs, selecionar runner parametrizado e
-output novo, reutilizar WAVs por hash, exportar os dois formatos e validar
+O ambiente fica `ready_to_execute` quando DOCX, catálogo de Santa V5, perfil e
+runner registrado estão presentes. A execução do capítulo 12 validou limites,
+reutilização de assets aprovados, WAV Kokoro, os dois formatos e
 FFprobe/decode/blackdetect/SRT/ducking. `technical_qa=PASS` continua separado
 de `artistic_qa=REVIEW_REQUIRED`.
 
@@ -93,12 +91,11 @@ revisão artística. FBS-SHORT-001 é regressão, não referência estética.
 
 ## Pendências
 
-- runner cinematográfico parametrizado por capítulo e output;
 - conexão do pack privado Santa V5 ao catálogo de produção;
 - edição de timeline cinematográfica no Desktop;
 - sessão fria com runtime LLM independente;
 - confirmação de direitos comerciais de músicas e clipes.
 
-Enquanto existirem, use o runner legado validado para capítulos especificados
-e o EngineService para diagnósticos, projetos, catálogo, jobs, render genérico
-e validação de referência. Não substitua a pipeline legada por um demo.
+Enquanto existirem, use o runner registrado para novas produções e o
+EngineService para diagnósticos, projetos, catálogo, jobs, render genérico e
+validação de referência. Não substitua a pipeline cinematográfica por um demo.

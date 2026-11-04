@@ -1,10 +1,10 @@
 """Compatibility boundary for the approved Crônicas de Topázio pipeline.
 
-The cinematic runners predate :class:`EngineService` and remain the source of
-truth for approved chapter production until a parametrized adapter is proven.
-This module deliberately does not reimplement their renderer.  It discovers
-the legacy components, validates reference outputs, builds a safe production
-plan, and refuses to execute a runner that cannot isolate its output.
+The cinematic renderer remains implemented by the approved legacy components,
+but execution is exposed through a hash-registered request-boundary runner.
+This module deliberately does not reimplement their renderer. It discovers
+the components, validates reference outputs, builds a safe production plan,
+and executes only runners that can isolate their output.
 """
 
 from __future__ import annotations
@@ -17,6 +17,9 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
+import threading
+import time
 from typing import Any, Callable
 
 from .paths import FabuloomPaths
@@ -46,6 +49,7 @@ class CinematicRequest:
     output_variants: tuple[str, ...] = ("horizontal", "vertical")
     mode: str = "plan"
     runner: str | None = None
+    output_root: str | None = None
 
     def validate(self) -> None:
         if isinstance(self.chapter, bool) or not isinstance(self.chapter, int) or self.chapter < 1:
@@ -61,6 +65,8 @@ class CinematicRequest:
             raise ValueError("output_variants must contain horizontal and/or vertical")
         if self.mode not in {"plan", "validate-reference", "execute"}:
             raise ValueError("mode must be plan, validate-reference or execute")
+        if self.output_root is not None and not str(self.output_root).strip():
+            raise ValueError("output_root must be non-empty when provided")
 
 
 def _sha256(path: Path) -> str:
@@ -79,7 +85,7 @@ def _relative(path: Path, root: Path) -> str:
 
 
 class CinematicCompatibility:
-    """Read-only audit and guarded adapter for legacy cinematic production."""
+    """Audit and safely execute the registered cinematic production boundary."""
 
     def __init__(self, paths: FabuloomPaths, *, product_root: str | Path):
         self.paths = paths
@@ -90,25 +96,34 @@ class CinematicCompatibility:
         return self.product_root / "profiles" / "cronicas-cinematic-production.json"
 
     @property
+    def runner_registry_path(self) -> Path:
+        return self.product_root / "profiles" / "registries" / "cinematic-runners.json"
+
+    @property
     def reference_root(self) -> Path:
         return self.paths.exports / "cronicas-book1-capitulo11-cinematic-r2"
 
     def _candidate_runners(self) -> list[tuple[Path, str]]:
         candidates: list[tuple[Path, str]] = []
-        configured = os.environ.get("FABULOOM_CINEMATIC_RUNNER")
-        if configured:
-            candidates.append((Path(configured).expanduser(), "environment"))
+        if self.runner_registry_path.is_file():
+            try:
+                registry = json.loads(self.runner_registry_path.read_text(encoding="utf-8"))
+                for entry in registry.get("runners", []):
+                    if isinstance(entry, dict) and isinstance(entry.get("script"), str):
+                        candidates.append((self.product_root / entry["script"], f"registered:{entry.get('id', 'unknown')}"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                pass
         candidates.extend(
             [
-                (self.paths.private / "productions" / "cronicas" / "examples" / "cronicas_cap11_cin_001_r2.py", "private-production"),
-                (self.paths.workspace / "legacy" / "cronicas_cap11_cin_001_r2.py", "workspace-legacy"),
+                (self.paths.private / "productions" / "cronicas" / "examples" / "cronicas_cap11_cin_001_r2.py", "private-production-evidence"),
+                (self.paths.workspace / "legacy" / "cronicas_cap11_cin_001_r2.py", "workspace-legacy-evidence"),
             ]
         )
-        # Existing PR worktrees are useful read-only evidence, but are never
-        # executable unless explicitly selected through the environment.
+        # Existing PR worktrees are read-only evidence. They are never
+        # executable through this service.
         worktrees = self.paths.root / "worktrees"
         if worktrees.is_dir():
-            candidates.extend((path, "worktree-discovery") for path in sorted(worktrees.glob("*/examples/cronicas_cap11_cin_001_r2.py")))
+            candidates.extend((path, "worktree-evidence") for path in sorted(worktrees.glob("*/examples/cronicas_cap11_cin_001_r2.py")))
         unique: list[tuple[Path, str]] = []
         seen: set[str] = set()
         for path, source in candidates:
@@ -131,9 +146,9 @@ class CinematicCompatibility:
         if exists and path.stat().st_size <= 2 * 1024 * 1024:
             source_text = path.read_text(encoding="utf-8", errors="replace")
         # A printed field or a hard-coded ``OUTPUT_ROOT`` is not a parameter.
-        # Require an actual CLI option declaration (or an explicit function
-        # argument) before allowing an external runner to write media.
-        parametrized = "--output-root" in source_text or bool(re.search(r"def\s+main\([^)]*output_root", source_text))
+        # Require the registered request boundary, not an arbitrary command.
+        parametrized = "--request" in source_text and "output_root" in source_text
+        registered = source.startswith("registered:")
         return {
             "path": str(path),
             "relative_path": _relative(path, self.paths.root),
@@ -143,9 +158,39 @@ class CinematicCompatibility:
             "safe_name": valid_name,
             "sha256": _sha256(path) if exists else None,
             "parameterized_output": parametrized,
-            "execution_allowed": bool(exists and inside and valid_name and source == "environment" and parametrized),
-            "reason": None if parametrized else "runner does not expose an isolated output-root parameter",
+            "registered": registered,
+            "execution_allowed": bool(exists and inside and valid_name and registered and parametrized),
+            "reason": None if registered and parametrized else "runner is not a registered request-boundary runner",
         }
+
+    def _registered_runner(self, runner_id: str) -> dict[str, object]:
+        if not self.runner_registry_path.is_file():
+            raise CinematicCompatibilityError(f"registered runner registry is missing: {self.runner_registry_path}")
+        try:
+            registry = json.loads(self.runner_registry_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise CinematicCompatibilityError("registered runner registry is invalid") from exc
+        entry = next((item for item in registry.get("runners", []) if isinstance(item, dict) and item.get("id") == runner_id), None)
+        if not entry:
+            raise CinematicCompatibilityError(f"unknown cinematic runner id: {runner_id}")
+        script_value = entry.get("script")
+        if not isinstance(script_value, str) or Path(script_value).is_absolute() or ".." in Path(script_value).parts:
+            raise CinematicCompatibilityError("registered runner script must be product-relative")
+        script = (self.product_root / script_value).resolve()
+        try:
+            script.relative_to(self.product_root.resolve())
+        except ValueError as exc:
+            raise CinematicCompatibilityError("registered runner escaped product root") from exc
+        if not script.is_file() or not _RUNNER_NAME.match(script.name):
+            raise CinematicCompatibilityError("registered runner script is missing or has an unsafe name")
+        expected_hash = entry.get("sha256")
+        actual_hash = _sha256(script)
+        if not isinstance(expected_hash, str) or expected_hash != actual_hash:
+            raise CinematicCompatibilityError("registered runner hash does not match the product registry")
+        source = script.read_text(encoding="utf-8", errors="replace")
+        if "--request" not in source or "output_root" not in source:
+            raise CinematicCompatibilityError("registered runner lacks the isolated request/output contract")
+        return {"id": runner_id, "script": str(script), "relative_script": script_value, "sha256": actual_hash, "capabilities": entry.get("capabilities", [])}
 
     def _reference_files(self) -> list[Path]:
         return [
@@ -193,7 +238,6 @@ class CinematicCompatibility:
             except (OSError, ValueError, json.JSONDecodeError):
                 santa_approved = False
         reference_ok = all(bool(item["exists"]) for item in reference)
-        configured_runner = next((item for item in runners if item["source"] == "environment"), None)
         executable_runner = next((item for item in runners if item["execution_allowed"]), None)
         missing_inputs = [item["relative_path"] for item in inputs if not item["exists"]]
         blockers: list[str] = []
@@ -204,9 +248,7 @@ class CinematicCompatibility:
         if missing_inputs:
             blockers.append("cinematic input library is incomplete")
         if not executable_runner:
-            blockers.append("no explicitly configured parameterized legacy runner is available")
-        if configured_runner and not configured_runner["execution_allowed"]:
-            blockers.append("configured runner cannot isolate its output; execution refused")
+            blockers.append("no registered request-boundary cinematic runner is available")
         return {
             "format": CINEMATIC_FORMAT,
             "profile": CINEMATIC_PROFILE_ID,
@@ -214,7 +256,7 @@ class CinematicCompatibility:
                 "reference_implementation": "PR #56 / Chapter 11 R2",
                 "runners": runners,
                 "status": "available_for_reference_validation" if reference_ok else "incomplete",
-                "execution_policy": "explicit_runner_and_isolated_output_only",
+                "execution_policy": "registered_runner_hash_and_isolated_output_only",
             },
             "reference_artifacts": {"root": str(self.reference_root), "files": reference, "complete": reference_ok},
             "inputs": inputs,
@@ -224,16 +266,16 @@ class CinematicCompatibility:
                 "manifest_contract": "fabuloom.audio-manifest/0.1",
                 "timeline_contract": "fabuloom.cronicas-cap11-cinematic/0.2",
                 "audio": "Kokoro native WAV + FFmpeg voice-priority ducking/limiter",
-                "canvas": "legacy NarratorAvatarRenderer through guarded adapter",
+                "canvas": "legacy NarratorAvatarRenderer through the registered runner",
                 "export": "FFmpeg H.264/AAC horizontal and vertical",
-                "status": "adapter_reference_validation_only" if not executable_runner else "adapter_ready_for_isolated_runner",
+                "status": "reference_validation_only" if not executable_runner else "ready_for_execution",
             },
             "next_chapter": {
                 "source_document_present": inputs[0]["exists"],
                 "official_santa_present": santa_approved,
                 "production_profile_present": self.profile_path.is_file(),
-                "status": "ready_to_plan" if inputs[0]["exists"] and santa_approved and self.profile_path.is_file() else "blocked",
-                "constraint": "a chapter-specific parameterized runner is still required before render",
+                "status": "ready_to_execute" if inputs[0]["exists"] and santa_approved and self.profile_path.is_file() and executable_runner else ("ready_to_plan" if inputs[0]["exists"] and santa_approved and self.profile_path.is_file() else "blocked"),
+                "constraint": "registered runner must pass source, voice, output and checkpoint validation before render",
             },
             "shorts": {
                 "profile": SHORTS_PROFILE_ID,
@@ -311,9 +353,15 @@ class CinematicCompatibility:
     def plan(self, request: CinematicRequest) -> dict[str, object]:
         request.validate()
         audit = self.audit()
+        if not audit["reference_artifacts"]["complete"] or audit["next_chapter"]["status"] == "blocked":
+            plan_status = "blocked"
+        elif audit["next_chapter"]["status"] == "ready_to_execute":
+            plan_status = "ready_for_execution"
+        else:
+            plan_status = "ready_for_reference_validation"
         return {
             "format": "fabuloom.cinematic-production-plan/0.1",
-            "status": "ready_for_reference_validation" if audit["reference_artifacts"]["complete"] else "blocked",
+            "status": plan_status,
             "request": {
                 "chapter": request.chapter,
                 "chapter_title": request.chapter_title,
@@ -321,6 +369,8 @@ class CinematicCompatibility:
                 "voice_id": request.voice_id,
                 "language": request.language,
                 "output_variants": list(request.output_variants),
+                "runner": request.runner or "cronicas.chapter",
+                "output_root": request.output_root,
             },
             "stages": [
                 "validate source DOCX boundaries and hash",
@@ -340,17 +390,109 @@ class CinematicCompatibility:
             "limitations": audit["blocking_issues"],
         }
 
-    def execute(self, request: CinematicRequest) -> dict[str, object]:
-        """Refuse unsafe legacy execution until the runner is isolated."""
+    def _choose_output_root(self, request: CinematicRequest) -> Path:
+        if request.output_root:
+            candidate = Path(request.output_root)
+            if not candidate.is_absolute():
+                candidate = self.paths.root / candidate
+            exports_root = self.paths.exports.resolve()
+            resolved = candidate.resolve()
+            try:
+                relative = resolved.relative_to(exports_root)
+            except ValueError as exc:
+                raise CinematicCompatibilityError("cinematic output_root must stay inside workspace/exports") from exc
+            if not relative.parts:
+                raise CinematicCompatibilityError("cinematic output_root must be a child of workspace/exports")
+            return resolved
+        base = self.paths.exports / f"cronicas-book1-capitulo{request.chapter}-cinematic-production"
+        if not base.exists():
+            return base
+        if (base / "CHECKPOINT.json").is_file() and not (base / "reports" / "production-result.json").is_file():
+            return base
+        for index in range(2, 1000):
+            candidate = base.with_name(f"{base.name}-attempt-{index}")
+            if not candidate.exists():
+                return candidate
+        raise CinematicCompatibilityError("unable to allocate a non-overwriting cinematic output root")
+
+    def execute(self, request: CinematicRequest, *, progress: Callable[[str, float, dict[str, object] | None], None] | None = None, cancel: threading.Event | None = None) -> dict[str, object]:
+        """Execute only a hash-registered runner with a workspace output root."""
 
         request.validate()
         if request.mode != "execute":
             raise CinematicCompatibilityError("execute requires mode=execute")
-        audit = self.audit()
-        runner = next((item for item in audit["legacy_pipeline"]["runners"] if item["source"] == "environment"), None)
-        if not runner or not runner["execution_allowed"]:
-            raise CinematicCompatibilityError("legacy runner is not explicitly configured with an isolated output-root contract; no media was written")
-        raise CinematicCompatibilityError("parameterized legacy execution adapter is reserved until a runner with isolated output is supplied")
+        runner_id = request.runner or "cronicas.chapter"
+        runner = self._registered_runner(runner_id)
+        output_root = self._choose_output_root(request)
+        if output_root.is_dir() and (output_root / "reports" / "production-result.json").is_file():
+            raise CinematicCompatibilityError(f"approved or completed output exists; refusing overwrite: {output_root}")
+        output_root.mkdir(parents=True, exist_ok=True)
+        request_file = output_root / ".engine-request.json"
+        payload = {
+            "chapter": request.chapter,
+            "chapter_title": request.chapter_title,
+            "source_document": request.source_document,
+            "voice_id": request.voice_id,
+            "language": request.language,
+            "music_asset_id": request.music_asset_id,
+            "scene_asset_ids": list(request.scene_asset_ids),
+            "output_variants": list(request.output_variants),
+            "output_root": str(output_root),
+            "runner_id": runner_id,
+        }
+        if request_file.is_file():
+            try:
+                existing = json.loads(request_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                raise CinematicCompatibilityError("existing engine request is invalid; refusing to reuse output root") from exc
+            if existing != payload:
+                raise CinematicCompatibilityError("output root contains a different request; refusing to mix productions")
+        else:
+            request_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        log_path = output_root / "runner.log"
+        environment = os.environ.copy()
+        environment.update({"FABULOOM_ROOT": str(self.paths.root), "FABULOOM_WORKSPACE_ROOT": str(self.paths.root), "FABULOOM_EXPORT_ROOT": str(self.paths.exports), "PYTHONPATH": str(self.product_root) + os.pathsep + environment.get("PYTHONPATH", "")})
+        configured_python = self.paths.root / "workspace" / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        python_executable = configured_python if configured_python.is_file() else Path(sys.executable)
+        command = [str(python_executable), str(runner["script"]), "--request", str(request_file)]
+        if progress:
+            progress("cinematic-runner-start", 0.08, {"runner": runner_id, "output_root": str(output_root)})
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(json.dumps({"event": "start", "runner": runner_id, "command": command, "output_root": str(output_root)}) + "\n")
+            process = subprocess.Popen(command, cwd=str(self.product_root), env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
+            lines: list[str] = []
+            def consume() -> None:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    lines.append(line.rstrip())
+                    log.write(line)
+                    log.flush()
+            reader = threading.Thread(target=consume, daemon=True)
+            reader.start()
+            while process.poll() is None:
+                if cancel and cancel.is_set():
+                    process.terminate()
+                    try:
+                        process.wait(timeout=8)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                    raise InterruptedError("cinematic runner cancelled")
+                if progress:
+                    progress("cinematic-runner", 0.10, {"runner": runner_id, "output_root": str(output_root), "checkpoint": str(output_root / "CHECKPOINT.json")})
+                time.sleep(0.5)
+            reader.join(timeout=5)
+            return_code = process.returncode
+        if return_code != 0:
+            tail = "\n".join(lines[-20:])
+            raise CinematicCompatibilityError(f"registered cinematic runner failed with exit code {return_code}: {tail}")
+        result_path = output_root / "reports" / "production-result.json"
+        if not result_path.is_file():
+            raise CinematicCompatibilityError("runner completed without production-result.json")
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        result["engine_execution"] = {"runner_id": runner_id, "runner_sha256": runner["sha256"], "output_root": str(output_root), "log": str(log_path), "request": payload}
+        if progress:
+            progress("cinematic-runner-complete", 1.0, {"output_root": str(output_root), "outputs": result.get("outputs", [])})
+        return result
 
 
 __all__ = [
