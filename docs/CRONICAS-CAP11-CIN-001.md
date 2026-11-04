@@ -45,3 +45,35 @@ comerciais da faixa e autorização de distribuição dos clipes cinematográfic
 continuam pendentes de confirmação. A aprovação artística humana permanece
 necessária; `QA_OK` significa apenas que as validações técnicas passaram.
 
+## Revisão R2 — transições editoriais
+
+A revisão R2 preserva integralmente a produção R1, os WAVs Kokoro medidos e a
+captura narrativa existente. A alteração é limitada à composição das
+transições entre blocos:
+
+- pausa de 1.000 ms entre a apresentação cinematográfica e a narrativa;
+- pausa de 1.200 ms entre a narrativa e a despedida cinematográfica;
+- dissolução de página/cristal com partículas determinísticas, sem tela preta;
+- Alba continua audível nas pausas, com a mesma velocidade e o mesmo tom;
+- efeitos de transição discretos, mixados abaixo da voz e da música.
+
+O runner da revisão é
+[cronicas_cap11_cin_001_r2.py](../examples/cronicas_cap11_cin_001_r2.py).
+Ele reutiliza os componentes R1 e somente insere os intervalos editoriais,
+os quadros de transição e a nova mixagem. Não há ressíntese, recaptura do
+Canvas ou alteração nos capítulos 01–10.
+
+Os artefatos R2 ficam fora do Git em
+`E:\Fabuloom\workspace\exports\cronicas-book1-capitulo11-cinematic-r2`.
+Os arquivos finais são `videos/cronicas-capitulo11-o-eco-que-nao-morre-
+horizontal-r2.mp4` e `videos/cronicas-capitulo11-o-eco-que-nao-morre-
+vertical-r2.mp4`, acompanhados de manifestos, SRT, timeline, pranchas e
+relatório técnico. A duração do manifesto é 298.280 ms; os contêineres
+medidos pelo FFprobe têm aproximadamente 298,333 s.
+
+O QA técnico R2 passou: H.264/AAC, 30 fps, 1920×1080 e 1080×1920, áudio
+estéreo a 48 kHz, decodificação FFmpeg concluída e `blackdetect` sem eventos.
+A inspeção das pranchas confirma a dissolução visual nos dois formatos. A
+escuta humana e a aprovação artística continuam pendentes, assim como a
+confirmação dos direitos comerciais da música e dos clipes fornecidos.
+
