@@ -574,3 +574,26 @@ fields. Migration starts with a dry-run checkpoint, verifies SHA-256 after each
 copy, preserves the source, and only permits rollback of unchanged targets.
 The configured root is checked for free space before heavy operations and no
 silent C: fallback is allowed.
+
+### FAB-ARCH-003 cinematic compatibility boundary
+
+The approved Crônicas de Topázio line is represented by the versioned
+`cronicas-cinematic-production` profile. `CinematicCompatibility` is a guarded
+adapter over the existing Chapter 11 R2 runners: it discovers components,
+plans requests and validates existing horizontal/vertical masters with the
+same manifest, timeline, Canvas and FFmpeg contracts. It does not duplicate
+the NarratorAvatarRenderer or rewrite the legacy cinematic compositor.
+
+The current Chapter 11 runner has a fixed output root. The shared engine
+therefore exposes `cinematic-audit`, `render-cinematic --mode plan` and
+`--mode validate-reference`, but refuses execution until a runner explicitly
+declares an isolated output parameter. This is a deliberate compatibility
+state, not an equivalence claim. The legacy runner remains the production
+path for already specified episodes, while the shared engine remains the
+single control surface for diagnosis, projects, jobs, catalog and future
+parameterized production.
+
+The same boundary distinguishes `technical_qa=PASS` from
+`artistic_qa=REVIEW_REQUIRED`, keeps Santa V5 and private media outside the
+public product, and prevents DRAFT identities or approved exports from being
+overwritten.

@@ -62,6 +62,7 @@ from .project_store import PROJECT_FORMAT, ProjectConflict, ProjectLocked, Proje
 from .migration import LibraryMigration, MIGRATION_FORMAT
 from .profiles import PROFILE_FORMAT, ProfileError, ProfileRegistry
 from .production import DEMO_TEXT, DeterministicAudioProvider, ProductionError, ProductionService, PRODUCTION_FORMAT
+from .cinematic import CINEMATIC_FORMAT, CINEMATIC_PROFILE_ID, SHORTS_PROFILE_ID, CinematicCompatibility, CinematicCompatibilityError, CinematicRequest
 
 __all__ = [
     "MODEL_FORMAT_VERSION",
@@ -132,4 +133,10 @@ __all__ = [
     "ProductionError",
     "ProductionService",
     "PRODUCTION_FORMAT",
+    "CINEMATIC_FORMAT",
+    "CINEMATIC_PROFILE_ID",
+    "SHORTS_PROFILE_ID",
+    "CinematicCompatibility",
+    "CinematicCompatibilityError",
+    "CinematicRequest",
 ]

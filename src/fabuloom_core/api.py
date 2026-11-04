@@ -55,6 +55,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 self._send(self.engine.capabilities())
             elif path == "/api/v1/doctor":
                 self._send(self.engine.doctor())
+            elif path == "/api/v1/cinematic":
+                self._send(self.engine.cinematic_diagnostics())
             elif path == "/api/v1/profiles":
                 self._send({"format": "fabuloom.production-profiles/0.1", "profiles": self.engine.list_profiles()})
             elif path == "/api/v1/projects":
@@ -88,6 +90,9 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 self._send(job, 202)
             elif path == "/api/v1/render":
                 job = self.engine.create_job("render-demo", payload)
+                self._send(job, 202)
+            elif path == "/api/v1/render/cinematic":
+                job = self.engine.create_job("render-cinematic", payload)
                 self._send(job, 202)
             elif path == "/api/v1/library/migration":
                 job = self.engine.create_job("library-migration", payload)

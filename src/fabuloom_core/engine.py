@@ -12,6 +12,7 @@ import threading
 import uuid
 
 from .asset_catalog import AssetCatalog
+from .cinematic import CinematicCompatibility, CinematicRequest
 from .migration import LibraryMigration
 from .paths import FabuloomPaths, PathConfigurationError
 from .profiles import ProfileRegistry
@@ -33,6 +34,7 @@ class EngineService:
         self.projects = ProjectStore(self.paths.projects)
         self.catalog = AssetCatalog(self.paths.library_source, self.paths.catalog_db)
         self.production = ProductionService(paths, product_root=Path(__file__).resolve().parents[2])
+        self.cinematic = CinematicCompatibility(paths, product_root=Path(__file__).resolve().parents[2])
         self.profiles = ProfileRegistry(Path(__file__).resolve().parents[2] / "profiles")
         self._job_threads: dict[str, threading.Thread] = {}
         self._job_cancel: dict[str, threading.Event] = {}
@@ -52,7 +54,13 @@ class EngineService:
             "projects": len(self.projects.list()),
             "jobs": {"total": len(jobs), "running": sum(job["state"] == "running" for job in jobs), "queued": sum(job["state"] == "queued" for job in jobs)},
             "network": {"default_binding": "loopback-only"},
+            "cinematic": {"profile": "cronicas-cinematic-production", "diagnostic": "available through doctor"},
         }
+
+    def cinematic_diagnostics(self) -> dict[str, object]:
+        """Read-only status for the real cinematic line, separate from demo QA."""
+
+        return self.cinematic.audit()
 
     def create_project(self, name: str, *, project_id: str | None = None, metadata: dict[str, object] | None = None) -> dict[str, object]:
         return self.projects.create(name, project_id=project_id, metadata=metadata)
@@ -86,6 +94,8 @@ class EngineService:
                 "projects.list": {"status": "implemented", "parameters": {}},
                 "render.dry_run": {"status": "implemented", "parameters": {"profile": "optional string", "provider": "optional string"}},
                 "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string", "capture_fps": "5 economy or 24/30 real Canvas", "output_fps": "24|30", "audio_sample_rate": "integer; 48000 recommended", "audio_channels": "1|2"}},
+                "render.cinematic.plan": {"status": "implemented", "parameters": {"chapter": "positive integer", "chapter_title": "string", "source_document": "workspace-relative string", "voice_id": "pm_santa", "language": "pt-BR", "output_variants": "horizontal|vertical"}},
+                "render.cinematic.validate_reference": {"status": "implemented", "parameters": {"decode": "boolean"}},
                 "audio.mix": {"status": "implemented", "parameters": {"music_path": "optional configured-root audio path", "music_asset_id": "optional catalog stable ID", "ducking": "voice-priority sidechain"}},
                 "library.migration": {"status": "implemented", "parameters": {"dry_run": "boolean", "checkpoint": "optional path"}},
                 "mcp.adapter": {"status": "implemented", "parameters": {"transport": "stdio"}},
@@ -93,8 +103,8 @@ class EngineService:
             },
             "dependencies": self.production._dependency_report(),
             "mounted_library": {"source": str(self.paths.library_source), "private_target": str(self.paths.library), "present": self.paths.library_source.is_dir()},
-            "jobs": sorted({"validate-project", "catalog-scan", "render-demo", "library-migration"}),
-            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
+            "jobs": sorted({"validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"}),
+            "limits": ["render-demo uses the existing Music Studio Canvas renderer", "cinematic production uses a guarded adapter over the approved legacy runner until isolated output parameters are available", "capture_fps=5 is economical and repeats frames during encoding; 24/30 captures real Canvas frames", "generic acceptance audio is synthetic unless provider=kokoro", "technical QA never implies artistic approval"],
         }
 
     def doctor(self) -> dict[str, object]:
@@ -107,6 +117,14 @@ class EngineService:
             storage = self.paths.storage_report()
             storage["validation_error"] = str(exc)
             storage_valid = False
+        try:
+            cinematic = self.cinematic_diagnostics()
+        except PathConfigurationError as exc:
+            cinematic = {
+                "format": "fabuloom.cronicas-cinematic-production/0.1",
+                "status": "blocked",
+                "blocking_issues": [f"runtime root validation failed: {exc}"],
+            }
         return {
             "format": "fabuloom.doctor/0.1",
             "status": "ready" if storage_valid and dependencies["ffmpeg"] and dependencies["ffprobe"] and storage["configured_free_bytes"] > 64 * 1024 * 1024 else "blocked",
@@ -116,6 +134,7 @@ class EngineService:
             "library_source": str(self.paths.library_source),
             "library_target": str(self.paths.library),
             "no_c_fallback": str(self.paths.root).upper().startswith("E:") or not os.name == "nt",
+            "cinematic": cinematic,
         }
 
     def list_profiles(self) -> list[dict[str, object]]:
@@ -169,7 +188,7 @@ class EngineService:
                 self._write_job(job)
 
     def create_job(self, kind: str, payload: dict[str, object] | None = None) -> dict[str, object]:
-        if kind not in {"validate-project", "catalog-scan", "render-demo", "library-migration"}:
+        if kind not in {"validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"}:
             raise ValueError(f"unsupported job kind: {kind}")
         job = {"format": "fabuloom.job/0.1", "id": f"job-{uuid.uuid4().hex[:16]}", "kind": kind, "payload": payload or {}, "state": "queued", "progress": 0, "created_at": _now(), "updated_at": _now()}
         self._write_job(job)
@@ -233,6 +252,31 @@ class EngineService:
                         "artifact_root": str(Path(str(result["project"])).parent.relative_to(self.paths.exports)),
                     }
                     self.update_project(project_id, {"name": current["name"], "metadata": metadata, "books": current.get("books", [])}, expected_revision=int(current.get("revision", 0)), operation="render-complete")
+            elif job["kind"] == "cinematic-audit":
+                result = self.cinematic_diagnostics()
+            elif job["kind"] == "render-cinematic":
+                payload = dict(job["payload"])
+                variants = payload.get("output_variants", ["horizontal", "vertical"])
+                if isinstance(variants, str):
+                    variants = [variants]
+                request = CinematicRequest(
+                    chapter=int(payload.get("chapter", 11)),
+                    chapter_title=str(payload.get("chapter_title", "")),
+                    source_document=str(payload.get("source_document", "workspace/inputs/book1/Topazio-O-Despertar-dos-Cristais.docx")),
+                    voice_id=str(payload.get("voice_id", "pm_santa")),
+                    language=str(payload.get("language", "pt-BR")),
+                    music_asset_id=str(payload["music_asset_id"]) if payload.get("music_asset_id") else None,
+                    scene_asset_ids=tuple(str(value) for value in payload.get("scene_asset_ids", []) if isinstance(value, str)),
+                    output_variants=tuple(str(value) for value in variants),
+                    mode=str(payload.get("mode", "plan")),
+                    runner=str(payload["runner"]) if payload.get("runner") else None,
+                )
+                if request.mode == "plan":
+                    result = self.cinematic.plan(request)
+                elif request.mode == "validate-reference":
+                    result = self.cinematic.validate_reference(decode=bool(payload.get("decode", False)), progress=lambda stage: progress("cinematic-qa", 0.5, {"stage": stage}))
+                else:
+                    result = self.cinematic.execute(request)
             else:
                 payload = job["payload"]
                 source_root = Path(str(payload.get("source_root") or self.paths.legacy_inputs)).resolve()

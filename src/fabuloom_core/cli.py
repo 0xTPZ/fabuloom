@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     job_commands = jobs.add_subparsers(dest="job_command", required=True)
     job_commands.add_parser("list")
     job_create = job_commands.add_parser("create")
-    job_create.add_argument("kind", choices=["validate-project", "catalog-scan", "render-demo", "library-migration"])
+    job_create.add_argument("kind", choices=["validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"])
     job_create.add_argument("--project-id")
     job_create.add_argument("--no-wait", action="store_true", help="return immediately; API/Desktop jobs are asynchronous by default")
     job_show = job_commands.add_parser("show")
@@ -79,6 +79,18 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--audio-channels", type=int, choices=[1, 2], help="encoded AAC channel count")
     demo.add_argument("--dry-run", action="store_true")
     demo.add_argument("--no-wait", action="store_true")
+    cinematic = render_subcommands.add_parser("cinematic")
+    cinematic.add_argument("--chapter", type=int, default=11)
+    cinematic.add_argument("--chapter-title", default="O eco que não morre")
+    cinematic.add_argument("--source-document", default="workspace/inputs/book1/Topazio-O-Despertar-dos-Cristais.docx")
+    cinematic.add_argument("--voice-id", default="pm_santa")
+    cinematic.add_argument("--language", default="pt-BR")
+    cinematic.add_argument("--music-asset-id")
+    cinematic.add_argument("--output-variant", dest="output_variants", action="append", choices=["horizontal", "vertical"])
+    cinematic.add_argument("--mode", choices=["plan", "validate-reference", "execute"], default="plan")
+    cinematic.add_argument("--decode", action="store_true")
+    cinematic.add_argument("--runner")
+    cinematic.add_argument("--no-wait", action="store_true")
     return parser
 
 
@@ -153,6 +165,23 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 created = engine.create_job("render-demo", payload)
                 _json(created if args.no_wait else engine.wait_for_job(str(created["id"])))
+        elif args.render_command == "cinematic":
+            payload = {
+                "chapter": args.chapter,
+                "chapter_title": args.chapter_title,
+                "source_document": args.source_document,
+                "voice_id": args.voice_id,
+                "language": args.language,
+                "mode": args.mode,
+                "decode": args.decode,
+                "output_variants": args.output_variants or ["horizontal", "vertical"],
+            }
+            if args.music_asset_id:
+                payload["music_asset_id"] = args.music_asset_id
+            if args.runner:
+                payload["runner"] = args.runner
+            created = engine.create_job("render-cinematic", payload)
+            _json(created if args.no_wait else engine.wait_for_job(str(created["id"])))
         return 0
     if args.command == "api":
         serve(engine, port=args.port)
