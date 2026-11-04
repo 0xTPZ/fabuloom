@@ -55,6 +55,10 @@ from .tts import (
     TTSError,
     TTSProvider,
 )
+from .asset_catalog import AssetCatalog, AssetRecord, CATALOG_FORMAT
+from .engine import EngineService
+from .paths import FabuloomPaths, PathConfigurationError
+from .project_store import PROJECT_FORMAT, ProjectConflict, ProjectLocked, ProjectNotFound, ProjectStore, ProjectStoreError
 
 __all__ = [
     "MODEL_FORMAT_VERSION",
@@ -103,4 +107,16 @@ __all__ = [
     "CharacterNotFound",
     "CharacterRegistry",
     "CharacterRegistryError",
+    "AssetCatalog",
+    "AssetRecord",
+    "CATALOG_FORMAT",
+    "EngineService",
+    "FabuloomPaths",
+    "PathConfigurationError",
+    "PROJECT_FORMAT",
+    "ProjectConflict",
+    "ProjectLocked",
+    "ProjectNotFound",
+    "ProjectStore",
+    "ProjectStoreError",
 ]

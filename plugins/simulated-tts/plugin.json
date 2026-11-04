@@ -1,0 +1,11 @@
+{
+  "format": "fabuloom.plugin/0.1",
+  "id": "fabuloom.tts.simulated",
+  "name": "Simulated TTS provider",
+  "version": "0.1.0",
+  "api_version": "0.1",
+  "capabilities": ["tts.synthesize", "tts.test"],
+  "entry_point": null,
+  "source": "builtin",
+  "enabled": true
+}

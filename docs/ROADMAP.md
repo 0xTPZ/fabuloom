@@ -12,6 +12,22 @@
 - Define public contribution and security rules.
 - Define private recovery and continuity records.
 
+## FAB-ARCH-001 — shared professional application foundation
+
+- One `EngineService` shared by Desktop, CLI, loopback API and browser views —
+  implemented on the isolated development branch.
+- Configurable product/private-library/workspace roots and read-only asset
+  catalog with duplicate reporting — implemented; no media was moved or
+  deleted.
+- Atomic project persistence with stable IDs, locks, optimistic revisions and
+  operation history — implemented.
+- Persistent validation/catalog jobs with progress, cancellation and stale-job
+  recovery — implemented for the initial job kinds.
+- Explicit plugin manifests and a Tkinter Desktop control shell — implemented.
+- Full project editor integration, render/TTS job plugins and physical library
+  migration — intentionally deferred. A local stdio MCP adapter is included
+  as a thin structured gateway over the shared engine.
+
 ## Version 0.1 — completed in Mission 004
 
 - Versioned script and scene data model — complete.
