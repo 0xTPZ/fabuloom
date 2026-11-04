@@ -16,9 +16,9 @@
       const session = params.get("session");
       const timelineUrl = params.get("timeline");
       const fps = Number(params.get("fps") || 30);
-      const chapterLabel = params.get("chapterLabel") || "CAPÍTULO 2 · A CICATRIZ";
-      const chapterNumber = params.get("chapterNumber") || "2";
-      const captureMode = params.get("captureMode") || "topazio-book1-chapter2-cronicas";
+      const chapterLabel = params.get("chapterLabel") || "CRÔNICAS DE TOPÁZIO";
+      const chapterNumber = params.get("chapterNumber") || "";
+      const captureMode = params.get("captureMode") || "cronicas-cinematic-production";
       const orientation = params.get("orientation") === "vertical" ? "vertical" : "horizontal";
       const canvas = document.querySelector("#capture-canvas");
       canvas.width = orientation === "vertical" ? 1080 : 1920;
@@ -26,6 +26,7 @@
       const context = canvas.getContext("2d");
       const WIDTH = canvas.width, HEIGHT = canvas.height;
       const status = document.querySelector("#status");
+      document.title = chapterLabel;
       const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
       const fail = (message) => { status.textContent = `error: ${message}`; document.title = `error: ${message}`; throw new Error(message); };
 

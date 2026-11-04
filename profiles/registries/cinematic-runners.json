@@ -4,7 +4,7 @@
     {
       "id": "cronicas.chapter",
       "script": "examples/cronicas_cinematic_production.py",
-      "sha256": "d7f23db1dfd7a29f4975692c31f4f4fa3c082abf32805e3c6555ba9b39072899",
+      "sha256": "f405a7c4d6af16cb0ce9c93eaddcf9eac053390d62151fecf319522d269c668e",
       "capabilities": [
         "chapter-source-extraction",
         "kokoro-pm-santa",

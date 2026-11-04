@@ -9,6 +9,7 @@ and executes only runners that can isolate their output.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import json
@@ -23,6 +24,7 @@ import time
 from typing import Any, Callable
 
 from .paths import FabuloomPaths
+from .scene_assets import SceneAssetError, SceneAssetRegistry, SceneAssetNotFound
 
 
 CINEMATIC_FORMAT = "fabuloom.cronicas-cinematic-production/0.1"
@@ -46,6 +48,9 @@ class CinematicRequest:
     language: str = "pt-BR"
     music_asset_id: str | None = None
     scene_asset_ids: tuple[str, ...] = ()
+    storyboard: tuple[dict[str, Any], ...] = ()
+    host_intro: str | None = None
+    host_outro: str | None = None
     output_variants: tuple[str, ...] = ("horizontal", "vertical")
     mode: str = "plan"
     runner: str | None = None
@@ -63,6 +68,34 @@ class CinematicRequest:
         allowed = {"horizontal", "vertical"}
         if not self.output_variants or not set(self.output_variants).issubset(allowed):
             raise ValueError("output_variants must contain horizontal and/or vertical")
+        if len(set(self.output_variants)) != len(self.output_variants):
+            raise ValueError("output_variants must not contain duplicates")
+        if len(set(self.scene_asset_ids)) != len(self.scene_asset_ids):
+            raise ValueError("scene_asset_ids must not contain duplicates")
+        for index, item in enumerate(self.storyboard):
+            if not isinstance(item, dict):
+                raise ValueError(f"storyboard[{index}] must be an object")
+            asset_id = item.get("asset_id")
+            start = item.get("story_segment_start")
+            end = item.get("story_segment_end")
+            if not isinstance(asset_id, str) or not asset_id.strip():
+                raise ValueError(f"storyboard[{index}].asset_id must be a non-empty string")
+            if isinstance(start, bool) or not isinstance(start, int) or start < 0:
+                raise ValueError(f"storyboard[{index}].story_segment_start must be a non-negative integer")
+            if isinstance(end, bool) or not isinstance(end, int) or end <= start:
+                raise ValueError(f"storyboard[{index}].story_segment_end must be an integer greater than start")
+            camera = item.get("camera")
+            if camera is not None and (not isinstance(camera, str) or not camera.strip()):
+                raise ValueError(f"storyboard[{index}].camera must be a non-empty string when provided")
+        if self.mode == "execute":
+            if not self.scene_asset_ids:
+                raise ValueError("execute requires scene_asset_ids")
+            if not self.storyboard:
+                raise ValueError("execute requires a storyboard mapping story segments to approved assets")
+            if not isinstance(self.host_intro, str) or not self.host_intro.strip():
+                raise ValueError("execute requires host_intro from the production contract")
+            if not isinstance(self.host_outro, str) or not self.host_outro.strip():
+                raise ValueError("execute requires host_outro from the production contract")
         if self.mode not in {"plan", "validate-reference", "execute"}:
             raise ValueError("mode must be plan, validate-reference or execute")
         if self.output_root is not None and not str(self.output_root).strip():
@@ -102,6 +135,36 @@ class CinematicCompatibility:
     @property
     def reference_root(self) -> Path:
         return self.paths.exports / "cronicas-book1-capitulo11-cinematic-r2"
+
+    @property
+    def scene_registry_path(self) -> Path:
+        return self.product_root / "assets" / "scene-registry.json"
+
+    def _validate_scene_contract(self, request: CinematicRequest) -> dict[str, object]:
+        """Validate request-selected scenes without opening model or media files."""
+
+        request.validate()
+        if request.mode != "execute":
+            return {"status": "not_required_for_plan", "assets": list(request.scene_asset_ids)}
+        try:
+            registry = SceneAssetRegistry.from_json(self.scene_registry_path, workspace_root=self.paths.root)
+            records: list[dict[str, object]] = []
+            for asset_id in request.scene_asset_ids:
+                asset = registry.get(asset_id)
+                approval = str(asset.metadata.get("approval_status") or asset.metadata.get("approval_state") or "").upper()
+                if approval != "APPROVED":
+                    raise CinematicCompatibilityError(f"scene asset is not approved for production: {asset_id}")
+                if asset.metadata.get("asset_type") != "background_plate" or asset.metadata.get("character_presence") != "none":
+                    raise CinematicCompatibilityError(f"scene asset is not an environment-only plate: {asset_id}")
+                resolved = registry.resolve(asset_id)
+                records.append({"id": asset.id, "relative_path": asset.relative_path, "path": str(resolved), "camera": asset.metadata.get("camera", "default")})
+            selected = set(request.scene_asset_ids)
+            for item in request.storyboard:
+                if item["asset_id"] not in selected:
+                    raise CinematicCompatibilityError(f"storyboard asset is not listed in scene_asset_ids: {item['asset_id']}")
+            return {"status": "validated", "assets": records, "storyboard_entries": len(request.storyboard), "draft_characters": "blocked"}
+        except (SceneAssetError, SceneAssetNotFound) as exc:
+            raise CinematicCompatibilityError(str(exc)) from exc
 
     def _candidate_runners(self) -> list[tuple[Path, str]]:
         candidates: list[tuple[Path, str]] = []
@@ -352,6 +415,7 @@ class CinematicCompatibility:
 
     def plan(self, request: CinematicRequest) -> dict[str, object]:
         request.validate()
+        scene_contract = self._validate_scene_contract(request)
         audit = self.audit()
         if not audit["reference_artifacts"]["complete"] or audit["next_chapter"]["status"] == "blocked":
             plan_status = "blocked"
@@ -369,6 +433,10 @@ class CinematicCompatibility:
                 "voice_id": request.voice_id,
                 "language": request.language,
                 "output_variants": list(request.output_variants),
+                "scene_asset_ids": list(request.scene_asset_ids),
+                "storyboard": [dict(item) for item in request.storyboard],
+                "host_intro": request.host_intro,
+                "host_outro": request.host_outro,
                 "runner": request.runner or "cronicas.chapter",
                 "output_root": request.output_root,
             },
@@ -386,6 +454,7 @@ class CinematicCompatibility:
                 "external_video_audio": "discarded",
                 "draft_characters": "blocked",
                 "private_library": "referenced by stable catalog IDs, never copied into product",
+                "scene_selection": scene_contract,
             },
             "limitations": audit["blocking_issues"],
         }
@@ -415,12 +484,76 @@ class CinematicCompatibility:
                 return candidate
         raise CinematicCompatibilityError("unable to allocate a non-overwriting cinematic output root")
 
+    @staticmethod
+    def _pid_alive(pid: object) -> bool:
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            return False
+        return True
+
+    @contextmanager
+    def _output_lock(self, output_root: Path, request_fingerprint: str):
+        """Prevent two engine processes from rendering the same output root."""
+
+        lock_path = output_root / ".engine-render.lock"
+        record = {"pid": os.getpid(), "started_at": time.time(), "request_fingerprint": request_fingerprint}
+        for attempt in range(2):
+            try:
+                with lock_path.open("x", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+                break
+            except FileExistsError as exc:
+                try:
+                    existing = json.loads(lock_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError, json.JSONDecodeError):
+                    existing = {}
+                if self._pid_alive(existing.get("pid")):
+                    raise CinematicCompatibilityError(f"output root is already being rendered: {output_root}") from exc
+                if attempt == 0:
+                    lock_path.unlink(missing_ok=True)
+                    continue
+                raise CinematicCompatibilityError(f"unable to reclaim stale render lock: {output_root}") from exc
+        try:
+            yield
+        finally:
+            try:
+                current = json.loads(lock_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                current = {}
+            if current.get("pid") == os.getpid() and current.get("request_fingerprint") == request_fingerprint:
+                lock_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def stop_runner_pid(pid: int) -> None:
+        """Terminate a registered runner process and its descendants."""
+
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True, check=False)
+        else:
+            try:
+                os.killpg(pid, 15)
+            except (ProcessLookupError, OSError):
+                try:
+                    os.kill(pid, 15)
+                except (ProcessLookupError, OSError):
+                    pass
+
+    @classmethod
+    def _stop_process_tree(cls, process: subprocess.Popen[str]) -> None:
+        if process.poll() is not None:
+            return
+        cls.stop_runner_pid(process.pid)
+
     def execute(self, request: CinematicRequest, *, progress: Callable[[str, float, dict[str, object] | None], None] | None = None, cancel: threading.Event | None = None) -> dict[str, object]:
         """Execute only a hash-registered runner with a workspace output root."""
 
         request.validate()
         if request.mode != "execute":
             raise CinematicCompatibilityError("execute requires mode=execute")
+        scene_contract = self._validate_scene_contract(request)
         runner_id = request.runner or "cronicas.chapter"
         runner = self._registered_runner(runner_id)
         output_root = self._choose_output_root(request)
@@ -436,6 +569,9 @@ class CinematicCompatibility:
             "language": request.language,
             "music_asset_id": request.music_asset_id,
             "scene_asset_ids": list(request.scene_asset_ids),
+            "storyboard": [dict(item) for item in request.storyboard],
+            "host_intro": request.host_intro,
+            "host_outro": request.host_outro,
             "output_variants": list(request.output_variants),
             "output_root": str(output_root),
             "runner_id": runner_id,
@@ -449,6 +585,7 @@ class CinematicCompatibility:
                 raise CinematicCompatibilityError("output root contains a different request; refusing to mix productions")
         else:
             request_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        request_fingerprint = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
         log_path = output_root / "runner.log"
         environment = os.environ.copy()
         environment.update({"FABULOOM_ROOT": str(self.paths.root), "FABULOOM_WORKSPACE_ROOT": str(self.paths.root), "FABULOOM_EXPORT_ROOT": str(self.paths.exports), "PYTHONPATH": str(self.product_root) + os.pathsep + environment.get("PYTHONPATH", "")})
@@ -457,9 +594,18 @@ class CinematicCompatibility:
         command = [str(python_executable), str(runner["script"]), "--request", str(request_file)]
         if progress:
             progress("cinematic-runner-start", 0.08, {"runner": runner_id, "output_root": str(output_root)})
-        with log_path.open("a", encoding="utf-8") as log:
+        with self._output_lock(output_root, request_fingerprint), log_path.open("a", encoding="utf-8") as log:
             log.write(json.dumps({"event": "start", "runner": runner_id, "command": command, "output_root": str(output_root)}) + "\n")
-            process = subprocess.Popen(command, cwd=str(self.product_root), env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
+            popen_kwargs: dict[str, object] = {"cwd": str(self.product_root), "env": environment, "stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "text": True, "encoding": "utf-8", "errors": "replace", "bufsize": 1}
+            if os.name == "nt":
+                popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            else:
+                popen_kwargs["start_new_session"] = True
+            process = subprocess.Popen(command, **popen_kwargs)
+            runner_state_path = output_root / "runner-process.json"
+            runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "running", "started_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            if progress:
+                progress("cinematic-runner-started", 0.09, {"runner": runner_id, "output_root": str(output_root), "pid": process.pid, "request_fingerprint": request_fingerprint, "scene_contract": scene_contract})
             lines: list[str] = []
             def consume() -> None:
                 assert process.stdout is not None
@@ -471,17 +617,20 @@ class CinematicCompatibility:
             reader.start()
             while process.poll() is None:
                 if cancel and cancel.is_set():
-                    process.terminate()
+                    self._stop_process_tree(process)
                     try:
                         process.wait(timeout=8)
                     except subprocess.TimeoutExpired:
+                        self._stop_process_tree(process)
                         process.kill()
+                    runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "cancelled", "finished_at": time.time(), "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                     raise InterruptedError("cinematic runner cancelled")
                 if progress:
                     progress("cinematic-runner", 0.10, {"runner": runner_id, "output_root": str(output_root), "checkpoint": str(output_root / "CHECKPOINT.json")})
                 time.sleep(0.5)
             reader.join(timeout=5)
             return_code = process.returncode
+            runner_state_path.write_text(json.dumps({"pid": process.pid, "state": "completed" if return_code == 0 else "failed", "finished_at": time.time(), "return_code": return_code, "request_fingerprint": request_fingerprint}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         if return_code != 0:
             tail = "\n".join(lines[-20:])
             raise CinematicCompatibilityError(f"registered cinematic runner failed with exit code {return_code}: {tail}")

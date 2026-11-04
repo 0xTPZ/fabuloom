@@ -49,23 +49,7 @@ FPS = 30
 TRANSITION_MS = 900
 APPROVED_CHARACTER_ID = "santa-v5-base"
 
-# These are approved environment/object plates already used by Chapter 4.  A
-# fresh production receives copies in its own output root; approved outputs and
-# the source library are never modified.
-SCENE_SPECS = (
-    ("shot-001-forest-threshold", "01-circular-scar.png", "cave_entry"),
-    ("shot-002-root-crystal", "02-crystal-ring.png", "crystal_drift"),
-    ("shot-003-ancient-map", "11-stone-map.png", "memory_fissure"),
-    ("shot-004-forest-storm", "13-aerial-temple-storm.png", "wind"),
-    ("shot-005-crystal-signal", "09-observatory-signals.png", "seven_pulse"),
-    ("shot-006-hidden-door", "12-cracked-doorway.png", "temple_approach"),
-    ("shot-007-shadow-grove", "10-mask-scythe-parapet.png", "shadow_cross"),
-    ("shot-008-black-water", "07-black-water-trident.png", "reflection_drift"),
-    ("shot-009-aftermath", "08-courtyard-aftermath.png", "road_push"),
-    ("shot-010-crystal-fire", "06-tower-fire-rings.png", "altar_push"),
-    ("shot-011-final-threshold", "04-east-gate-attack.png", "chapter_fade"),
-    ("shot-012-night-canopy", "05-frost-gate.png", "host_closing"),
-)
+STORYBOARD_FORMAT = "fabuloom.cronicas-storyboard/0.1"
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -139,7 +123,7 @@ def _title_without_prefix(value: str, number: int) -> str:
     return re.sub(rf"^Cap.*?\s{number}\s*[—–:-]\s*", "", value.strip(), flags=re.IGNORECASE).strip()
 
 
-def _sync_helpers(project_id: str, project_root: Path, source_doc: Path, music: Path, title: str) -> None:
+def _sync_helpers(project_id: str, project_root: Path, source_doc: Path, music: Path, title: str, chapter: int, host_intro: str, host_outro: str) -> None:
     values = {
         "FABULOOM_ROOT": FABULOOM_ROOT,
         "EXPORT_ROOT": EXPORT_ROOT,
@@ -153,10 +137,11 @@ def _sync_helpers(project_id: str, project_root: Path, source_doc: Path, music: 
         "LANGUAGE": LANGUAGE,
         "TRANSITION_MS": TRANSITION_MS,
         "APPROVED_CHARACTER_ID": APPROVED_CHARACTER_ID,
-        "SCENE_SPECS": SCENE_SPECS,
+        "CHAPTER_NUMBER": chapter,
+        "CHAPTER_TITLE": _title_without_prefix(title, chapter),
         "SOURCE_CHAPTER_TITLE": title,
-        "HOST_INTRO": f"Saudações, Guardiões!\n\nHoje abrimos o capítulo {project_id.split('capitulo', 1)[-1].split('-', 1)[0]} de\nO Despertar dos Cristais:\n\n{_title_without_prefix(title, int(project_id.split('capitulo', 1)[-1].split('-', 1)[0]))}.\n\nA história continua.",
-        "HOST_OUTRO": "E assim, Guardiões, a floresta revelou apenas o primeiro de seus segredos.\n\nA jornada continua no próximo capítulo.\n\nAté a próxima jornada!",
+        "HOST_INTRO": host_intro,
+        "HOST_OUTRO": host_outro,
     }
     for key, value in values.items():
         setattr(base, key, value)
@@ -176,20 +161,96 @@ def _checkpoint(output_root: Path, *, stage: str, state: str = "completed", **de
     print(json.dumps({"stage": stage, "state": state, **details}, ensure_ascii=False), flush=True)
 
 
-def _copy_scene_assets(project_root: Path) -> None:
-    source_root = EXPORT_ROOT / "topazio-book1-capitulo4-cronicas" / "assets" / "generated"
-    target_root = project_root / "assets" / "generated"
+def _copy_scene_assets(project_root: Path, registry: base.SceneAssetRegistry, scene_asset_ids: tuple[str, ...]) -> dict[str, str]:
+    target_root = project_root / "assets" / "scenes"
     target_root.mkdir(parents=True, exist_ok=True)
-    for _, filename, _ in SCENE_SPECS:
-        source = source_root / filename
-        target = target_root / filename
-        if not source.is_file():
-            raise FileNotFoundError(f"approved environment plate unavailable: {source}")
+    copied: dict[str, str] = {}
+    for asset_id in scene_asset_ids:
+        asset = registry.get(asset_id)
+        approval = str(asset.metadata.get("approval_status") or asset.metadata.get("approval_state") or "").upper()
+        if approval != "APPROVED":
+            raise ValueError(f"scene asset is not approved for production: {asset_id}")
+        if asset.metadata.get("asset_type") != "background_plate" or asset.metadata.get("character_presence") != "none":
+            raise ValueError(f"scene asset is not an environment-only plate: {asset_id}")
+        source = registry.resolve(asset_id)
+        target = target_root / f"{asset_id}{source.suffix.lower()}"
         if not target.exists():
             shutil.copyfile(source, target)
+        copied[asset_id] = (target.relative_to(EXPORT_ROOT)).as_posix()
+    return copied
 
 
-def _capture(timeline_path: Path, frames_root: Path, *, orientation: str, port: int, timeout_seconds: float) -> tuple[Path, dict]:
+def _story_segments(manifest: dict) -> list[dict]:
+    return [segment for segment in manifest["segments"] if segment.get("metadata", {}).get("editorial_block") == "STORY_CHAPTER"]
+
+
+def _build_scene_schedule(manifest: dict, storyboard: tuple[dict, ...], asset_images: dict[str, str], library_hash: str) -> tuple[dict, ...]:
+    blocks = manifest["metadata"]["editorial_blocks"]
+    intro = next(item for item in blocks if item["type"] == "HOST_INTRO")
+    outro = next(item for item in blocks if item["type"] == "HOST_OUTRO")
+    story_segments = _story_segments(manifest)
+    ordered = sorted(storyboard, key=lambda item: int(item["story_segment_start"]))
+    cursor = 0
+    scenes: list[dict] = [{
+        "id": "host-library-opening",
+        "kind": "host",
+        "asset_id": "santa-library-topazioverse-v1",
+        "image": "official-scenes/santa-library-topazioverse-v1/library-base.png",
+        "camera": "host_wide",
+        "start_ms": int(intro["start_ms"]),
+        "end_ms": int(intro["end_ms"]),
+        "source_paragraphs": [],
+        "character_registry_id": APPROVED_CHARACTER_ID,
+    }]
+    for index, item in enumerate(ordered, 1):
+        start = int(item["story_segment_start"])
+        end = int(item["story_segment_end"])
+        if start != cursor or end > len(story_segments):
+            raise ValueError(f"storyboard must cover story segments contiguously; entry {index} starts at {start}, expected {cursor}")
+        cursor = end
+        group = story_segments[start:end]
+        asset_id = str(item["asset_id"])
+        metadata = [segment.get("metadata", {}) for segment in group]
+        source_paragraphs = sorted({int(value["source_paragraph"]) for value in metadata if "source_paragraph" in value})
+        scenes.append({
+            "id": f"story-{index:03d}-{asset_id}",
+            "kind": "story",
+            "asset_id": asset_id,
+            "image": asset_images[asset_id],
+            "camera": str(item.get("camera") or "default"),
+            "start_ms": int(group[0]["start_ms"]),
+            "end_ms": int(group[-1]["end_ms"]) + int(group[-1].get("metadata", {}).get("pause_after_ms", 0)),
+            "source_segments": list(range(start, end)),
+            "source_paragraphs": source_paragraphs,
+            "character_registry_id": APPROVED_CHARACTER_ID,
+            "character_visual_policy": "Santa V5 medallion only; no story characters",
+            "environment_only": True,
+            "narrative_tag": item.get("narrative_tag"),
+        })
+    if cursor != len(story_segments):
+        raise ValueError(f"storyboard does not cover all story segments: covered {cursor}, total {len(story_segments)}")
+    scenes.append({
+        "id": "host-library-closing",
+        "kind": "host",
+        "asset_id": "santa-library-topazioverse-v1",
+        "image": "official-scenes/santa-library-topazioverse-v1/library-base.png",
+        "camera": "host_closing",
+        "start_ms": int(outro["start_ms"]),
+        "end_ms": int(outro["end_ms"]),
+        "source_paragraphs": [],
+        "character_registry_id": APPROVED_CHARACTER_ID,
+    })
+    scenes.sort(key=lambda item: (int(item["start_ms"]), item["id"]))
+    scenes[-1]["end_ms"] = int(manifest["duration_ms"])
+    if scenes[0]["start_ms"] != 0 or scenes[-1]["end_ms"] != int(manifest["duration_ms"]):
+        raise ValueError("scene schedule does not cover the measured episode")
+    for scene in scenes:
+        scene["library_asset_id"] = "santa-library-topazioverse-v1"
+        scene["library_sha256"] = library_hash
+    return tuple(scenes)
+
+
+def _capture(timeline_path: Path, frames_root: Path, *, orientation: str, chapter: int, title: str, port: int, timeout_seconds: float) -> tuple[Path, dict]:
     edge = v1._find_edge()
     frames_root.mkdir(parents=True, exist_ok=True)
     session = f"capture-{orientation}-{int(time.time())}"
@@ -203,7 +264,8 @@ def _capture(timeline_path: Path, frames_root: Path, *, orientation: str, port: 
         url_root = f"http://127.0.0.1:{port}/capture-topazio-book1-chapter2.html"
         v1._wait_for_http(url_root, 25)
         relative = timeline_path.relative_to(EXPORT_ROOT).as_posix()
-        query = urlencode({"session": session, "timeline": f"/exports/{relative}", "fps": FPS, "chapterLabel": "CAPÍTULO 12 · A FLORESTA QUE ESCOLHE", "chapterNumber": "12", "captureMode": "fab-prod-004", "orientation": orientation})
+        chapter_label = f"CAPÍTULO {chapter} · {title.upper()}"
+        query = urlencode({"session": session, "timeline": f"/exports/{relative}", "fps": FPS, "chapterLabel": chapter_label, "chapterNumber": str(chapter), "captureMode": "fab-prod-004", "orientation": orientation})
         browser_size = "1080,1920" if orientation == "vertical" else "1920,1080"
         url = f"{url_root}?{query}"
         command = [edge, "--headless=new", "--disable-gpu", "--dump-dom", "--hide-scrollbars", f"--window-size={browser_size}", "--run-all-compositor-stages-before-draw", "--virtual-time-budget=3600000", f"--user-data-dir={profile_dir}", url]
@@ -249,27 +311,38 @@ def _write_srt(manifest: dict, path: Path) -> None:
     path.write_text("\n".join(blocks), encoding="utf-8")
 
 
+def _chapter_slug(title: str, chapter: int) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", title.casefold()).strip("-") or f"capitulo-{chapter}"
+
+
+def _variant_output_paths(project_root: Path, chapter: int, title: str, variant: str) -> tuple[Path, Path]:
+    slug = _chapter_slug(title, chapter)
+    return (
+        project_root / "videos" / f"cronicas-capitulo{chapter}-{slug}-{variant}.mp4",
+        project_root / "captures" / f"chapter{chapter}-{variant}-frames.png",
+    )
+
+
 def _probe(path: Path) -> dict[str, object]:
     result = subprocess.run(["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(path)], check=True, capture_output=True, text=True)
     return json.loads(result.stdout)
 
 
-def _run_variant(project_root: Path, timeline_path: Path, mix_path: Path, manifest: dict, variant: str, *, port: int, timeout_seconds: float) -> dict[str, object]:
-    video_path = project_root / "videos" / f"cronicas-capitulo12-a-floresta-que-escolhe-{variant}.mp4"
+def _run_variant(project_root: Path, timeline_path: Path, mix_path: Path, manifest: dict, variant: str, *, chapter: int, title: str, port: int, timeout_seconds: float) -> dict[str, object]:
+    video_path, board_path = _variant_output_paths(project_root, chapter, title, variant)
     if not video_path.is_file():
         frames_root = project_root / ".frames" / variant
-        session, completion = _capture(timeline_path, frames_root, orientation=variant, port=port, timeout_seconds=timeout_seconds)
+        session, completion = _capture(timeline_path, frames_root, orientation=variant, chapter=chapter, title=title, port=port, timeout_seconds=timeout_seconds)
         v1.render_mp4(session, mix_path, video_path, int(manifest["duration_ms"]), overwrite=False)
-        board = project_root / "captures" / f"chapter12-{variant}-frames.png"
-        v1.frame_board(session, board, int(completion["frame_count"]), overwrite=False)
+        v1.frame_board(session, board_path, int(completion["frame_count"]), overwrite=False)
     probe = _probe(video_path)
-    return {"variant": variant, "path": str(video_path), "probe": probe, "frame_board": str(project_root / "captures" / f"chapter12-{variant}-frames.png")}
+    return {"variant": variant, "path": str(video_path), "probe": probe, "frame_board": str(board_path)}
 
 
 def run(request_path: Path) -> dict[str, object]:
     request = json.loads(request_path.read_text(encoding="utf-8"))
     chapter = int(request["chapter"])
-    output_root = _inside(Path(str(request["output_root"])), FABULOOM_ROOT)
+    output_root = _inside(Path(str(request["output_root"])), EXPORT_ROOT)
     source_doc = _resolve_input(request.get("source_document"), root=FABULOOM_ROOT, default=SOURCE_DOC_DEFAULT)
     music = _resolve_input(request.get("music_asset_id"), root=FABULOOM_ROOT, default=DEFAULT_MUSIC)
     if not source_doc.is_file():
@@ -283,11 +356,23 @@ def run(request_path: Path) -> dict[str, object]:
     requested_title = str(request.get("chapter_title") or extracted_title).strip()
     if requested_title.casefold() != extracted_title.casefold():
         raise ValueError(f"requested title does not match DOCX: {requested_title!r} != {extracted_title!r}")
+    host_intro = str(request.get("host_intro") or "").strip()
+    host_outro = str(request.get("host_outro") or "").strip()
+    if not host_intro or not host_outro:
+        raise ValueError("production request must provide host_intro and host_outro from its versioned contract")
+    scene_asset_ids = tuple(str(value) for value in request.get("scene_asset_ids", []) if isinstance(value, str))
+    raw_storyboard = request.get("storyboard")
+    if not scene_asset_ids or not isinstance(raw_storyboard, list) or not raw_storyboard:
+        raise ValueError("production request must provide scene_asset_ids and a storyboard")
+    storyboard = tuple(dict(item) for item in raw_storyboard if isinstance(item, dict))
+    if len(storyboard) != len(raw_storyboard):
+        raise ValueError("storyboard entries must be objects")
     project_id = output_root.name
-    _sync_helpers(project_id, output_root, source_doc, music, str(source_meta["title"]))
+    _sync_helpers(project_id, output_root, source_doc, music, str(source_meta["title"]), chapter, host_intro, host_outro)
     for directory in (output_root / "audio", output_root / "timeline", output_root / "captures", output_root / "reports", output_root / "videos", output_root / ".frames", output_root / "assets" / "generated", output_root / "metadata", output_root / "source"):
         directory.mkdir(parents=True, exist_ok=True)
-    _copy_scene_assets(output_root)
+    scene_registry = base.SceneAssetRegistry.from_json(REGISTRY, workspace_root=FABULOOM_ROOT)
+    asset_images = _copy_scene_assets(output_root, scene_registry, scene_asset_ids)
     source_meta["requested_title"] = requested_title
     source_meta["source_document_sha256"] = _sha256(source_doc)
     _write_json(output_root / "source" / "chapter-source.json", source_meta)
@@ -295,7 +380,6 @@ def run(request_path: Path) -> dict[str, object]:
     _checkpoint(output_root, stage="source-validated", details=source_meta)
     character_registry = CharacterRegistry.from_json(CHARACTER_REGISTRY_PATH, workspace_root=FABULOOM_ROOT)
     character_registry.require_approved(APPROVED_CHARACTER_ID)
-    scene_registry = base.SceneAssetRegistry.from_json(REGISTRY, workspace_root=FABULOOM_ROOT)
     library_path = scene_registry.resolve("santa-library-topazioverse-v1")
     library_hash = _sha256(library_path)
     manifest_path = output_root / "manifest.json"
@@ -306,18 +390,18 @@ def run(request_path: Path) -> dict[str, object]:
     else:
         provider = KokoroTTSProvider(output_dir=output_root / "audio", allow_overwrite=False)
         try:
-            intro_text = str(base.HOST_INTRO)
-            outro_text = str(base.HOST_OUTRO)
+            intro_text = host_intro
+            outro_text = host_outro
             intro = base._synthesize_block(provider, intro_text, f"cap{chapter}-host-intro", output_root / "audio" / "host-intro", overwrite=False)
             story = base._synthesize_block(provider, chapter_text, f"cap{chapter}-story", output_root / "audio" / "story", overwrite=False)
             outro = base._synthesize_block(provider, outro_text, f"cap{chapter}-host-outro", output_root / "audio" / "host-outro", overwrite=False)
             manifest = base.compose_episode_manifest(intro, story, outro)
             _write_json(manifest_path, manifest)
-            _write_json(output_root / "reports" / "tts-report.json", {"provider": provider.provider_id, "model": provider.model_id, "model_revision": provider.model_revision, "model_load_count": provider.model_load_count, "voice_id": VOICE_ID, "language": LANGUAGE})
+            _write_json(output_root / "reports" / f"chapter{chapter}-tts-report.json", {"provider": provider.provider_id, "model": provider.model_id, "model_revision": provider.model_revision, "model_load_count": provider.model_load_count, "voice_id": VOICE_ID, "language": LANGUAGE})
         finally:
             provider.close()
     _checkpoint(output_root, stage="narration", details={"manifest": str(manifest_path), "duration_ms": manifest["duration_ms"], "segments": len(manifest["segments"]), "voice_id": VOICE_ID, "language": LANGUAGE})
-    timeline_path = output_root / "timeline" / "chapter12.json"
+    timeline_path = output_root / "timeline" / f"chapter{chapter}.json"
     timeline = {
         "format": "fabuloom.cronicas-cinematic-production/0.1",
         "title": f"Crônicas de Topázio — Livro 1 — {source_meta['title']}",
@@ -329,6 +413,9 @@ def run(request_path: Path) -> dict[str, object]:
         "source_text_sha256": source_meta["text_sha256"],
         "music_asset": str(music.relative_to(FABULOOM_ROOT)).replace("\\", "/"),
         "scene_registry": "assets/scene-registry.json",
+        "storyboard_format": STORYBOARD_FORMAT,
+        "scene_asset_ids": list(scene_asset_ids),
+        "storyboard": [dict(item) for item in storyboard],
         "character_registry": "assets/character-registry.json",
         "library_asset_id": "santa-library-topazioverse-v1",
         "library_asset_sha256": library_hash,
@@ -339,21 +426,22 @@ def run(request_path: Path) -> dict[str, object]:
         "timing_source": "measured_wav_segments",
         "word_phoneme_viseme_timing": "unavailable",
         "character_policy": {"approved_only": True, "draft_rendering": "blocked", "story_visuals": "environment_only"},
-        "scenes": list(base.build_scene_schedule(manifest, library_path, library_hash)),
+        "scenes": list(_build_scene_schedule(manifest, storyboard, asset_images, library_hash)),
     }
     _write_json(timeline_path, timeline)
-    _write_srt(manifest, output_root / "timeline" / "chapter12.srt")
+    _write_json(output_root / "timeline" / "storyboard-used.json", {"format": STORYBOARD_FORMAT, "chapter": chapter, "title": requested_title, "scene_asset_ids": list(scene_asset_ids), "entries": [dict(item) for item in storyboard], "scenes": timeline["scenes"]})
+    _write_srt(manifest, output_root / "timeline" / f"chapter{chapter}.srt")
     _checkpoint(output_root, stage="timeline", details={"timeline": str(timeline_path), "scenes": len(timeline["scenes"])})
-    voice_path = output_root / "audio" / "chapter12-voice.wav"
+    voice_path = output_root / "audio" / f"chapter{chapter}-voice.wav"
     if not voice_path.is_file():
         base.compose_voice(manifest, voice_path)
-    sfx_path = output_root / "audio" / "chapter12-sfx-bed.wav"
+    sfx_path = output_root / "audio" / f"chapter{chapter}-sfx-bed.wav"
     if not sfx_path.is_file():
         v1._write_sfx_bed(sfx_path, int(manifest["duration_ms"]))
-    music_loop = output_root / "audio" / "chapter12-music-loop.wav"
+    music_loop = output_root / "audio" / f"chapter{chapter}-music-loop.wav"
     if not music_loop.is_file():
         v1.make_crossfaded_music_loop(music, music_loop, int(manifest["duration_ms"]), overwrite=False)
-    mix_path = output_root / "audio" / "chapter12-mix.wav"
+    mix_path = output_root / "audio" / f"chapter{chapter}-mix.wav"
     if not mix_path.is_file():
         mix_audio_v2(voice_path, music_loop, sfx_path, mix_path, int(manifest["duration_ms"]))
     _checkpoint(output_root, stage="audio-mixed", details={"voice": str(voice_path), "mix": str(mix_path), "music": str(music), "sample_rate": 48000, "channels": 2, "ducking": "sidechain voice-priority", "limiter": 0.90})
@@ -363,7 +451,7 @@ def run(request_path: Path) -> dict[str, object]:
         if variant not in {"horizontal", "vertical"}:
             raise ValueError(f"unsupported output variant: {variant}")
         _checkpoint(output_root, stage=f"capture-{variant}", state="running", details={"variant": variant, "ordinal": index + 1, "total": len(variants)})
-        result = _run_variant(output_root, timeline_path, mix_path, manifest, variant, port=8787 + index, timeout_seconds=float(request.get("capture_timeout", 2400)))
+        result = _run_variant(output_root, timeline_path, mix_path, manifest, variant, chapter=chapter, title=requested_title, port=8787 + index, timeout_seconds=float(request.get("capture_timeout", 2400)))
         results.append(result)
         _checkpoint(output_root, stage=f"capture-{variant}", state="completed", details=result)
         _checkpoint(output_root, stage=f"export-{variant}", details=result)
@@ -373,10 +461,13 @@ def run(request_path: Path) -> dict[str, object]:
         "status": "completed_pending_human_artistic_review",
         "chapter": chapter,
         "title": extracted_title,
+        "project_id": project_id,
         "source": source_meta,
         "voice": {"provider": "kokoro", "voice_id": VOICE_ID, "language": LANGUAGE, "word_phoneme_viseme_timing": "unavailable"},
         "music": {"path": str(music), "ducking": "sidechain voice-priority", "limiter": 0.90, "rights_review_required": True},
         "timeline": str(timeline_path),
+        "scene_asset_ids": list(scene_asset_ids),
+        "storyboard": [dict(item) for item in storyboard],
         "outputs": results,
         "character_policy": {"approved_only": True, "approved_id": APPROVED_CHARACTER_ID, "draft_rendering": "blocked", "story_visuals": "environment_only"},
         "visibility": visibility,

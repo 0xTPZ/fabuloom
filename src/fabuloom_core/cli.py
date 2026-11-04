@@ -86,6 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     cinematic.add_argument("--voice-id", default="pm_santa")
     cinematic.add_argument("--language", default="pt-BR")
     cinematic.add_argument("--music-asset-id")
+    cinematic.add_argument("--scene-asset-id", dest="scene_asset_ids", action="append", help="approved environment scene asset ID; repeat for each allowed asset")
+    cinematic.add_argument("--storyboard-json", help="JSON file containing storyboard entries with asset_id and story_segment_start/end")
+    cinematic.add_argument("--host-intro")
+    cinematic.add_argument("--host-outro")
     cinematic.add_argument("--output-variant", dest="output_variants", action="append", choices=["horizontal", "vertical"])
     cinematic.add_argument("--mode", choices=["plan", "validate-reference", "execute"], default="plan")
     cinematic.add_argument("--decode", action="store_true")
@@ -176,7 +180,17 @@ def main(argv: list[str] | None = None) -> int:
                 "mode": args.mode,
                 "decode": args.decode,
                 "output_variants": args.output_variants or ["horizontal", "vertical"],
+                "scene_asset_ids": args.scene_asset_ids or [],
             }
+            if args.storyboard_json:
+                storyboard = json.loads(Path(args.storyboard_json).read_text(encoding="utf-8"))
+                if not isinstance(storyboard, list):
+                    raise SystemExit("storyboard JSON must contain an array")
+                payload["storyboard"] = storyboard
+            if args.host_intro:
+                payload["host_intro"] = args.host_intro
+            if args.host_outro:
+                payload["host_outro"] = args.host_outro
             if args.music_asset_id:
                 payload["music_asset_id"] = args.music_asset_id
             if args.runner:

@@ -94,9 +94,9 @@ class EngineService:
                 "projects.list": {"status": "implemented", "parameters": {}},
                 "render.dry_run": {"status": "implemented", "parameters": {"profile": "optional string", "provider": "optional string"}},
                 "render.demo": {"status": "implemented", "parameters": {"profile": "string", "provider": "simulated-audio|kokoro", "voice_id": "string", "text": "string", "capture_fps": "5 economy or 24/30 real Canvas", "output_fps": "24|30", "audio_sample_rate": "integer; 48000 recommended", "audio_channels": "1|2"}},
-                "render.cinematic.plan": {"status": "implemented", "parameters": {"chapter": "positive integer", "chapter_title": "string", "source_document": "workspace-relative string", "voice_id": "pm_santa", "language": "pt-BR", "output_variants": "horizontal|vertical", "runner": "optional registered runner ID", "output_root": "optional child of workspace/exports"}},
+                "render.cinematic.plan": {"status": "implemented", "parameters": {"chapter": "positive integer", "chapter_title": "string", "source_document": "workspace-relative string", "voice_id": "pm_santa", "language": "pt-BR", "scene_asset_ids": "approved environment asset IDs", "storyboard": "story segment ranges mapped to scene_asset_ids", "host_intro": "contract text", "host_outro": "contract text", "output_variants": "horizontal|vertical", "runner": "optional registered runner ID", "output_root": "optional child of workspace/exports"}},
                 "render.cinematic.validate_reference": {"status": "implemented", "parameters": {"decode": "boolean"}},
-                "render.cinematic.execute": {"status": "implemented", "parameters": {"runner": "registered runner ID", "output_root": "optional child of workspace/exports", "music_asset_id": "optional catalog stable ID", "output_variants": "horizontal|vertical"}},
+                "render.cinematic.execute": {"status": "implemented", "parameters": {"runner": "registered runner ID", "output_root": "optional child of workspace/exports", "music_asset_id": "optional catalog stable ID", "scene_asset_ids": "approved environment asset IDs", "storyboard": "required contiguous story segment mapping", "host_intro": "required contract text", "host_outro": "required contract text", "output_variants": "horizontal|vertical"}},
                 "audio.mix": {"status": "implemented", "parameters": {"music_path": "optional configured-root audio path", "music_asset_id": "optional catalog stable ID", "ducking": "voice-priority sidechain"}},
                 "library.migration": {"status": "implemented", "parameters": {"dry_run": "boolean", "checkpoint": "optional path"}},
                 "mcp.adapter": {"status": "implemented", "parameters": {"transport": "stdio"}},
@@ -181,12 +181,63 @@ class EngineService:
         return values
 
     def recover_stale_jobs(self) -> None:
-        """Mark abandoned in-process jobs; arbitrary work is never resumed silently."""
+        """Reconcile jobs after a service restart without orphaning live runners."""
 
         for job in self.list_jobs():
             if job.get("state") in {"queued", "running"}:
-                job.update({"state": "interrupted", "finished_at": _now(), "error": "previous engine process ended before completion"})
-                self._write_job(job)
+                self._reconcile_job(job, after_restart=True)
+
+    @staticmethod
+    def _pid_alive(pid: object) -> bool:
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            return False
+        return True
+
+    def _reconcile_job(self, job: dict[str, object], *, after_restart: bool = False) -> dict[str, object]:
+        """Reconcile persisted cinematic state with its child process/checkpoint."""
+
+        if job.get("state") not in {"queued", "running"}:
+            return job
+        job_id = str(job["id"])
+        thread = self._job_threads.get(job_id)
+        if thread and thread.is_alive() and not after_restart:
+            return job
+        details = job.get("stage_details") if isinstance(job.get("stage_details"), dict) else {}
+        output_root = details.get("output_root") if isinstance(details, dict) else None
+        if not output_root:
+            payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
+            output_root = payload.get("output_root")
+        if output_root:
+            root = Path(str(output_root))
+            result_path = root / "reports" / "production-result.json"
+            if result_path.is_file():
+                try:
+                    result = json.loads(result_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError, json.JSONDecodeError):
+                    result = None
+                if isinstance(result, dict):
+                    job.update({"state": "completed", "progress": 1.0, "result": result, "finished_at": _now(), "updated_at": _now(), "recovery": "reconciled-production-result"})
+                    self._write_job(job)
+                    return job
+            runner_state = root / "runner-process.json"
+            if runner_state.is_file():
+                try:
+                    state = json.loads(runner_state.read_text(encoding="utf-8"))
+                except (OSError, ValueError, json.JSONDecodeError):
+                    state = {}
+                if self._pid_alive(state.get("pid")):
+                    job.update({"state": "running", "updated_at": _now(), "recovery": "runner-still-alive-after-engine-restart", "stage_details": {**details, "pid": state.get("pid"), "output_root": str(root)}})
+                    self._write_job(job)
+                    return job
+        if thread and thread.is_alive() and not after_restart:
+            return job
+        job.update({"state": "interrupted", "finished_at": _now(), "updated_at": _now(), "error": "engine ended before the registered runner produced a completed result", "recovery": "reconciled-no-live-runner"})
+        self._write_job(job)
+        return job
 
     def create_job(self, kind: str, payload: dict[str, object] | None = None) -> dict[str, object]:
         if kind not in {"validate-project", "catalog-scan", "render-demo", "library-migration", "cinematic-audit", "render-cinematic"}:
@@ -268,6 +319,9 @@ class EngineService:
                     language=str(payload.get("language", "pt-BR")),
                     music_asset_id=str(payload["music_asset_id"]) if payload.get("music_asset_id") else None,
                     scene_asset_ids=tuple(str(value) for value in payload.get("scene_asset_ids", []) if isinstance(value, str)),
+                    storyboard=tuple(dict(value) for value in payload.get("storyboard", []) if isinstance(value, dict)),
+                    host_intro=str(payload["host_intro"]) if payload.get("host_intro") else None,
+                    host_outro=str(payload["host_outro"]) if payload.get("host_outro") else None,
                     output_variants=tuple(str(value) for value in variants),
                     mode=str(payload.get("mode", "plan")),
                     runner=str(payload["runner"]) if payload.get("runner") else None,
@@ -312,7 +366,7 @@ class EngineService:
             self._write_job(job)
 
     def get_job(self, job_id: str) -> dict[str, object]:
-        return self._read_job(job_id)
+        return self._reconcile_job(self._read_job(job_id))
 
     def wait_for_job(self, job_id: str, *, timeout_seconds: float | None = None) -> dict[str, object]:
         deadline = time.monotonic() + timeout_seconds if timeout_seconds is not None else None
@@ -331,7 +385,13 @@ class EngineService:
                 event.set()
         job = self._read_job(job_id)
         if job.get("state") in {"queued", "running"} and not event:
-            job.update({"state": "cancel-requested", "updated_at": _now()})
+            details = job.get("stage_details") if isinstance(job.get("stage_details"), dict) else {}
+            pid = details.get("pid") if isinstance(details, dict) else None
+            if self._pid_alive(pid):
+                self.cinematic.stop_runner_pid(int(pid))
+                job.update({"state": "cancelled", "error": "orphaned runner tree terminated after cancellation request", "finished_at": _now(), "updated_at": _now(), "recovery": "orphaned-runner-cancelled"})
+            else:
+                job.update({"state": "cancel-requested", "updated_at": _now()})
             self._write_job(job)
         return job
 
